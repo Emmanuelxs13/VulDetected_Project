@@ -1,0 +1,7 @@
+# Normalize line endings: LF everywhere (matches .editorconfig and Prettier),
+# regardless of the platform that clones the repository.
+* text=auto eol=lf
+
+# Windows shell scripts keep CRLF if they are ever added.
+*.bat text eol=crlf
+*.cmd text eol=crlf

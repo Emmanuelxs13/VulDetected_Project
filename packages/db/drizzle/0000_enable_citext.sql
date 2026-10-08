@@ -1,0 +1,25 @@
+-- =============================================================================
+-- 0000 — enable citext
+--
+-- MUST run before 0001. `users.email` is declared `"citext"` in the generated
+-- schema, so Postgres has to know the type at CREATE TABLE time.
+--
+-- PROVIDER NEUTRALITY (ADR 0004). `citext` is a core PostgreSQL contrib module,
+-- not a hosted-provider feature, so this statement is valid on a local container
+-- and on a managed provider alike. It is also the ONLY extension this project
+-- requires — note that `inet`, used by `audit_logs.ip`, is a built-in
+-- `pg_catalog` type and needs nothing.
+--
+-- IF NOT EXISTS, deliberately: this migration is idempotent so re-running it on
+-- a partially-provisioned database does not abort. `CREATE EXTENSION` is not
+-- transactional with the rest of the schema, which is exactly why the
+-- extension has to be its own migration rather than folded into the table one.
+--
+-- NOTE: `citext` compares using the column's collation and treats the value as
+-- case-insensitive for BOTH equality and LIKE. That is what makes `Alice@x.com`
+-- and `alice@x.com` one account instead of two. It is a stronger guarantee than
+-- lowercasing in application code, which a direct SQL client or a future service
+-- would bypass.
+-- =============================================================================
+
+CREATE EXTENSION IF NOT EXISTS citext;

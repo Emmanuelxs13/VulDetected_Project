@@ -1,0 +1,30 @@
+{
+  "name": "@vuldetected/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "VulDetected data layer — Drizzle schema, connection factory and migrations (provider-neutral).",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts"
+  },
+  "files": [
+    "src",
+    "drizzle"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:generate:custom": "drizzle-kit generate --custom",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.6",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.6",
+    "drizzle-kit": "^0.31.5",
+    "typescript": "^5.9.3"
+  }
+}

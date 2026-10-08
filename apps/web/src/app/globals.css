@@ -1,0 +1,66 @@
+/*
+ * VulDetected — application stylesheet.
+ *
+ * ORDER MATTERS IN CSS `@import`. Everything below must come first, before any
+ * rule that could depend on the cascade being already resolved.
+ *
+ * ---------------------------------------------------------------------------
+ * 1. The design system
+ * ---------------------------------------------------------------------------
+ * `@import '@vuldetected/ui/styles.css'` pulls in the whole Tailwind v4 layer
+ * INCLUDING `@import 'tailwindcss'` and the `@theme static` token block.
+ *
+ * Do NOT add a second `@import 'tailwindcss'` here. That is the single most
+ * common way to break this setup: duplicate preflight and duplicate theme
+ * variables, with the app's copy silently winning over the design system's.
+ *
+ * ---------------------------------------------------------------------------
+ * 2. Source registration — the part that fails SILENTLY
+ * ---------------------------------------------------------------------------
+ * Tailwind v4 does not scan `node_modules` by default. `packages/ui/src/styles/
+ * tokens.css` already registers `@source` for its own components directory,
+ * which resolves relative to that stylesheet and is therefore enough for the
+ * primitives on their own.
+ *
+ * (Do not paste a recursive glob literally into a comment here. A CSS comment
+ * ends at the first star-slash sequence, and a recursive glob's doubled star
+ * contains one — so the comment silently terminates early and the remainder is
+ * parsed as CSS, failing with `Unknown word` on a line that looks fine.)
+ *
+ * The app's own class names still need registering, because they live in
+ * `apps/web/src` — not a `components/` directory, and not under a registered
+ * path. Without this line, every utility used in a page below silently compiles
+ * away: no error, no warning, just an unstyled page. That failure mode is why
+ * the directive is here rather than relying on a default.
+ *
+ * `@source` paths are resolved relative to THIS file.
+ */
+
+/* The design system. This is the ONLY place `tailwindcss` enters the bundle. */
+@import '@vuldetected/ui/styles.css';
+
+/* The app's own components, pages, layouts and feature slices. */
+@source "../**/*.{ts,tsx}";
+
+/*
+ * The design system. Already self-registers via a stylesheet-relative
+ * `@source`, but registered explicitly here as well because it is cheap and
+ * because `packages/ui` is a workspace symlink — a path that resolves through
+ * pnpm can differ from a path resolved inside the package itself. Belt and
+ * braces on a failure that produces no error message.
+ */
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
+
+/* ---------------------------------------------------------------------------
+ * 3. App-local utilities
+ * ---------------------------------------------------------------------------
+ * Almost nothing belongs here. A utility that any page needs belongs in
+ * `packages/ui` as a component variant, so that the design system stays the
+ * single place a value can be changed (ADR 0003 §1).
+ */
+
+/* Visible only in development, for the Sprint-state banners. */
+@utility dev-banner {
+  border: 1px dashed var(--color-medium);
+  background-color: var(--color-medium-tint);
+}

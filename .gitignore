@@ -1,0 +1,39 @@
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+turbo/
+.turbo/
+coverage/
+
+# TypeScript incremental build state — machine-local, never source
+*.tsbuildinfo
+
+# Environment files — only .env.example is tracked
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs and OS noise
+*.log
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Local tool state — machine-local indexes and logs, never shared
+.codegraph/
+
+# Generated artifacts that must never be committed even if a broad glob would
+# otherwise cover them
+packages/ui/dist/
+
+# NOTE: packages/db/drizzle/meta/_journal.json IS tracked on purpose.
+# Drizzle Kit's migration journal is required to replay migrations; losing it
+# desynchronizes the migration history from the actual schema.
+!packages/db/drizzle/meta/_journal.json
+
+# NOTE: .atl/ is NOT ignored. It holds tracked project configuration (skill
+# registry and its cache) and must stay in version control.

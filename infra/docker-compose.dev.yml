@@ -1,0 +1,91 @@
+# =============================================================================
+# VulDetected — local development infrastructure
+# =============================================================================
+# DEV ONLY. Every port published here binds to localhost and nothing in this file
+# is intended for production. Production secrets, email and databases are
+# managed by the deployment platform, not by this compose file.
+#
+# Usage (from the repository root):
+#   docker compose -f infra/docker-compose.dev.yml up -d
+#   docker compose -f infra/docker-compose.dev.yml ps
+#   docker compose -f infra/docker-compose.dev.yml down
+#   docker compose -f infra/docker-compose.dev.yml down -v   # also drop volumes
+#
+# Why Postgres runs in Docker: this workstation has no local `psql` client, and
+# the project must stay runnable on any machine without native database setup.
+# See infra/README.md.
+# =============================================================================
+
+# Pinned so container and volume names do not depend on which directory the
+# command was run from. Without this, Compose derives the project name from the
+# compose file's own folder and produces `infra_vuldetected-pgdata`.
+name: vuldetected
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vuldetected-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vuldetected
+      POSTGRES_PASSWORD: vuldetected
+      POSTGRES_DB: vuldetected
+    ports:
+      # Bound to localhost only. Credentials are dev-grade by design.
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - vuldetected-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The app must not start migrating before Postgres accepts connections.
+      test: ['CMD-SHELL', 'pg_isready -U vuldetected -d vuldetected']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  mailpit:
+    # Dev-only mail catcher. Nothing leaves the machine; read it at
+    # http://localhost:8025 instead of a real inbox.
+    image: axllent/mailpit:latest
+    container_name: vuldetected-mailpit
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:1025:1025' # SMTP
+      - '127.0.0.1:8025:8025' # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  redis:
+    # Consumed by the Python scanner worker (Celery broker + result backend).
+    # Ships in Sprint 1 so the infra contract is already standing; nothing
+    # connects to it until Sprint 2 introduces services/scanner.
+    image: redis:7-alpine
+    container_name: vuldetected-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - vuldetected-redisdata:/data
+
+  # ---------------------------------------------------------------------------
+  # scanner — LANDS IN SPRINT 2, deliberately not defined yet.
+  # ---------------------------------------------------------------------------
+  # In Sprint 2 this file gains a `scanner` service built from services/scanner
+  # (Python + Celery worker). Its constraints are fixed now so the design is not
+  # renegotiated later:
+  #   * image:      built from services/scanner/Dockerfile (not a public image)
+  #   * network:    internal-only network, no host port published by default;
+  #                 jobs are dispatched through Redis, not over HTTP
+  #   * filesystem: read-only root filesystem, tmpfs for /tmp
+  #   * egress:     filtered outbound (see docs/security.md — worker network
+  #                 isolation), because scanning targets user-supplied hosts
+  #   * capabilities: drop ALL, no-new-privileges
+  # It is intentionally absent rather than stubbed: a stubbed scanner would let
+  # the app enqueue jobs that silently go nowhere.
+  # ---------------------------------------------------------------------------
+
+volumes:
+  vuldetected-pgdata:
+  vuldetected-redisdata:
