@@ -1,26 +1,28 @@
-# Architecture
+# Arquitectura
 
-System overview for VulDetected: what the pieces are, how a request flows through
-them, and where the trust boundaries sit.
+Vista general del sistema de VulDetected: cuáles son las piezas, cómo fluye una
+solicitud a través de ellas y dónde están las fronteras de confianza.
 
-Read this first, then [`codebase-map.md`](./codebase-map.md) for the repository
-layout and import rules, then the [ADRs](./adr/) for the reasoning, then
-[`security.md`](./security.md) for the threat model.
+Lea esto primero, luego [`codebase-map.md`](./codebase-map.md) para la
+estructura del repositorio y las reglas de importación, luego los
+[ADR](./adr/) para el razonamiento, y finalmente
+[`security.md`](./security.md) para el modelo de amenazas.
 
-## The three deployables
+## Los tres desplegables
 
-| Deployable                      | Technology                    | Responsibility                                                                                                                                 |
-| ------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Web** (`apps/web`)            | Next.js App Router on Node 22 | The entire product backend: auth, session validation, authorization, business rules, database access, UI, API routes, and the progress stream. |
-| **Worker** (`services/scanner`) | Python + Celery               | Executes scans. Orchestrates Nuclei and OWASP ZAP against an already-verified domain. Holds no business rules and no session validation.       |
-| **Database**                    | PostgreSQL 16                 | System of record for users, sessions, domains, scans, and findings. Never exposed to the public internet.                                      |
+| Desplegable                     | Tecnología                       | Responsabilidad                                                                                                                                                             |
+| ------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Web** (`apps/web`)            | Next.js App Router sobre Node 22 | Todo el backend del producto: autenticación, validación de sesión, autorización, reglas de negocio, acceso a la base de datos, interfaz, rutas API y el stream de progreso. |
+| **Worker** (`services/scanner`) | Python + Celery                  | Ejecuta escaneos. Orquesta Nuclei y OWASP ZAP contra un dominio ya verificado. No contiene reglas de negocio ni validación de sesión.                                       |
+| **Base de datos**               | PostgreSQL 16                    | Registro de verdad para usuarios, sesiones, dominios, escaneos y hallazgos. Nunca se expone a internet público.                                                             |
 
-Supporting infrastructure: Redis (Celery broker and result backend, Sprint 2) and
-an SMTP relay for transactional email (Mailpit locally).
+Infraestructura de apoyo: Redis (broker de Celery y backend de resultados,
+Sprint 2) y un relé SMTP para correo transaccional (Mailpit en local).
 
-The worker is a separate process on purpose — see
-[ADR 0001](./adr/0001-monorepo-and-runtime-split.md). The single most important
-consequence: **all product authorization logic lives in exactly one runtime.**
+El worker es un proceso separado a propósito — ver
+[ADR 0001](./adr/0001-monorepo-and-runtime-split.md). La consecuencia más
+importante: **toda la lógica de autorización del producto vive en exactamente
+un runtime.**
 
 ```
                             ┌───────────────────────────────────────────────┐
@@ -55,9 +57,10 @@ consequence: **all product authorization logic lives in exactly one runtime.**
                                                     └─────────────┘
 ```
 
-Trust boundaries are marked `[TB]` and detailed below.
+Las fronteras de confianza están marcadas con `[TB]` y se detallan a
+continuación.
 
-## Request flow — register and log in
+## Flujo de una solicitud — registro e inicio de sesión
 
 ```
  [TB1] Browser  ── HTTPS ──▶ [TB2] Next.js route handler
@@ -99,13 +102,13 @@ Trust boundaries are marked `[TB]` and detailed below.
                     └─────────────────────────────┘
 ```
 
-**Every subsequent authenticated request repeats steps 5–7 in lookup form:** the
-cookie's raw token is hashed, and the digest is looked up in `sessions.token_hash`.
-An expired or unknown digest means an unauthenticated request — there is no
-"trust the signature alone" path. That is why the database can be stolen without
-handing over live sessions.
+**Cada solicitud autenticada posterior repite los pasos 5–7 en forma de
+consulta:** el token en crudo de la cookie se hashea y el resumen se busca en
+`sessions.token_hash`. Un resumen vencido o desconocido significa una solicitud
+no autenticada — no existe un camino de "confiar solo en la firma". Por eso la
+base de datos puede ser robada sin entregar sesiones activas.
 
-## Scan flow — planned, lands in Sprint 2
+## Flujo de escaneo — planificado, llega en el Sprint 2
 
 ```
  [TB1] Browser ──▶ [TB2] Next.js
@@ -162,77 +165,83 @@ handing over live sessions.
         └───────────────────────────────────────────────────────────────┘
 ```
 
-Two properties of this flow are load-bearing:
+Dos propiedades de este flujo son determinantes:
 
-- **Step 3 is a gate, not a feature.** Domain ownership verification exists because
-  scanning a system you do not own is unlawful in most jurisdictions. No scan may
-  be enqueued without it, and that guard is covered by tests — not by
-  convention.
-- **Step 7 is re-applied at every hop.** Validating the initial URL is not enough:
-  a redirect to `169.254.169.254` or `127.0.0.1` defeats a one-time check. Each
-  redirect target is resolved and re-validated.
+- **El paso 3 es un control, no una función.** La verificación de la propiedad
+  del dominio existe porque escanear un sistema que no se posee es ilegal en la
+  mayoría de las jurisdicciones. No se puede encolar ningún escaneo sin ella, y
+  esa salvaguarda está cubierta por pruebas — no por convención.
+- **El paso 7 se reaplica en cada salto.** Validar la URL inicial no basta: una
+  redirección a `169.254.169.254` o `127.0.0.1` derrota una verificación única.
+  Cada destino de redirección se resuelve y se revalida.
 
-## Trust boundaries
+## Fronteras de confianza
 
-### [TB1] Browser ↔ server
+### [TB1] Navegador ↔ servidor
 
-Untrusted. The browser is fully under an attacker's control in a compromised or
-hostile-client scenario. Everything arriving from it is untrusted input.
+No confiable. El navegador está totalmente bajo el control de un atacante en un
+escenario de cliente comprometido u hostil. Todo lo que llega desde él es una
+entrada no confiable.
 
-Controls: server-side validation on every field, no authorization decision in the
-browser, `HttpOnly` + `SameSite=Lax` + `Secure` session cookies, no secrets ever
-sent to the client, and `NEXT_PUBLIC_*` variables treated as public.
+Controles: validación en el servidor de cada campo, ninguna decisión de
+autorización en el navegador, cookies de sesión `HttpOnly` + `SameSite=Lax` +
+`Secure`, nunca se envían secretos al cliente y las variables `NEXT_PUBLIC_*`
+se tratan como públicas.
 
-### [TB2] Browser ↔ Next.js server
+### [TB2] Navegador ↔ servidor Next.js
 
-The authenticated application surface. Session cookies are the only credential,
-and they are checked against the database on every request.
+La superficie autenticada de la aplicación. Las cookies de sesión son la única
+credencial y se verifican contra la base de datos en cada solicitud.
 
-Crossing this boundary in the wrong direction is the classic Next.js mistake:
-placing authorization in middleware alone. **Server-side data access must validate
-the session itself.** Middleware is a coarse filter, not the authorization
-boundary; a route handler or server action that trusts middleware has no
-authorization.
+Cruzar esta frontera en la dirección equivocada es el error clásico de Next.js:
+colocar la autorización solo en el middleware. **El acceso a datos en el servidor
+debe validar la sesión en sí.** El middleware es un filtro grueso, no la
+frontera de autorización; un route handler o una server action que confía en el
+middleware no tiene autorización.
 
-### [TB3] Web server ↔ PostgreSQL
+### [TB3] Servidor web ↔ PostgreSQL
 
-The web server is trusted; the database holds the most sensitive state in the
-system (hashed passwords, token digests, audit trail). It is never exposed to the
-public internet — reachable only from the application network.
+El servidor web es de confianza; la base de datos contiene el estado más
+sensible del sistema (contraseñas hasheadas, resúmenes de tokens, rastro de
+auditoría). Nunca se expone a internet público — solo es accesible desde la red
+de la aplicación.
 
-Controls: connections only via `DATABASE_URL`, TLS outside local development,
-credentials from environment only, least-privilege role, pooled connections with
-bounded size, and the parameterized queries Drizzle emits.
+Controles: conexiones solo mediante `DATABASE_URL`, TLS fuera del desarrollo
+local, credenciales solo desde el entorno, rol de mínimo privilegio, conexiones
+agrupadas con tamaño acotado y las consultas parametrizadas que emite Drizzle.
 
-### [TB4] Web server ↔ worker (via Redis)
+### [TB4] Servidor web ↔ worker (mediante Redis)
 
-The worker is a **separate trust domain** from the web app, not a trusted
-extension of it. Anyone who can write to the broker can ask the worker to scan a
-host — which makes the broker a privileged channel.
+El worker es un **dominio de confianza separado** de la aplicación web, no una
+extensión de confianza de la misma. Cualquiera que pueda escribir en el broker
+puede pedirle al worker que escanee un host — lo que convierte al broker en un
+canal privilegiado.
 
-Controls: Redis not exposed publicly, credentials from the environment, the broker
-is not a general-purpose message bus, and the worker independently re-validates
-every target against the SSRF rules. The worker trusts the queue for _what to do_
-and **never** for _whether a target is safe_.
+Controles: Redis no expuesto públicamente, credenciales desde el entorno, el
+broker no es un bus de mensajes de propósito general, y el worker revalida de
+forma independiente cada objetivo contra las reglas SSRF. El worker confía en la
+cola para _qué hacer_ y **nunca** para _si un objetivo es seguro_.
 
-### [TB5] Worker ↔ target network
+### [TB5] Worker ↔ red de destino
 
-The most dangerous boundary, because the destination is attacker-influenced input.
+La frontera más peligrosa, porque el destino es una entrada influenciada por el
+atacante.
 
-Controls: filtered egress (only the ports and protocols scanning requires),
-rejection of private / loopback / link-local / IPv6 loopback ranges after DNS
-resolution, port restrictions, request timeouts and concurrency caps, a read-only
-root filesystem with `tmpfs` on `/tmp`, dropped capabilities, and no host
-filesystem or database mounts in the worker container. Full detail in
-[`security.md`](./security.md).
+Controles: salida filtrada (solo los puertos y protocolos que el escaneo
+necesita), rechazo de rangos privados / de loopback / link-local / de loopback
+IPv6 después de la resolución DNS, restricción de puertos, tiempos de espera de
+solicitud y límites de concurrencia, un sistema de archivos raíz de solo lectura
+con `tmpfs` en `/tmp`, capacidades retiradas y ningún montaje del sistema de
+archivos ni de la base de datos del host en el contenedor del worker. Detalle
+completo en [`security.md`](./security.md).
 
-### [TB6] Service ↔ external providers (Supabase, SMTP, Stripe)
+### [TB6] Servicio ↔ proveedores externos (Supabase, SMTP, Stripe)
 
-Third-party processors holding real data. Credentials come from the environment,
-never from git; outbound traffic is provider-specific and should not carry
-credentials to unrelated hosts.
+Procesadores de terceros que poseen datos reales. Las credenciales provienen del
+entorno, nunca de git; el tráfico salente es específico del proveedor y no
+debería llevar credenciales a hosts sin relación.
 
-## Component flow at a glance
+## Flujo de componentes de un vistazo
 
 ```
 apps/web
@@ -248,19 +257,20 @@ services/scanner (Sprint 2)
   └─ normalizer        tool output → findings shape
 ```
 
-## Design constraints that follow from this architecture
+## Restricciones de diseño que se derivan de esta arquitectura
 
-- **One authorization runtime.** Every permission decision happens in Next.js. The
-  worker never decides who may see what.
-- **Worker has no business logic.** Keeping it narrow is what makes its isolation
-  requirements achievable. If business rules creep in, the isolation model starts
-  eroding.
-- **The worker does not hold database credentials.** It receives a scan job and
-  posts a result back through a narrow channel. If the worker can write directly
-  to `users` or `sessions`, its blast radius after a compromise is the entire
-  product.
-- **Normalized findings are tool-independent.** Nuclei and ZAP must map onto one
-  `findings` shape, otherwise severity classification in Sprint 3 becomes a
-  per-tool special case.
-- **Progress is append-only.** `scan_events` is written by the worker and read by
-  the browser stream. Nothing rewrites history mid-scan.
+- **Un solo runtime de autorización.** Cada decisión de permiso ocurre en
+  Next.js. El worker nunca decide quién puede ver qué.
+- **El worker no tiene lógica de negocio.** Mantenerlo acotado es lo que hace
+  alcanzables sus requisitos de aislamiento. Si se cuela lógica de negocio, el
+  modelo de aislamiento empieza a erosionarse.
+- **El worker no posee credenciales de la base de datos.** Recibe un trabajo de
+  escaneo y publica un resultado de vuelta por un canal estrecho. Si el worker
+  puede escribir directamente en `users` o `sessions`, su radio de impacto tras
+  una brecha es todo el producto.
+- **Los hallazgos normalizados son independientes de la herramienta.** Nuclei y
+  ZAP deben mapearse a una única forma `findings`; de lo contrario, la
+  clasificación de severidad del Sprint 3 se vuelve un caso especial por
+  herramienta.
+- **El progreso es solo-append.** `scan_events` lo escribe el worker y lo lee el
+  stream del navegador. Nada reescribe el historial a mitad de un escaneo.

@@ -1,263 +1,299 @@
-# ADR 0002: Authentication
+# ADR 0002: Autenticación
 
-- **Status:** Accepted
-- **Date:** Sprint 1
+- **Estado:** Aceptada
+- **Fecha:** Sprint 1
 
-## Context
+## Contexto
 
-Sprint 1 must deliver working authentication with email + password. The
-non-negotiable properties:
+El Sprint 1 debe entregar una autenticación funcional con correo + contraseña.
+Las propiedades innegociables:
 
-- **Passwords are never stored in recoverable form.** A database leak must not
-  yield usable credentials.
-- **Session tokens are never stored recoverably either.** The database is a
-  higher-value target than the session cookie jar, so a plaintext token column
-  turns a read-only SQL injection into full session hijacking.
-- **The setup works on a Windows workstation without a compiler.** A developer
-  should not need Visual Studio Build Tools or WSL to register an account.
-- **Sessions are server-authoritative.** Every protected request validates
-  against Postgres. A signed-but-unvalidated cookie is not a session.
+- **Las contraseñas nunca se almacenan en forma recuperable.** Una filtración de
+  la base de datos no debe producir credenciales utilizables.
+- **Los tokens de sesión tampoco se almacenan de forma recuperable.** La base de
+  datos es un objetivo de mayor valor que el tarro de cookies de sesión, de modo
+  que una columna de token en texto plano convierte una inyección SQL de solo
+  lectura en secuestro completo de sesión.
+- **La configuración funciona en una estación de trabajo Windows sin
+  compilador.** Un desarrollador no debería necesitar Visual Studio Build Tools
+  ni WSL para registrar una cuenta.
+- **Las sesiones son autoritativas en el servidor.** Cada solicitud protegida
+  valida contra Postgres. Una cookie firmada pero no validada no es una sesión.
 
-Two constraints narrowed the field significantly: we are on Node 22 with
-Postgres, and we already decided on Drizzle as the data layer (see
-[ADR 0001](./0001-monorepo-and-runtime-split.md) and
+Dos restricciones acotaron el campo significativamente: estamos en Node 22 con
+Postgres, y ya decidimos Drizzle como capa de datos (ver
+[ADR 0001](./0001-monorepo-and-runtime-split.md) y
 [ADR 0004](./0004-database-provider-neutrality.md)).
 
-## Decision
+## Decisión
 
-### Better Auth with the Drizzle adapter, email + password only
+### Better Auth con el adaptador de Drizzle, solo correo + contraseña
 
-- **Better Auth** provides the schema, session lifecycle, and the Drizzle
-  adapter, so the session and account records follow one library's contract
-  rather than something hand-assembled.
-- **Email + password only for Sprint 1.** Social providers (Google, GitHub) are
-  Sprint 4+ per the [roadmap](../roadmap.md#sprint-4--deferred).
-- **argon2id password hashing via `@node-rs/argon2`.** argon2id is the current
-  OWASP-recommended password hash: memory-hard, salted, and resistant to both
-  GPU cracking and side-channel comparison attacks. The `@node-rs/` distribution
-  ships **prebuilt native binaries** for Windows, macOS, and Linux, which
-  removes `node-gyp` and its Build Tools requirement from the setup path.
+- **Better Auth** provee el esquema, el ciclo de vida de sesiones y el adaptador
+  de Drizzle, de modo que los registros de sesión y de cuenta siguen el
+  contrato de una librería en lugar de algo armado a mano.
+- **Solo correo + contraseña para el Sprint 1.** Los proveedores sociales
+  (Google, GitHub) son del Sprint 4+ según el
+  [roadmap](../roadmap.md#sprint-4--aplazado).
+- **Hasheo de contraseñas con argon2id a través de `@node-rs/argon2`.** argon2id
+  es el algoritmo de hasheo de contraseñas que OWASP recomienda actualmente:
+  resistente en memoria, con salt, y resistente tanto al descifrado por GPU
+  como a los ataques de comparación por canal lateral. La distribución
+  `@node-rs/` incluye **binarios nativos predeterminados** para Windows, macOS y
+  Linux, lo que elimina `node-gyp` y su requisito de Build Tools del camino de
+  configuración.
 
-### Session tokens are stored hashed — REVISED, this decision did not hold
+### Los tokens de sesión se almacenan hasheados — REVISADA, esta decisión no se sostuvo
 
-> **This decision was reversed during Sprint 1 implementation, and the reversal was
-> forced by the library rather than chosen.** The original text is kept below the
-> correction so the record shows what was believed and why, not just what is true.
+> **Esta decisión se revirtió durante la implementación del Sprint 1, y la
+> inversión fue impuesta por la librería en lugar de elegida.** El texto
+> original se conserva debajo de la corrección para que el registro muestre qué
+> se creía y por qué, no solo qué es cierto.
 
-**The decision as originally written, which turned out to be unimplementable:**
+**La decisión tal como se escribió originalmente, que resultó ser
+inimplementable:**
 
-- The raw session token exists **only** in the user's cookie.
-- Postgres stores `sessions.token_hash` — a SHA-256 digest of the raw token —
-  never the token itself.
-- Lookup is by hash, so a stolen database dump yields hashes that cannot be
-  replayed as cookies.
+- El token de sesión en crudo existe **solo** en la cookie del usuario.
+- Postgres almacena `sessions.token_hash` — un digesto SHA-256 del token en
+  crudo — nunca el token mismo.
+- La búsqueda es por hash, de modo que un volcado de base de datos robado produce
+  hashes que no pueden reproducirse como cookies.
 
-**Why it failed.** The assumption was that Better Auth would generate a raw token,
-hand it to the cookie, and store something else. Verified against the installed
-`1.7.7`, it does the opposite ordering:
+**Por qué falló.** El supuesto era que Better Auth generaría un token en crudo,
+lo entregaría a la cookie y almacenaría otra cosa. Verificado contra la versión
+instalada `1.7.7`, hace exactamente el orden inverso:
 
-1. Better Auth **generates** the raw token.
-2. It **hashes** it with SHA-256 to decide what to store.
-3. It **inserts the digest**, then builds its return value from the database's
-   `RETURNING` clause — which yields the _digest_, not the token.
-4. It derives the session cookie from that same returned value.
+1. Better Auth **genera** el token en crudo.
+2. Lo **hashea** con SHA-256 para decidir qué almacenar.
+3. **Inserta el digesto** y luego construye su valor de retorno a partir de la
+   cláusula `RETURNING` de la base de datos — que devuelve el _digesto_, no el
+   token.
+4. Deriva la cookie de sesión de ese mismo valor devuelto.
 
-So Better Auth's "returned" token is the hash. A `databaseHooks.session.create.after`
-hook that hashed the value before insert would store `hash(hash(token))` and hand
-the browser `hash(token)`. On the next request the server would look up
-`hash(token)`, not find it, and reject a session that was created correctly
-milliseconds earlier. There is no insert-time hook that can avoid this, because the
-value the cookie must contain is not the value the application controls at insert
-time.
+Entonces el token "devuelto" por Better Auth es el hash. Un hook
+`databaseHooks.session.create.after` que hasheara el valor antes del insert
+almacenaría `hash(hash(token))` y le entregaría al navegador `hash(token)`. En la
+siguiente solicitud el servidor buscaría `hash(token)`, no lo encontraría y
+rechazaría una sesión que se había creado correctamente milisegundos antes. No
+existe ningún hook en el momento del insert que pueda evitar esto, porque el
+valor que la cookie debe contener no es el valor que la aplicación controla en el
+momento del insert.
 
-**The decision as implemented:**
+**La decisión tal como se implementó:**
 
-- `sessions.token` holds the **raw** token. There is no `token_hash` column, and
-  the schema never had one.
-- The property is scoped and compensated rather than eliminated: 7-day absolute
-  expiry (no silent renewal), `HttpOnly`, `SameSite=Lax`, `Secure` in production,
-  immediate server-side revocation on sign-out, and account-state gating at session
-  creation.
-- The exposure is bounded by requiring prior database read access — a database
-  dump is a prior breach, not a path to one.
+- `sessions.token` contiene el token **en crudo**. No existe la columna
+  `token_hash`, y el esquema nunca la tuvo.
+- La propiedad se acota y se compensa en lugar de eliminarse: expiración
+  absoluta de 7 días (sin renovación silenciosa), `HttpOnly`, `SameSite=Lax`,
+  `Secure` en producción, revocación inmediata en el servidor al cerrar sesión,
+  y validación del estado de la cuenta en la creación de la sesión.
+- La exposición está acotada por exigir acceso previo de lectura a la base de
+  datos — un volcado de la base de datos es una brecha previa, no un camino
+  hacia una.
 
-**Rejected alternatives:**
+**Alternativas rechazadas:**
 
-- **Patch or fork the adapter.** Rejected: a hand-patched authentication library
-  fails silently on upgrade, and it would _look_ like the problem was solved. That
-  is worse than a documented gap, because the next engineer inherits false
-  confidence instead of a known risk.
-- **Store a digest in a second column and keep the raw token for lookup.** Rejected:
-  it reintroduces the raw token into the database, so the dump risk — the entire
-  point of the original decision — is unchanged, while the schema gets more
-  complex.
+- **Parchear o bifurcar el adaptador.** Rechazada: una librería de
+  autenticación parcheada a mano falla en silencio al actualizarse, y además
+  _parecería_ que el problema estaba resuelto. Eso es peor que una brecha
+  documentada, porque el siguiente ingeniero hereda falsa confianza en lugar de
+  un riesgo conocido.
+- **Almacenar un digesto en una segunda columna y conservar el token en crudo
+  para la búsqueda.** Rechazada: reintroduce el token en crudo en la base de
+  datos, de modo que el riesgo del volcado — toda la razón de la decisión
+  original — no cambia, mientras el esquema se vuelve más complejo.
 
-**Revisit condition:** re-evaluate on every Better Auth minor upgrade, and check
-for a first-party hashing option before anything else. Until then, treat
-`sessions.token` as a secret — restrict dump access, and never paste a row from it
-into an issue, a log, or a screenshot.
+**Condición de revisión:** reevaluar en cada actualización menor de Better Auth y
+buscar primero una opción de hasheo de primera parte. Hasta entonces, trate
+`sessions.token` como un secreto — restrinja el acceso a volcados y nunca pegue
+una fila suya en un issue, un log ni una captura de pantalla.
 
-Tracked as an open finding in
-[security.md](../security.md#4-session-security).
+Seguimiento como hallazgo abierto en
+[security.md](../security.md#4-seguridad-de-la-sesión).
 
-### Verification tokens are hashed where the library allows it
+### Los tokens de verificación se hashean donde la librería lo permite
 
-The same limitation does **not** apply to `verification_tokens`, and the distinction
-is worth recording because it shows the constraint is specific rather than blanket.
+La misma limitación **no** se aplica a `verification_tokens`, y la distinción
+merece registrarse porque demuestra que la restricción es específica y no
+global.
 
-- `identifier` **is** hashed, via `verification.storeIdentifier: 'hashed'`. The
-  library defaults this to `"plain"`, so leaving it alone would have stored every
-  address in the clear. The lookup path applies the identical transform, which is
-  what makes hashed rows still findable.
-- `value` is stored **raw**. `createVerificationValue` hashes the identifier only
-  and passes the rest of the payload through untouched; the `storeToken` option
-  that would cover it belongs to the magic-link plugin, not core email
-  verification.
+- `identifier` **sí** se hashea, mediante
+  `verification.storeIdentifier: 'hashed'`. La librería tiene `"plain"` como
+  valor por defecto, de modo que dejarlo como estaba habría almacenado cada
+  dirección en claro. La ruta de búsqueda aplica la misma transformación, y eso
+  es lo que hace que las filas hasheadas sigan siendo localizables.
+- `value` se almacena **en crudo**. `createVerificationValue` solo hashea el
+  identifier y deja pasar el resto del payload sin tocar; la opción `storeToken`
+  que lo cubriría pertenece al plugin de magic link, no a la verificación de
+  correo principal.
 
-Accepted because the table is currently inert: `sendOnSignUp` is `false` and Sprint
-1 has no mailer, so nothing writes a verification row. It must be resolved before
-the first verification email is sent in Sprint 2.
+Se acepta porque la tabla está actualmente inerte: `sendOnSignUp` es `false` y el
+Sprint 1 no tiene mailer, así que nada escribe una fila de verificación. Debe
+resolverse antes de que se envíe el primer correo de verificación en el Sprint 2.
 
-### Cookies are httpOnly and SameSite=Lax
+### Las cookies son httpOnly y SameSite=Lax
 
-- **`HttpOnly`** — JavaScript cannot read the session cookie. This is the single
-  most effective mitigation against token theft via XSS.
-- **`SameSite=Lax`** — the cookie is not sent on cross-site subrequests, which
-  blocks the classic cross-site request forgery vector while still allowing
-  top-level navigations (an emailed verification link) to work.
-- `Secure` in every non-local environment; omitted locally only because
-  `http://localhost` is not a secure context.
-- `AUTH_SECRET` must be 32+ bytes. It is generated locally and never committed.
+- **`HttpOnly`** — JavaScript no puede leer la cookie de sesión. Es la
+  mitigación más eficaz contra el robo de tokens vía XSS.
+- **`SameSite=Lax`** — la cookie no se envía en las subpeticiones cross-site, lo
+  que bloquea el vector clásico de request forgery cross-site a la vez que
+  permite que funcionen las navegaciones de nivel superior (un enlace de
+  verificación enviado por correo).
+- `Secure` en todo entorno que no sea local; se omite localmente solo porque
+  `http://localhost` no es un contexto seguro.
+- `AUTH_SECRET` debe tener 32 bytes o más. Se genera localmente y nunca se
+  versiona.
 
-## Consequences
+## Consecuencias
 
-**Accepted benefits**
+**Beneficios aceptados**
 
-- The setup works on Windows with no native toolchain. This is not a nicety; it
-  removes the single most common reason a JS auth setup stalls on a new machine.
-- One library owns the session lifecycle, so cookie rotation, expiry, and
-  revocation follow a reviewed implementation instead of bespoke code.
-- The Drizzle adapter keeps auth tables in the same schema and the same migration
-  history as the rest of the product — no parallel, hand-managed table set.
+- La configuración funciona en Windows sin toolchain nativa. No es un lujo: elimina
+  la razón más común por la que una configuración de autenticación en JS se
+  atasca en una máquina nueva.
+- Una librería es dueña del ciclo de vida de sesiones, de modo que la rotación,
+  la expiración y la revocación de cookies siguen una implementación revisada
+  en lugar de código a medida.
+- El adaptador de Drizzle mantiene las tablas de autenticación en el mismo
+  esquema y el mismo historial de migraciones que el resto del producto — sin un
+  juego de tablas paralelo administrado a mano.
 
-**Accepted costs**
+**Costos aceptados**
 
-- **Session tokens are stored unhashed.** This is the single most significant cost of
-  this decision, and it is a direct consequence of Better Auth's `1.7.7` token
-  round-trip rather than a shortcut taken for convenience. A database compromise
-  yields live session tokens instead of inert digests. Compensated by a 7-day
-  absolute expiry, immediate revocation, `HttpOnly`/`SameSite=Lax`/`Secure` cookies,
-  and account-state gating at session creation — but not eliminated. This must be
-  resolved, or formally accepted with eyes open, before any public launch.
-- **`verification_tokens.value` is unhashed** for the same structural reason, though
-  the table is inert until Sprint 2 mail arrives.
-- **Better Auth owns the shape of `users`, `sessions`, and `verification_tokens`.**
-  Column-level control is partial, and deviating from its expectations is a
-  source of subtle breakage. `verification_tokens` exists in Sprint 1 largely
-  because the library expects it, even though verified-email enforcement is an
-  open product question (see
-  [decisions-pending.md](../decisions-pending.md#email-verification-before-first-login)).
-- **argon2id is intentionally slow.** Login and registration are deliberately
-  more expensive than a hash-and-compare. That is the point, and it makes
-  rate limiting on auth endpoints mandatory rather than optional — see
-  [`docs/security.md`](../security.md).
-- **`@node-rs/argon2` is a native module**, so deployment targets must be
-  linux-x64 or linux-arm64 (or win32 for local dev) with matching prebuilds. A
-  platform without a prebuild falls back to a source build.
-- One more dependency in the auth path. Accepted: writing authentication by hand
-  is exactly the category of code that should not be improvised.
+- **Los tokens de sesión se almacenan sin hashear.** Es el costo más significativo
+  de esta decisión, y es una consecuencia directa del ciclo de tokens de Better
+  Auth `1.7.7`, no un atajo tomado por conveniencia. Una compromiso de la base
+  de datos produce tokens de sesión vivos en lugar de digestos inertes. Se
+  compensa con expiración absoluta de 7 días, revocación inmediata, cookies
+  `HttpOnly`/`SameSite=Lax`/`Secure` y validación del estado de la cuenta en la
+  creación de la sesión — pero no se elimina. Esto debe resolverse, o aceptarse
+  formalmente con los ojos abiertos, antes de cualquier lanzamiento público.
+- **`verification_tokens.value` está sin hashear** por la misma razón
+  estructural, aunque la tabla queda inerte hasta que llegue el correo del
+  Sprint 2.
+- **Better Auth es dueño de la forma de `users`, `sessions` y
+  `verification_tokens`.** El control a nivel de columna es parcial, y desviarse
+  de sus expectativas es una fuente de fallos sutiles. `verification_tokens`
+  existe en el Sprint 1 en gran parte porque la librería lo espera, aunque la
+  exigencia de correo verificado es una pregunta abierta de producto (ver
+  [decisions-pending.md](../decisions-pending.md#3-se-exige-la-verificación-de-correo-antes-del-primer-inicio-de-sesión)).
+- **argon2id es lentitud intencional.** El inicio de sesión y el registro son
+  deliberadamente más costosos que un hash-y-comparar. Ése es el punto, y hace
+  que la limitación de tasa en los endpoints de autenticación sea obligatoria y
+  no opcional — ver [`docs/security.md`](../security.md).
+- **`@node-rs/argon2` es un módulo nativo**, de modo que los destinos de
+  despliegue deben ser linux-x64 o linux-arm64 (o win32 para desarrollo local)
+  con prebuilds coincidentes. Una plataforma sin prebuild recurre a una
+  compilación desde el código fuente.
+- Una dependencia más en la ruta de autenticación. Aceptado: escribir
+  autenticación a mano es exactamente la categoría de código que no debe
+  improvisarse.
 
-**Also required by Better Auth, and easy to miss**
+**También requerido por Better Auth, y fácil de pasar por alto**
 
-- **`nextCookies()` plugin.** Without it, calling `auth.api.*` from a Server Action
-  silently drops `Set-Cookie`: sign-in "succeeds", no error is raised, and the next
-  request has no session. This is the worst bug shape available — no exception, no
-  log line, and a bug report that just says "login is broken".
-- **`'use server'` at the top of the Server Action module.** Without it, a client
-  component importing the action drags `next/headers` into the client bundle. The
-  build fails with an error about Server Components that points at the wrong file,
-  and `tsc` reports nothing at all.
-- **`advanced.database.generateId: 'uuid'`.** Our primary keys are
-  `uuid DEFAULT gen_random_uuid()`. Better Auth's default id generator produces a
-  32-character alphanumeric string, which Postgres rejects for a `uuid` column —
-  so every signup would 500. With `'uuid'` set, Better Auth omits `id` from the
-  INSERT and lets the database default supply it, putting the authority for
-  uniqueness in Postgres where a constraint can enforce it.
-- **`nextCookies` and `'use server'` are load-bearing, not stylistic.** All three
-  items above were verified against the installed package rather than inferred from
-  documentation.
+- **El plugin `nextCookies()`.** Sin él, llamar a `auth.api.*` desde una Server
+  Action descarta `Set-Cookie` en silencio: el inicio de sesión "tiene éxito",
+  no se lanza ningún error y la siguiente solicitud no tiene sesión. Ésa es la
+  peor forma de bug disponible — sin excepción, sin línea de log, y un reporte
+  de bug que solo dice "el login no funciona".
+- **`'use server'` al principio del módulo de la Server Action.** Sin él, un
+  componente de cliente que importa la action arrastra `next/headers` dentro del
+  bundle de cliente. La compilación falla con un error sobre Server Components
+  que apunta al archivo equivocado, y `tsc` no reporta absolutamente nada.
+- **`advanced.database.generateId: 'uuid'`.** Nuestras claves primarias son
+  `uuid DEFAULT gen_random_uuid()`. El generador de id por defecto de Better
+  Auth produce una cadena alfanumérica de 32 caracteres, que Postgres rechaza
+  para una columna `uuid` — de modo que cada registro daría error 500. Con
+  `'uuid'` configurado, Better Auth omite `id` del INSERT y deja que el valor
+  por defecto de la base de datos lo provea, colocando la autoridad de la
+  unicidad en Postgres, donde una restricción puede hacerla cumplir.
+- **`nextCookies` y `'use server'` son estructurales, no de estilo.** Los tres
+  puntos anteriores se verificaron contra el paquete instalado en lugar de
+  inferirse de la documentación.
 
-## Alternatives considered
+## Alternativas consideradas
 
-### Auth.js (NextAuth) with the Credentials provider — **rejected**
+### Auth.js (NextAuth) con el proveedor Credentials — **rechazada**
 
-Rejected, and the reason is structural rather than a matter of taste:
+Rechazada, y la razón es estructural y no cuestión de gusto:
 
-- **It provides no user table.** The Credentials provider does not create or own
-  a user model. Registering a user therefore requires a hand-rolled `users`
-  table plus hand-rolled signup logic, and Auth.js's own docs treat this as
-  user-managed territory.
-- **It forces ad-hoc session storage.** With Credentials and database sessions
-  you must wire a session table and adapter yourself, which is precisely the
-  security-critical machinery that should come from a maintained implementation.
-- **The credentials flow is a documented footgun.** NextAuth's own guidance
-  treats credentials as requiring extra care (hashing, secure cookies, database
-  sessions). Auth.js actively encourages OAuth providers, which is the opposite
-  of what Sprint 1 needs — and it is why the maintained-core-credentials path is
-  thinner than the OAuth paths.
-- **The combination degrades to hand-rolled auth with a library in the middle.**
-  That is the worst of both: the attack surface of custom auth plus an extra
-  layer of configuration to keep in sync.
+- **No provee una tabla de usuarios.** El proveedor Credentials no crea ni es
+  dueño de un modelo de usuario. Registrar un usuario requiere por lo tanto una
+  tabla `users` armada a mano más lógica de registro armada a mano, y la
+  documentación misma de Auth.js trata esto como territorio administrado por el
+  usuario.
+- **Fuerza un almacenamiento de sesiones ad-hoc.** Con Credentials y sesiones en
+  base de datos hay que cablear usted mismo una tabla de sesiones y un
+  adaptador, que es precisamente la maquinaria crítica en materia de seguridad
+  que debería venir de una implementación mantenida.
+- **El flujo de credentials es un pie-trampa documentado.** La guía misma de
+  NextAuth trata los credentials como algo que requiere cuidado extra (hasheo,
+  cookies seguras, sesiones en base de datos). Auth.js fomenta activamente los
+  proveedores OAuth, que es exactamente lo contrario de lo que el Sprint 1
+  necesita — y es la razón por la que el camino de credentials mantenidas en el
+  núcleo es más delgado que los caminos OAuth.
+- **La combinación degrada a autenticación armada a mano con una librería en el
+  medio.** Ése es lo peor de ambos mundos: la superficie de ataque de una
+  autenticación a medida más una capa extra de configuración que mantener en
+  sincronía.
 
-For an MVP whose entire auth surface is email + password, Auth.js Credentials
-gives us the least structure for the most custom code.
+Para un MVP cuya superficie de autenticación completa es correo + contraseña,
+Auth.js Credentials nos da la menor estructura con el mayor código a medida.
 
-### Roll our own sessions with signed cookies
+### Implementar nuestras propias sesiones con cookies firmadas
 
-Rejected. Rolling your own session implementation is a well-trodden path to
-subtle replay, rotation, and fixation bugs. The cost of this decision is a
-dependency; the cost of getting it wrong is an authentication bypass. Use the
-reviewed implementation.
+Rechazada. Implementar usted mismo su propia sesión es un camino bien trillado
+hacia bugs sutiles de reproducción, rotación y fijación. El costo de esta
+decisión es una dependencia; el costo de hacerlo mal es un bypass de
+autenticación. Use la implementación revisada.
 
-### bcrypt instead of argon2id
+### bcrypt en lugar de argon2id
 
-Rejected. bcrypt is not memory-hard and is GPU-friendly; argon2id is the current
-OWASP recommendation. bcrypt is also implemented in pure JavaScript and is
-_faster_, which in a password context is a disadvantage.
+Rechazada. bcrypt no es resistente en memoria y es amigable para GPU; argon2id es
+la recomendación actual de OWASP. bcrypt además está implementado en JavaScript
+puro y es _más rápido_, lo cual en un contexto de contraseñas es una
+desventaja.
 
-### Storing raw session tokens (the default-friendly path)
+### Almacenar tokens de sesión en crudo (el camino amigable por defecto)
 
-**Rejected as a choice — and then forced as a constraint.** These were two separate
-conclusions that initially got conflated, and keeping them apart is the point:
+**Rechazada como elección — y luego impuesta como restricción.** Fueron dos
+conclusiones separadas que al principio se confundieron, y mantenerlas apartes es
+lo que importa:
 
-- **Rejected on the merits.** If the token column is readable, every SQL injection,
-  backup leak, or accidental dump becomes instant session theft. On its own terms
-  this option is correct and worth real cost to get right.
-- **Forced by the library.** Every application-side route to that outcome turned out
-  to be blocked by Better Auth's `1.7.7` token round-trip — see the revised
-  decision above. Hashing on write is not merely inconvenient here; it produces a
-  session the server cannot subsequently resolve.
+- **Rechazada por sus méritos.** Si la columna del token es legible, cada inyección
+  SQL, cada filtración de backup o cada volcado accidental se convierte en robo
+  de sesión instantáneo. En sus propios términos esta opción es correcta y
+  merece un costo real para hacerse bien.
+- **Impuesta por la librería.** Cada ruta del lado de la aplicación hacia ese
+  resultado resultó estar bloqueada por el ciclo de tokens de Better Auth
+  `1.7.7` — ver la decisión revisada arriba. Hashear en la escritura no es
+  meramente inconveniente aquí; produce una sesión que el servidor no puede
+  resolver después.
 
-So the honest statement is that this is a known, scoped, and _currently
-unavoidable_ deviation from good practice, with a documented revisit condition. It
-is not a case of the mitigation having been considered and traded away.
+Entonces la declaración honesta es que ésta es una desviación conocida, acotada y
+_actualmente inevitable_ de las buenas prácticas, con una condición de revisión
+documentada. No es un caso de que la mitigación se haya considerado y se haya
+cambiado por otra cosa.
 
 ### Firebase Auth / Supabase Auth / Clerk
 
-- **Firebase Auth** — a separate identity system whose admin SDK requires
-  service-account credentials in our environment, adding an operational
-  dependency and a second source of truth for user records.
-- **Supabase Auth** — would drag the entire Supabase decision into Sprint 1 while
-  [ADR 0004](./0004-database-provider-neutrality.md) deliberately keeps the data
-  layer provider-neutral.
-- **Clerk** — a hosted commercial dependency with its own pricing, its own
-  session model, and a hard coupling between our user table and theirs. Too much
-  product surface before there is a product.
+- **Firebase Auth** — un sistema de identidad aparte cuyo SDK admin requiere
+  credenciales de cuenta de servicio en nuestro entorno, agregando una
+  dependencia operativa y una segunda fuente de verdad para los registros de
+  usuario.
+- **Supabase Auth** — arrastraría toda la decisión de Supabase al Sprint 1
+  mientras el [ADR 0004](./0004-database-provider-neutrality.md) deliberadamente
+  mantiene la capa de datos neutral respecto del proveedor.
+- **Clerk** — una dependencia comercial alojada con su propio modelo de precios,
+  su propio modelo de sesión y un acoplamiento duro entre nuestra tabla de
+  usuarios y la suya. Demasiada superficie de producto antes de que haya un
+  producto.
 
-### JSON Web Tokens instead of database sessions
+### JSON Web Tokens en lugar de sesiones en base de datos
 
-Rejected for now. JWTs remove the revocation problem only on paper: you cannot
-invalidate a stateless token before expiry, so "log out everywhere" and "revoke a
-compromised session" both stop working. Database sessions cost one indexed lookup
-and give real revocation. Reconsider only if the lookup becomes a measured
-bottleneck at scale.
+Rechazada por ahora. Los JWT eliminan el problema de la revocación solo en el
+papel: no puede invalidar un token sin estado antes de su expiración, de modo que
+"cerrar sesión en todas partes" y "revocar una sesión comprometida" dejan de
+funcionar. Las sesiones en base de datos cuestan una búsqueda indexada y dan
+revocación real. Se reconsidera solo si la búsqueda se convierte en un
+cuello de botella medido a escala.

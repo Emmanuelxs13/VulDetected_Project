@@ -1,287 +1,145 @@
-# VulDetected
+## Inicio rápido
 
-![Sprint 1 — in progress](https://img.shields.io/badge/status-Sprint%201%20%E2%80%94%20in%20progress-4c8cff)
-![Stack](https://img.shields.io/badge/stack-TypeScript%20%C2%B7%20Python%20%C2%B7%20PostgreSQL-3178c6)
-![Docs](https://img.shields.io/badge/docs-see%20%60docs%2F%60-informational)
+### Qué funciona hoy
 
-**Current status:** Sprint 1 — in progress. See
-[the roadmap](docs/roadmap.md) for what each sprint delivers and what "done"
-means.
+Verificado ejecutando cada comando en este repositorio, no por intención:
 
----
+| Comando                             | Estado                    | Notas                                                                                                                                            |
+| ----------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm install`                      | ✅ funciona               | Se resuelven los enlaces del workspace.                                                                                                          |
+| `pnpm typecheck`                    | ✅ funciona               | 3/3 paquetes sin errores mediante Turborepo.                                                                                                     |
+| `pnpm build`                        | ✅ funciona               | La compilación de producción de Next.js se realiza correctamente — **sin `.env` presente**, lo cual es una propiedad deliberada (ver más abajo). |
+| `pnpm format` / `pnpm format:check` | ✅ funciona               | Prettier limpia todo el repositorio.                                                                                                             |
+| `pnpm lint`                         | ⚠️ sin efecto             | **No hay linter configurado.** Se eliminó un script `eslint` huérfano en `packages/ui` porque solo podía fallar.                                 |
+| `docker compose ... up -d`          | ✅ funciona               | PostgreSQL, Mailpit y Redis en localhost.                                                                                                        |
+| Ejecutar la aplicación (`pnpm dev`) | ⚠️ necesita base de datos | Requiere `.env` **y** que se apliquen las migraciones. No se ha realizado ninguna de las dos acciones — consulte más abajo.                      |
+| Registrarse / iniciar sesión        | ❌ sin verificar          | Está escrito y pasado por typecheck, pero nunca se ha ejecutado contra una base de datos real. Consulte la advertencia más abajo.                |
+| Analizar un objetivo                | ❌ aún no                 | Sprint 2+. No hay worker, no hay cola, no hay hallazgos.                                                                                         |
 
-## What VulDetected is
+#### Que `pnpm build` funcione sin `.env` es intencional
 
-You point VulDetected at a web application you own. It runs a real security scan,
-finds the problems, and — this is the part that matters — **tells you how to fix
-them, with the actual code you need to write.**
+`next build` se completa en una máquina **sin archivo de entorno ni base de datos**. Esto es un requisito de diseño, no una casualidad: `getEnv()`, `getDb()` y `getAuth()` son todos perezosos y con memoización, y `getServerSession()` llama a `headers()` _antes_ de acceder a la configuración. Una compilación que requiriera secretos significaría que la aplicación no podría compilarse ni verificarse en CI sin aprovisionar primero una base de datos.
 
-Most security tools produce a list of scary acronyms that only a security
-engineer can translate into action. A finding says "SQL injection in
-`/api/search`". VulDetected says: here is the vulnerable line, here is the
-parameterized query that replaces it, here is the change for the developer, the
-configuration change for the sysadmin, and the business risk in plain language for
-the person who signs off the budget.
-
-## Who it is for
-
-| Audience            | What they get                                                                      |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| **Developers**      | The vulnerable code path, a concrete fix, and copyable code.                       |
-| **Sysadmins**       | What is exposed at the infrastructure level and the config change that closes it.  |
-| **Business owners** | What it means in risk and cost terms, without needing a developer to interpret it. |
-
-## The six non-negotiable security principles
-
-These are not aspirations. Each is tracked with an explicit status in
-[docs/security.md](docs/security.md).
-
-1. **Domain ownership verification before any scan.** Proving you own a domain is a
-   legal requirement, not a setting. No scan is ever queued without it.
-2. **SSRF defense.** Scan targets are attacker-influenced input, so DNS is resolved
-   and checked, private/loopback/link-local ranges are rejected, every redirect is
-   re-validated, and ports are restricted.
-3. **Worker isolation.** The scanner runs with filtered egress, a read-only
-   filesystem, dropped capabilities, and no database credentials.
-4. **Session tokens are stored as digests — _not yet achieved_.** Session tokens are
-   currently stored in the clear, because Better Auth `1.7.7` derives the cookie
-   from the hashed value it returns from the insert. The compensating controls are in
-   place (7-day absolute expiry, `HttpOnly`/`SameSite=Lax`/`Secure`, immediate
-   revocation, account-state gating), but this principle is **unmet**, and it is
-   listed here rather than quietly marked done. Tracked as an open finding in
-   [docs/security.md](docs/security.md#4-session-security) and
-   [ADR 0002](docs/adr/0002-authentication.md).
-5. **No secrets in git.** `.env` files are ignored; only `.env.example` is tracked;
-   secrets are generated, never authored.
-6. **Rate limiting.** Enforced server-side on auth and on scan submission.
-
----
-
-## Stack
-
-| Layer         | Technology                               | Why                                                                                                                                                                             |
-| ------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Monorepo      | pnpm workspaces + Turborepo              | One repo, incremental builds, one task runner across TS packages.                                                                                                               |
-| Web + backend | Next.js App Router (TypeScript)          | One runtime owns auth, authorization, business rules, and data access. No duplicated session validation or CORS.                                                                |
-| UI system     | Tailwind v4 (CSS-first `@theme`) + Radix | Semantic tokens defined once; accessible, unstyled primitives. See [ADR 0003](docs/adr/0003-design-tokens-and-color-budget.md).                                                 |
-| Database      | PostgreSQL 16 + Drizzle ORM              | Real constraints and transactions; a thin, reviewable query layer instead of a hidden abstraction.                                                                              |
-| Auth          | Better Auth + argon2id                   | Maintained session lifecycle, memory-hard password hashing via prebuilt `@node-rs/argon2` binaries — no `node-gyp` on Windows. See [ADR 0002](docs/adr/0002-authentication.md). |
-| Scan worker   | Python + Celery + Nuclei + OWASP ZAP     | Python is where the scanner tooling is; Celery gives a real queue for long-running work.                                                                                        |
-| Queue         | Redis                                    | Celery broker and result backend.                                                                                                                                               |
-| Email (dev)   | Mailpit                                  | Dev mail stays on the machine — nothing leaves localhost.                                                                                                                       |
-| Local infra   | Docker Compose                           | Postgres, Mailpit, and Redis run in containers, so setup is identical everywhere. See [infra/README.md](infra/README.md).                                                       |
-
-Full reasoning for each choice is in [docs/adr/](docs/adr/).
-
-## Repository layout
-
-```
-vuldetected/
-├─ apps/
-│  └─ web/                        Next.js app — the entire product backend  (Sprint 1, in progress)
-├─ packages/
-│  ├─ db/                         Drizzle schema, migrations, connection factory  (Sprint 1)
-│  ├─ ui/                         Tailwind v4 theme tokens and UI primitives  (Sprint 1)
-│  └─ config/                     Shared tsconfig / eslint / prettier presets  (Sprint 1)
-├─ services/
-│  └─ scanner/                    Python + Celery worker running Nuclei and ZAP  (Sprint 2, not yet created)
-├─ infra/
-│  ├─ docker-compose.dev.yml      Postgres + Mailpit + Redis for local development
-│  └─ README.md                   How to run the local stack, and why Postgres is in Docker
-├─ docs/
-│  ├─ README.md                   Documentation index
-│  ├─ roadmap.md                  The authoritative plan: sprints, exit criteria, deferred decisions
-│  ├─ architecture.md             Deployables, request and scan flows, trust boundaries
-│  ├─ database.md                 Schema reference and DB touch points needing owner sign-off
-│  ├─ security.md                 Threat model with an explicit status per control
-│  ├─ decisions-pending.md        Open questions awaiting the owner
-│  ├─ changelog.md                Keep a Changelog record of what actually changed
-│  └─ adr/
-│     ├─ README.md                ADR index and format rules
-│     ├─ 0001-monorepo-and-runtime-split.md
-│     ├─ 0002-authentication.md
-│     ├─ 0003-design-tokens-and-color-budget.md
-│     ├─ 0004-database-provider-neutrality.md
-│     └─ 0005-deferred-multi-tenancy.md
-├─ .atl/                          Tracked project configuration (do not remove)
-├─ package.json                   Workspace root scripts
-├─ pnpm-workspace.yaml            Workspace globs: apps/*, packages/*
-├─ turbo.json                     Turborepo task graph and build outputs
-├─ .env.example                   Every environment variable, documented — the single source of truth
-├─ .prettierrc.json               Formatting rules shared by every package
-├─ .editorconfig                  Encoding, line endings, indentation
-├─ .nvmrc                         Node 22
-└─ README.md                      This file
-```
-
-Directories under `apps/`, `packages/`, and `services/` arrive with the next
-Sprint 1 commits. Everything else listed here exists today.
-
----
-
-## Quick start
-
-### What works today
-
-Verified by running each command in this repository, not by intention:
-
-| Command                             | Status              | Notes                                                                                                             |
-| ----------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `pnpm install`                      | ✅ works            | Workspace links resolve.                                                                                          |
-| `pnpm typecheck`                    | ✅ works            | 3/3 packages clean via Turborepo.                                                                                 |
-| `pnpm build`                        | ✅ works            | Next.js production build succeeds — **with no `.env` present**, which is a deliberate property, see below.        |
-| `pnpm format` / `pnpm format:check` | ✅ works            | Prettier clean across the repo.                                                                                   |
-| `pnpm lint`                         | ⚠️ no-op            | **No linter is configured.** An orphaned `eslint` script in `packages/ui` was removed because it could only fail. |
-| `docker compose ... up -d`          | ✅ works            | Postgres, Mailpit, Redis on localhost.                                                                            |
-| Running the app (`pnpm dev`)        | ⚠️ needs a database | Requires `.env` **and** the migrations applied. Neither has been done — see below.                                |
-| Registering / logging in            | ❌ unverified       | Written and type-checked, but never exercised against a real database. See the warning below.                     |
-| Scanning a target                   | ❌ not yet          | Sprint 2+. No worker, no queue, no findings.                                                                      |
-
-#### The build succeeding without `.env` is intentional
-
-`next build` completes on a machine with **no environment file and no database**.
-That is a design requirement, not luck: `getEnv()`, `getDb()`, and `getAuth()` are
-all lazy and memoised, and `getServerSession()` calls `headers()` _before_ touching
-configuration. A build that requires secrets would mean the app cannot be compiled
-or verified in CI without provisioning a database first.
-
-Two ordering rules make this work, and both were learned by breaking them — see
+Dos reglas de orden lo hacen posible, ambas aprendidas al romperlas — consulte
 [ADR 0002](docs/adr/0002-authentication.md):
 
-- `headers()` must be called before `getAuth()`. A call written as
-  `getAuth().api.getSession({ headers: await headers() })` evaluates the callee
-  first, so env validation runs during prerender and the build fails with a
-  misleading "missing `DATABASE_URL`".
-- `features/auth/actions.ts` must start with `'use server'`. Without it, a client
-  component importing the action pulls `next/headers` into the client bundle.
-  `tsc` reports nothing; only the build fails.
+- `headers()` debe llamarse antes que `getAuth()`. Una llamada escrita como
+  `getAuth().api.getSession({ headers: await headers() })` evalúa el receptor primero, por lo que la validación de entorno se ejecuta durante el prerender y la compilación falla con el error engañoso "falta `DATABASE_URL`".
+- `features/auth/actions.ts` debe comenzar con `'use server'`. Sin ello, un componente cliente que importe la acción arrastra `next/headers` al bundle del cliente.
+  `tsc` no informa nada; solo la compilación falla.
 
-#### What has NOT been verified, and this matters
+#### Lo que NO se ha verificado, y por qué es importante
 
-**No code has ever run against a database.** Per the Sprint 1 constraint, no
-container was started and **no migration was executed**. So the following are
-authored and type-checked but unproven at runtime:
+**Nunca se ha ejecutado código contra una base de datos.** Según la restricción del Sprint 1, no se inició ningún contenedor y **no se ejecutó ninguna migración**. Por ello, lo siguiente está escrito y pasado por typecheck, pero no se ha probado en tiempo de ejecución:
 
-- the generated SQL in `packages/db/drizzle/`, including the `citext` extension and
-  the append-only trigger;
-- the Drizzle ↔ Better Auth schema mapping in both directions;
-- argon2id hashing at the configured cost;
-- every register / login / logout path, including the enumeration and lockout
-  behaviour.
+- El SQL generado en `packages/db/drizzle/`, incluyendo la extensión `citext` y el trigger de solo adición;
+- El mapeo entre Drizzle y el esquema de Better Auth en ambas direcciones;
+- El hash con argon2id al coste configurado;
+- Todos los caminos de registro, inicio de sesión y cierre de sesión, incluyendo el comportamiento de enumeración y bloqueo de cuentas.
 
-Treat the auth flow as **unproven until it has been run against Postgres once**. The
-reasoning in the code is deliberate and, where checkable, verified against the
-installed Better Auth source — but reading a library's source is not running it.
+Considere el flujo de autenticación como **no probado hasta que se ejecute al menos una vez contra PostgreSQL**. El razonamiento en el código es deliberado y, cuando se ha podido comprobar, se verificó contra el código fuente de Better Auth instalado — pero leer el código fuente de una biblioteca no es ejecutarlo.
 
-### Prerequisites
+### Requisitos previos
 
-- **Node.js 22** or newer — see [`.nvmrc`](.nvmrc). Version is pinned there for a reason.
-- **pnpm 10.25.0** — the version is pinned in `package.json` via `packageManager`.
-  With Corepack enabled: `corepack enable && corepack prepare pnpm@10.25.0 --activate`
-- **Docker** with Compose v2+.
-- A `git` client. There are **no commits in this repository yet**.
+- **Node.js 22** o superior — consulte [`.nvmrc`](.nvmrc). La versión está fijada por una razón.
+- **pnpm 10.25.0** — la versión está fijada en `package.json` mediante `packageManager`.
+  Con Corepack habilitado: `corepack enable && corepack prepare pnpm@10.25.0 --activate`
+- **Docker** con Compose v2+.
+- Un cliente de `git`. **No hay commits en este repositorio aún**.
 
-### Setup
+### Configuración
 
 ```powershell
-# 1. Install dependencies (works once workspace packages exist)
+# 1. Instalar dependencias (funciona cuando existen los paquetes del workspace)
 pnpm install
 
-# 2. Create your local environment file and fill in AUTH_SECRET
+# 2. Crear el archivo de entorno local y completar AUTH_SECRET
 Copy-Item .env.example .env
-# Generate a secret with:  openssl rand -base64 32
+# Generar un secreto con:  openssl rand -base64 32
 
-# 3. Start the local infrastructure (works today)
+# 3. Iniciar la infraestructura local (funciona hoy)
 docker compose -f infra/docker-compose.dev.yml up -d
 docker compose -f infra/docker-compose.dev.yml ps
 
-# 4. Run the app in development mode
+# 4. Ejecutar la aplicación en modo desarrollo
 pnpm dev
 ```
 
-Web UI: <http://localhost:3000> · Mailpit inbox: <http://localhost:8025>
+Interfaz web: <http://localhost:3000> · Bandeja de Mailpit: <http://localhost:8025>
 
-### Stopping
+### Detención
 
 ```powershell
-docker compose -f infra/docker-compose.dev.yml down      # stop containers, keep data
-docker compose -f infra/docker-compose.dev.yml down -v   # stop and delete the volumes
+docker compose -f infra/docker-compose.dev.yml down      # detener contenedores, conservar datos
+docker compose -f infra/docker-compose.dev.yml down -v   # detener y eliminar volúmenes
 ```
 
-### Migrations
+### Migraciones
 
-**No migration has been run.** The schema is documented in
-[docs/database.md](docs/database.md), and any migration touching the tables listed
-there requires **owner sign-off before it is authored**. Migrations are applied
-with drizzle-kit against `DATABASE_URL`.
+**No se ha ejecutado ninguna migración.** El esquema está documentado en
+[docs/database.md](docs/database.md), y cualquier migración que afecte a las tablas que allí se enumeran requiere **la aprobación del propietario antes de escribirse**. Las migraciones se aplican con drizzle-kit contra `DATABASE_URL`.
 
 ---
 
-## Documentation
+## Documentación
 
-| Document                                               | What it gives you                                                                         |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| [docs/roadmap.md](docs/roadmap.md)                     | The authoritative plan: sprints, deliverables, exit criteria, what is deferred.           |
-| [docs/architecture.md](docs/architecture.md)           | The three deployables, request and scan flows, trust boundaries, diagram.                 |
-| [docs/database.md](docs/database.md)                   | Every table and column, the DDL decisions, and the DB touch points needing your decision. |
-| [docs/security.md](docs/security.md)                   | Threat model. Six non-negotiables, each with a status.                                    |
-| [docs/decisions-pending.md](docs/decisions-pending.md) | Open questions waiting on you.                                                            |
-| [docs/changelog.md](docs/changelog.md)                 | The running record of what changed.                                                       |
-| [docs/adr/](docs/adr/)                                 | Architecture Decision Records — why the system is shaped this way.                        |
-| [infra/README.md](infra/README.md)                     | The local Docker stack.                                                                   |
+| Documento                                              | Qué proporciona                                                                                                   |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| [docs/roadmap.md](docs/roadmap.md)                     | Hoja de ruta autoritativa: sprints, entregables, criterios de salida y lo diferido.                               |
+| [docs/architecture.md](docs/architecture.md)           | Los tres desplegables, flujos de solicitud y análisis, fronteras de confianza y diagrama.                         |
+| [docs/database.md](docs/database.md)                   | Todas las tablas y columnas, decisiones del DDL y puntos de contacto con la base de datos que requieren decisión. |
+| [docs/security.md](docs/security.md)                   | Modelo de amenazas. Seis elementos innegociables, cada uno con su estado.                                         |
+| [docs/decisions-pending.md](docs/decisions-pending.md) | Preguntas abiertas pendientes de resolución.                                                                      |
+| [docs/changelog.md](docs/changelog.md)                 | Registro continuo de lo que ha cambiado.                                                                          |
+| [docs/adr/](docs/adr/)                                 | Architecture Decision Records — por qué el sistema tiene esta forma.                                              |
+| [infra/README.md](infra/README.md)                     | La pila local de Docker.                                                                                          |
 
-Two rules keep this from rotting: **scope** lives in
-[docs/roadmap.md](docs/roadmap.md), and **architecture** lives in
-[docs/adr/](docs/adr/). If another document disagrees with one of those, those
-win.
+Dos reglas evitan que la documentación se desactualice: el **alcance** vive en
+[docs/roadmap.md](docs/roadmap.md), y la **arquitectura** vive en
+[docs/adr/](docs/adr/). Si otro documento entra en contradicción con alguno de ellos, prevalecen esos dos.
 
 ---
 
-## Open decisions
+## Decisiones abiertas
 
-Four questions are waiting on the owner and are listed in full in
+Cuatro preguntas están pendientes del propietario y se enumeran en detalle en
 [docs/decisions-pending.md](docs/decisions-pending.md):
 
-1. **Spanish or English UI copy** — the code and docs are English by contract;
-   the product UI language is not decided.
-2. **Email verification before first login** — required, or allow with limits?
-3. **Free-tier scan quota for the MVP** — depends on real scan cost from Sprint 2.
-4. **Retention period for scan results** — cheaper to design into the Sprint 2
-   tables than to retrofit.
+1. **Texto de la interfaz en español o en inglés** — el código y la documentación son en inglés por contrato;
+   el idioma de la interfaz de usuario aún no se ha decidido.
+2. **Verificación de correo antes del primer inicio de sesión** — ¿debe ser obligatoria o permitirse con límites?
+3. **Cuota de análisis para el tier gratuito en el MVP** — depende del coste real de los análisis a partir del Sprint 2.
+4. **Periodo de retención de los resultados de análisis** — es más barato diseñarlo en las tablas del Sprint 2 que corregirlo posteriormente.
 
-The database hosting question is **resolved**: local PostgreSQL 18 via pgAdmin 4,
-documented in
+La pregunta sobre el alojamiento de la base de datos **está resuelta**: PostgreSQL 18 local mediante pgAdmin 4,
+documentado en
 [docs/local-postgres-setup.md](docs/local-postgres-setup.md).
 
-Multi-tenancy and billing are deliberately deferred to Sprint 4+ — see
+La multi-tenencia y la facturación se difieren deliberadamente a partir del Sprint 4+ — consulte
 [ADR 0005](docs/adr/0005-deferred-multi-tenancy.md).
 
 ---
 
-## Contributing
+## Contribución
 
-- **Conventional commits.** `feat:`, `fix:`, `docs:`, `refactor:`, `test:`,
-  `chore:`, `build:`, `ci:`. A type of `refactor:`, `perf:`, or `feat!:` for
-  breaking changes.
-- **English for everything technical.** Code, identifiers, comments, documentation,
-  commit messages, and UI copy are written in English. Repository artifacts are
-  technical artifacts; they are not written in the conversation language.
-- **No AI attribution in commits.** No `Co-Authored-By` trailers, no AI-generated
-  lines in commit messages, and no tool-name footers.
-- **Format before committing.** `pnpm check` runs lint, typecheck, and
-  `format:check`. Formatting is enforced by Prettier; do not hand-tune whitespace.
-- **One decision per commit.** A commit that changes behaviour and refactors
-  unrelated code cannot be reviewed.
-- **Schema changes need an owner.** Read
-  [docs/database.md](docs/database.md#db-touch-points--owner-decision-required)
-  first, and get sign-off before writing the migration.
-- **New architectural decisions get an ADR.** Copy the six-section format from
+- **Commits convencionales.** `feat:`, `fix:`, `docs:`, `refactor:`, `test:`,
+  `chore:`, `build:`, `ci:`. Tipos `refactor:`, `perf:` o `feat!:` para cambios que rompen compatibilidad.
+- **Inglés para todo lo técnico.** Código, identificadores, comentarios, documentación,
+  mensajes de commit y texto de la interfaz se escriben en inglés. Los artefactos del repositorio son artefactos técnicos; no se escriben en el idioma de la conversación.
+- **Sin atribución de IA en los commits.** Sin trailers `Co-Authored-By`, sin líneas generadas por IA en los mensajes de commit y sin pies de página con nombres de herramientas.
+- **Formatear antes de hacer commit.** `pnpm check` ejecuta lint, typecheck y
+  `format:check`. El formato se aplica con Prettier; no se debe ajustar manualmente el espaciado.
+- **Un cambio de decisión por commit.** Un commit que cambie comportamiento y refactorice código no relacionado no es revisable.
+- **Los cambios en el esquema necesitan aprobación del propietario.** Lea
+  [docs/database.md](docs/database.md#puntos-de-contacto-en-la-db--se-requiere-decisión-del-propietario)
+  primero y obtenga la aprobación antes de escribir la migración.
+- **Las nuevas decisiones arquitectónicas requieren un ADR.** Copie el formato de seis secciones de
   [docs/adr/README.md](docs/adr/README.md).
-- **Secrets never enter the repository.** Add the variable to `.env.example`,
-  generate the value locally, and leave `.env` untracked.
+- **Nunca incluir secretos en el repositorio.** Añada la variable a `.env.example`,
+  genere el valor localmente y deje `.env` sin rastrear.
 
 ---
 
-## License
+## Licencia
 
-Not yet specified. All rights reserved until the owner chooses a license.
+Aún no se ha especificado. Todos los derechos reservados hasta que el propietario elija una licencia.

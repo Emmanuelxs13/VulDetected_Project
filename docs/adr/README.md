@@ -1,41 +1,42 @@
-# Architecture Decision Records
+# Architecture Decision Records (registros de decisiones de arquitectura)
 
-An ADR captures a decision that was **not** obvious, together with the context
-that made it reasonable and the consequences it creates. The point is not to
-document what the code does — the code does that — but to record _why a
-reasonable engineer might have chosen otherwise_.
+Un ADR registra una decisión que **no** era obvia, junto con el contexto que la
+volvía razonable y las consecuencias que crea. El punto no es documentar lo que
+hace el código — eso ya lo hace el código — sino registrar _por qué un ingeniero
+razonable podría haber elegido lo contrario_.
 
-## Format
+## Formato
 
-Every ADR uses the same six sections:
+Cada ADR usa las mismas seis secciones:
 
-| Section                     | Purpose                                                               |
-| --------------------------- | --------------------------------------------------------------------- |
-| **Title**                   | The decision, stated as a choice.                                     |
-| **Status**                  | `Proposed`, `Accepted`, or `Superseded by ADR-NNNN`.                  |
-| **Context**                 | The forces and constraints that made a decision necessary.            |
-| **Decision**                | What we chose, concretely enough to act on.                           |
-| **Consequences**            | What becomes easier, what becomes harder, and what we accept as cost. |
-| **Alternatives considered** | What else was on the table and why it lost.                           |
+| Sección                       | Propósito                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| **Título**                    | La decisión, enunciada como una elección.                                      |
+| **Estado**                    | `Propuesta`, `Aceptada` o `Reemplazada por ADR-NNNN`.                          |
+| **Contexto**                  | Las fuerzas y restricciones que hicieron necesaria la decisión.                |
+| **Decisión**                  | Qué elegimos, con la concreción suficiente para actuar.                        |
+| **Consecuencias**             | Qué se vuelve más fácil, qué se vuelve más difícil y qué aceptamos como costo. |
+| **Alternativas consideradas** | Qué más estaba en la mesa y por qué perdió.                                    |
 
-## Rules
+## Reglas
 
-1. Write the ADR **when the decision is made**, not retroactively. A decision
-   recorded after it ships is a rationalization, not a record.
-2. Do not edit the substance of an accepted ADR. Supersede it with a new file
-   and update the old one's Status line — the history of the reasoning is the
-   entire value.
-3. Keep consequences honest. If a decision is expensive, say so; a record that
-   only lists benefits is marketing.
-4. Every meaningful architectural choice gets one. If you are debating whether
-   something qualifies, it qualifies.
+1. Escriba el ADR **cuando se toma la decisión**, no retroactivamente. Una
+   decisión registrada después de que se lanza es una racionalización, no un
+   registro.
+2. No edite la sustancia de un ADR aceptado. Reemplácelo con un archivo nuevo y
+   actualice la línea de Estado del antiguo — el historial del razonamiento es
+   todo el valor.
+3. Mantenga las consecuencias honestas. Si una decisión es costosa, dígalo; un
+   registro que solo enumera beneficios es marketing.
+4. Cada elección arquitectónica significativa merece uno. Si está debatiendo si
+   algo califica, califica.
 
-## Index
+## Índice
 
-| ADR                                              | Status   | One-line summary                                                                                               |
-| ------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------- |
-| [0001](./0001-monorepo-and-runtime-split.md)     | Accepted | pnpm + Turborepo monorepo; Next.js App Router is the only TS backend; Python exists solely to drive Nuclei/ZAP |
-| [0002](./0002-authentication.md)                 | Accepted | Better Auth + Drizzle, email/password, argon2id, hashed session tokens                                         |
-| [0003](./0003-design-tokens-and-color-budget.md) | Accepted | Semantic tokens defined once in Tailwind v4 `@theme`; severity colors never used alone                         |
-| [0004](./0004-database-provider-neutrality.md)   | Accepted | Data layer stays provider-neutral: everything through `DATABASE_URL`                                           |
-| [0005](./0005-deferred-multi-tenancy.md)         | Accepted | No `organization_id` in Sprint 1; rationale and reconsideration trigger                                        |
+| ADR                                              | Estado   | Resumen de una línea                                                                                                  |
+| ------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| [0001](./0001-monorepo-and-runtime-split.md)     | Aceptada | monorepo con pnpm + Turborepo; Next.js App Router es el único backend TS; Python existe solo para impulsar Nuclei/ZAP |
+| [0002](./0002-authentication.md)                 | Aceptada | Better Auth + Drizzle, correo/contraseña, argon2id, tokens de sesión hasheados                                        |
+| [0003](./0003-design-tokens-and-color-budget.md) | Aceptada | tokens semánticos definidos una sola vez en `@theme` de Tailwind v4; los colores de severidad nunca se usan solos     |
+| [0004](./0004-database-provider-neutrality.md)   | Aceptada | la capa de datos permanece neutral respecto del proveedor: todo pasa por `DATABASE_URL`                               |
+| [0005](./0005-deferred-multi-tenancy.md)         | Aceptada | sin `organization_id` en el Sprint 1; justificación y disparador de reconsideración                                   |

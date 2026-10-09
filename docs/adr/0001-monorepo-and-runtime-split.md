@@ -1,132 +1,143 @@
-# ADR 0001: Monorepo and runtime split
+# ADR 0001: Monorepo y división de runtimes
 
-- **Status:** Accepted
-- **Date:** Sprint 1
+- **Estado:** Aceptada
+- **Fecha:** Sprint 1
 
-## Context
+## Contexto
 
-VulDetected needs three very different kinds of machinery:
+VulDetected necesita tres tipos de maquinaria muy diferentes:
 
-1. A web application — forms, dashboards, authentication, a real-time stream of
-   scan progress.
-2. A scan worker — long-running, CPU- and network-heavy, orchestrating external
-   tools (Nuclei, OWASP ZAP) that are distributed as standalone binaries.
-3. A relational database.
+1. Una aplicación web — formularios, paneles, autenticación, un flujo en tiempo
+   real con el progreso de los escaneos.
+2. Un worker de escaneo — proceso de larga duración, intensivo en CPU y red,
+   que orquesta herramientas externas (Nuclei, OWASP ZAP) distribuidas como
+   binarios independientes.
+3. Una base de datos relacional.
 
-Two of these (1 and 2) want different things from a runtime:
+Dos de ellas (1 y 2) quieren cosas distintas de un runtime:
 
-- The web app benefits from server-side rendering, route handlers, cookie-based
-  sessions, and a build step that produces a deployable artifact.
-- The worker wants a long-lived process with a job queue, no HTTP surface, and
-  whatever bindings make shelling out to scanners reliable.
+- La aplicación web se beneficia del renderizado en el servidor, los route
+  handlers, las sesiones basadas en cookies y un paso de compilación que produce
+  un artefacto desplegable.
+- El worker quiere un proceso de larga duración con una cola de trabajos, sin
+  superficie HTTP, y los bindings que hagan fiable la invocación de los
+  escáneres.
 
-A common instinct is to give the backend a NestJS service alongside Next.js, on
-the theory that "backend deserves a real backend framework." That instinct costs
-more than it returns at MVP scale, and this ADR explains why.
+Un instinto común es darle al backend un servicio NestJS al lado de Next.js, con
+la teoría de que "un backend merece un framework de backend de verdad". Ese
+instinto cuesta más de lo que devuelve a escala MVP, y este ADR explica por qué.
 
-The repository also has to host a Python service, which means the tooling story
-is not purely TypeScript.
+El repositorio además debe alojar un servicio Python, lo que significa que la
+historia de las herramientas no es puramente TypeScript.
 
-## Decision
+## Decisión
 
-**1. Monorepo layout.** pnpm workspaces + Turborepo, with `apps/*` and
-`packages/*` as the workspace globs.
+**1. Estructura de monorepo.** Workspaces de pnpm + Turborepo, con `apps/*` y
+`packages/*` como globs del workspace.
 
 ```
-apps/web                 Next.js App Router (web + product backend)
-packages/db              Drizzle schema, migrations, connection factory
-packages/ui              Tailwind v4 theme tokens and primitives
-packages/config          Shared tsconfig/eslint/prettier presets
-services/scanner         Python + Celery worker (built and run via Docker only)
-infra/                   Docker Compose dev stack
-docs/                    This documentation set
+apps/web                 Next.js App Router (web + backend del producto)
+packages/db              esquema Drizzle, migraciones, fábrica de conexiones
+packages/ui              tokens de tema y primitivas de Tailwind v4
+packages/config          presets compartidos de tsconfig/eslint/prettier
+services/scanner         worker Python + Celery (compilado y ejecutado solo vía Docker)
+infra/                   stack de desarrollo con Docker Compose
+docs/                    este conjunto de documentación
 ```
 
-`services/scanner` is deliberately **not** a pnpm package. It is built and run
-through Docker. Mixing a Python toolchain into the pnpm/Turbo task graph would
-mean every `pnpm run` invocation negotiates with two ecosystems for zero benefit.
+`services/scanner` es deliberadamente **no** un paquete de pnpm. Se compila y
+ejecuta a través de Docker. Mezclar una toolchain de Python en el grafo de tareas
+de pnpm/Turbo significaría que cada invocación de `pnpm run` negocia con dos
+ecosistemas sin ningún beneficio.
 
-**2. Next.js App Router is the only product backend. No NestJS.** The Next.js
-server owns auth, session validation, authorization, the database connection
-pool, business rules, and the API surface that the browser talks to.
+**2. Next.js App Router es el único backend del producto. Sin NestJS.** El
+servidor de Next.js es dueño de la autenticación, la validación de sesiones, la
+autorización, el pool de conexiones a la base de datos, las reglas de negocio y
+la superficie API con la que habla el navegador.
 
-**3. The Python service exists for exactly one reason: to orchestrate Nuclei and
-ZAP via Celery.** It is a scan executor with a job queue, not a second product
-backend. It holds no business rules, no session validation, and no write access
-to product data beyond scan results posted back through a narrow, authenticated
-channel.
+**3. El servicio Python existe por exactamente una razón: orquestar Nuclei y ZAP
+mediante Celery.** Es un ejecutor de escaneos con una cola de trabajos, no un
+segundo backend del producto. No contiene reglas de negocio, ni validación de
+sesiones, ni acceso de escritura a los datos del producto más allá de los
+resultados de escaneo devueltos a través de un canal autenticado y estrecho.
 
-## Consequences
+## Consecuencias
 
-**Accepted costs**
+**Costos aceptados**
 
-- A long-running scan job cannot be hosted inside a serverless request handler.
-  This is why the Python worker and a real job queue (Celery + Redis) are not
-  optional — they are what makes long-running work survivable.
-- Two runtimes means two dependency sets, two Dockerfiles, and two CI jobs. Turbo
-  hides some of this; it does not eliminate it.
-- The Python service cannot import TypeScript domain types directly. Types
-  crossing the boundary are validated at runtime, not shared by the compiler.
-  We accept the cost and pay it with schema validation, because compile-time
-  coupling across a process boundary would be a lie anyway.
+- Un trabajo de escaneo de larga duración no puede alojarse dentro de un
+  request handler serverless. Ésa es la razón por la que el worker en Python y
+  una cola de trabajos real (Celery + Redis) no son opcionales — son lo que hace
+  sobrevivible el trabajo de larga duración.
+- Dos runtimes significan dos conjuntos de dependencias, dos Dockerfiles y dos
+  trabajos de CI. Turbo oculta parte de esto; no lo elimina.
+- El servicio Python no puede importar directamente los tipos de dominio en
+  TypeScript. Los tipos que cruzan la frontera se validan en tiempo de
+  ejecución, no los comparte el compilador. Aceptamos el costo y lo pagamos con
+  validación de esquema, porque el acoplamiento en tiempo de compilación a
+  través de una frontera de proceso sería igualmente una mentira.
 
-**Accepted benefits**
+**Beneficios aceptados**
 
-- One place where auth is enforced. Every authorization decision happens in one
-  runtime, one framework, one language. There is no "which service validates the
-  session?" question to get wrong.
-- One set of secrets to manage for the product surface.
-- One CORS story: the browser talks to one origin. Cross-origin complexity
-  between `web` and `api` disappears entirely.
-- One deployment artifact for the product backend, instead of two that must be
-  version-compatible.
-- TypeScript across the whole product surface means one type system, one lint
-  setup, and shared types in `packages/`.
+- Un solo lugar donde se aplica la autenticación. Cada decisión de autorización
+  ocurre en un runtime, un framework, un lenguaje. No existe la pregunta "¿qué
+  servicio valida la sesión?" para responder mal.
+- Un solo juego de secretos que administrar para la superficie del producto.
+- Una sola historia de CORS: el navegador habla con un solo origen. La
+  complejidad cross-origin entre `web` y `api` desaparece por completo.
+- Un solo artefacto de despliegue para el backend del producto, en lugar de dos
+  que deben ser compatibles en versión.
+- TypeScript en toda la superficie del producto significa un solo sistema de
+  tipos, una sola configuración de lint y tipos compartidos en `packages/`.
 
-## Alternatives considered
+## Alternativas consideradas
 
-### NestJS as a separate API service
+### NestJS como servicio API aparte
 
-Rejected. It would mean a second TS backend duplicating concerns that the
-Next.js server already has to solve, and each duplication is a place for a
-security control to be missed:
+Rechazada. Significaría un segundo backend TS que duplica preocupaciones que el
+servidor de Next.js ya debe resolver, y cada duplicación es un lugar donde
+olvidar un control de seguridad:
 
-- **Auth/session validation implemented twice.** Two implementations drift. The
-  one that drifts wrong is an auth bypass.
-- **CORS configuration** between `web` and `api`, including credentialed
-  requests, preflight caching, and origin allowlists.
-- **Deployment coordination** — two services to version, roll back, and keep on
-  compatible API versions.
-- **Secrets** — a second environment to configure and a second place for a
-  secret to leak from.
-- **Body validation and error handling** duplicated in a second framework with
-  different idioms.
+- **Autenticación/validación de sesiones implementada dos veces.** Dos
+  implementaciones se desvían. La que se desvía mal es un bypass de
+  autenticación.
+- **Configuración de CORS** entre `web` y `api`, incluidas las solicitudes con
+  credenciales, el caché de preflight y las listas de permitidos de orígenes.
+- **Coordinación de despliegue** — dos servicios que versionar, revertir y
+  mantener en versiones de API compatibles.
+- **Secretos** — un segundo entorno que configurar y un segundo lugar desde el
+  cual puede filtrarse un secreto.
+- **Validación de cuerpo y manejo de errores** duplicados en un segundo framework
+  con distinta idiomática.
 
-For an MVP whose traffic is authenticated dashboard users, not a public API
-consumed at scale, this is pure overhead. If a real, heavy public API later
-justifies a separate service, this ADR is superseded — and the trigger is
-recorded rather than assumed away.
+Para un MVP cuyo tráfico son usuarios autenticados de un panel, no una API
+pública consumida a escala, esto es sobrecarga pura. Si más adelante una API
+pública real y pesada justifica un servicio aparte, este ADR queda reemplazado —
+y el disparador queda registrado en lugar de darlo por supuesto.
 
-### Micro-frontends / separate frontend repo
+### Micro-frontends / repositorio de frontend separado
 
-Rejected. There is one product surface. A split frontend repo buys organizational
-independence the team does not need yet and pays in cross-repo coordination,
-duplicated types, and inconsistent design tokens — which directly contradicts
-ADR 0003's requirement that tokens be defined exactly once.
+Rechazada. Hay una sola superficie de producto. Un repositorio de frontend
+partido compra independencia organizacional que el equipo todavía no necesita y
+paga con coordinación entre repositorios, tipos duplicados y design tokens
+inconsistentes — lo que contradice directamente el requisito del ADR 0003 de que
+los tokens se definan exactamente una sola vez.
 
-### Python backend instead of a Python worker
+### Backend en Python en lugar de un worker en Python
 
-Rejected. Making the worker a full backend would drag business logic, session
-handling, and authorization across a process boundary that exists solely to run
-external scanners. Keeping the service narrow is what makes its isolation
-requirements (filtered egress, read-only filesystem, no database credentials)
-achievable — see [ADR 0004](./0004-database-provider-neutrality.md) and
+Rechazada. Convertir al worker en un backend completo arrastraría lógica de
+negocio, manejo de sesiones y autorización a través de una frontera de proceso
+que existe únicamente para ejecutar escáneres externos. Mantener el servicio
+estrecho es lo que hace alcanzables sus requisitos de aislamiento (egreso
+filtrado, sistema de archivos de solo lectura, sin credenciales de la base de
+datos) — ver [ADR 0004](./0004-database-provider-neutrality.md) y
 [`docs/security.md`](../security.md).
 
-### Go or Rust for the scanner worker
+### Go o Rust para el worker del escáner
 
-Not rejected on merit — viable and faster to run. Deferred: it adds a third
-toolchain for a workload that is I/O-bound (network waits against slow targets),
-not CPU-bound. Python plus Celery is the fastest path to a working scan loop,
-and Celery is a mature, observable queue. Revisit if worker memory or cold-start
-cost becomes a measured problem.
+No rechazada por sus méritos — es viable y más rápido de ejecutar. Aplazada:
+agregaría una tercera toolchain para una carga de trabajo que es limitada por
+E/I (esperas de red contra objetivos lentos), no por CPU. Python más Celery es el
+camino más rápido hacia un ciclo de escaneo funcional, y Celery es una cola
+madura y observable. Se revisa si el uso de memoria del worker o el costo de
+arranque en frío se convierten en un problema medido.

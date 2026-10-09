@@ -1,148 +1,160 @@
-# Open decisions
+# Decisiones abiertas
 
-Questions waiting on the **owner**. These are product and operational calls, not
-engineering tasks — engineering can build either side, so the choice is recorded
-here instead of being made implicitly in code.
+Preguntas a la espera del **propietario**. Son decisiones de producto y
+operativas, no tareas de ingeniería — la ingeniería puede construir ambos lados,
+así que la elección se registra aquí en lugar de tomarse implícitamente en el
+código.
 
-Related: [roadmap.md](./roadmap.md) → [Deferred decisions](./roadmap.md#deferred-decisions).
-
----
-
-## 1. Database hosting — RESOLVED (twice)
-
-**Status:** Resolved. **Local PostgreSQL 18 via pgAdmin 4**, for Sprint 1
-verification.
-
-The data layer is provider-neutral (see
-[ADR 0004](./adr/0004-database-provider-neutrality.md)), so this was always a
-`DATABASE_URL` edit. The owner first chose **Supabase**, then switched to a
-**local PostgreSQL 18** server for Sprint 1 because it is already installed and
-running on the development machine (18.3, port 5432, pgAdmin 4 alongside it).
-
-Current runbook: [`local-postgres-setup.md`](./local-postgres-setup.md).
-Supabase alternative, not executed: [`supabase-setup.md`](./supabase-setup.md).
-
-**Provider neutrality was not tested, but it is load-bearing here.** Supabase chose
-`Session pooler (5432)` over the transaction pooler because transaction mode
-destroys session state and `postgres.js` pipelines by default. A local server has no
-pooler at all, so the choice never arises — but the moment the project moves to
-Supabase, that table applies again, and `LISTEN/NOTIFY` in Sprint 2 makes it a real
-decision rather than a preference.
-
-Remaining open sub-questions:
-
-- Backups and retention policy.
-- Whether to use Supabase Row Level Security as a second authorization layer. It
-  is _available_ without violating neutrality, but _using_ it is an
-  authorization decision, not a configuration detail. (Not applicable to a local
-  server; this question only exists if/when Supabase is adopted.)
-- Cost at production traffic.
+Relacionado: [roadmap.md](./roadmap.md) → [Decisiones aplazadas](./roadmap.md#decisiones-aplazadas).
 
 ---
 
-## 2. Spanish or English UI copy?
+## 1. Alojamiento de la base de datos — RESUELTO (dos veces)
 
-**Status:** Unresolved.
+**Estado:** Resuelto. **PostgreSQL 18 local mediante pgAdmin 4**, para la
+verificación del Sprint 1.
 
-The entire codebase, documentation, and commits are in English by contract. The
-**product-facing UI copy** is a separate question and has not been decided.
+La capa de datos es neutral respecto del proveedor (ver
+[ADR 0004](./adr/0004-database-provider-neutrality.md)), de modo que esto siempre
+fue una edición de `DATABASE_URL`. El propietario eligió primero **Supabase** y
+luego cambió a un servidor **PostgreSQL 18 local** para el Sprint 1 porque ya
+está instalado y en ejecución en la máquina de desarrollo (18.3, puerto 5432,
+pgAdmin 4 a su lado).
 
-Open sub-questions:
+Runbook actual: [`local-postgres-setup.md`](./local-postgres-setup.md).
+Alternativa con Supabase, no ejecutada: [`supabase-setup.md`](./supabase-setup.md).
 
-- Is the UI English only, Spanish only, or bilingual from the start?
-- If bilingual, is it i18n from the first component, or English first with copy
-  centralized so translation is possible later? Centralizing copy in Sprint 1 is
-  cheap insurance; wiring full i18n before the copy exists is expensive.
-- Do the three audiences (developer, sysadmin, business owner) read the same
-  language? A business owner and the developer they hired may differ.
+**La neutralidad del proveedor no se puso a prueba, pero aquí es determinante.**
+Se eligió el `Session pooler (5432)` de Supabase frente al pooler transaccional
+porque el modo transaccional destruye el estado de sesión y los pipelings de
+`postgres.js` por defecto. Un servidor local no tiene pooler en absoluto, de modo
+que la elección nunca surge — pero en cuanto el proyecto se mude a Supabase, esa
+tabla vuelve a aplicarse, y `LISTEN/NOTIFY` en el Sprint 2 convierte la cuestión
+en una decisión real y no en una preferencia.
 
-**Why it matters now:** retrofitting i18n touches every component, so "decide
-later" has a real cost. It does not have to be decided _this_ week, but the
-answer should be "centralize copy" or "go bilingual" rather than left implicit.
+Subpreguntas abiertas restantes:
+
+- Copias de seguridad y política de retención.
+- Si usar la seguridad a nivel de fila de Supabase como una segunda capa de
+  autorización. Está _disponible_ sin violar la neutralidad, pero _usarla_ es
+  una decisión de autorización, no un detalle de configuración. (No aplica a un
+  servidor local; esta pregunta solo existe si se adopta Supabase.)
+- Costo con tráfico de producción.
 
 ---
 
-## 3. Email verification required before first login?
+## 2. ¿Textos de la interfaz en español o en inglés?
 
-**Status:** Unresolved.
+**Estado:** Sin resolver.
 
-`users.email_verified` (boolean) exists so this can change without a migration. The
-product question is whether an account can sign in before verifying.
+Todo el código base, la documentación y los commits están en inglés por contrato.
+Los **textos de la interfaz orientados al producto** son una pregunta aparte y no
+se han decidido.
 
-- **Required before first login** — higher integrity; costs friction and a support
-  path for people who never see the email.
-- **Allowed before verification, with unverified accounts limited** — lower
-  friction; the application must then enforce the limit, which is a real code path
-  and a real place to get a check wrong.
+Subpreguntas abiertas:
 
-Also open: whether an unverified account can create a scan at all.
+- ¿La interfaz es solo en inglés, solo en español o bilingüe desde el inicio?
+- Si es bilingüe, ¿i18n desde el primer componente, o primero inglés con los
+  textos centralizados para que la traducción sea posible más adelante?
+  Centralizar los textos en el Sprint 1 es un seguro barato; cablear i18n
+  completo antes de que los textos existen es caro.
+- ¿Las tres audiencias (desarrollador, administrador de sistemas, responsable de
+  negocio) leen el mismo idioma? Un responsable de negocio y el desarrollador que
+  contrató pueden diferir.
 
-**Note:** `account_status` currently defaults to `active`, because email verification
-is disabled in Sprint 1 and no code path performs the transition yet. When this
-decision is made, that default is the thing that changes — and changing it is a
-migration, which is exactly why it needs an owner decision before Sprint 2 authors
+**Por qué importa ahora:** incorporar i18n después toca cada componente, de modo
+que "decidir después" tiene un costo real. No hace falta decidirlo _esta_ semana,
+pero la respuesta debería ser "centralizar los textos" o "ir a bilingüe" en lugar
+de dejarlo implícito.
+
+---
+
+## 3. ¿Se exige la verificación de correo antes del primer inicio de sesión?
+
+**Estado:** Sin resolver.
+
+`users.email_verified` (booleano) existe para que esto pueda cambiar sin una
+migración. La pregunta de producto es si una cuenta puede iniciar sesión antes de
+verificarse.
+
+- **Exigida antes del primer inicio de sesión** — mayor integridad; cuesta
+  fricción y una vía de soporte para quienes nunca ven el correo.
+- **Permitida antes de verificar, con limitaciones para las cuentas sin verificar**
+  — menor fricción; la aplicación debe entonces imponer el límite, que es una
+  ruta real de código y un lugar real para equivocarse en la comprobación.
+
+También está abierta la pregunta de si una cuenta sin verificar puede crear un
+escaneo en absoluto.
+
+**Nota:** `account_status` tiene actualmente por defecto `active`, porque la
+verificación de correo está desactivada en el Sprint 1 y ninguna ruta de código
+realiza todavía la transición. Cuando se tome esta decisión, ese valor por
+defecto es lo que cambia — y cambiarlo es una migración, que es exactamente por
+qué necesita una decisión del propietario antes de que el Sprint 2 redacte
 `scans`.
 
 ---
 
-## 4. Free-tier scan quota for the MVP
+## 4. Cuota de escaneos del plan gratuito para el MVP
 
-**Status:** Unresolved.
+**Estado:** Sin resolver.
 
-The number of scans a free account gets per month. This is a product decision with
-a direct cost consequence, and it is blocked on knowing what a scan actually costs
-in wall-clock time and worker capacity — which Sprint 2 measures rather than
-predicts.
+La cantidad de escaneos que recibe una cuenta gratuita por mes. Es una decisión
+de producto con una consecuencia directa de costo, y está bloqueada por saber qué
+cuesta realmente un escaneo en tiempo de reloj y en capacidad del worker — algo
+que el Sprint 2 mide en lugar de predecir.
 
-Open sub-questions:
+Subpreguntas abiertas:
 
-- Scans per month, or per day? Monthly is easier to communicate; daily spreads load
-  better.
-- Does a re-scan of the same domain count as a new scan?
-- Are concurrent scans limited separately from total volume?
-- What happens at the limit: hard block, or a queued position?
-- Does a failed scan count against the quota? (Recommendation: no — charging for
-  our failures is indefensible.)
+- ¿Escaneos por mes o por día? Lo mensual es más fácil de comunicar; lo diario
+  reparte mejor la carga.
+- ¿Un reescaneo del mismo dominio cuenta como un escaneo nuevo?
+- ¿Los escaneos concurrentes se limitan por separado del volumen total?
+- ¿Qué ocurre al llegar al límite: bloqueo duro o una posición en cola?
+- ¿Un escaneo fallido cuenta contra la cuota? (Recomendación: no — cobrar por
+  nuestros propios fallos es indefendible).
 
-**Interim stance:** rate limiting exists in Sprint 2 to protect the system; the
-_quota_ as a product concept waits for real cost data.
-
----
-
-## 5. Retention period for scan results
-
-**Status:** Unresolved.
-
-How long `scans`, `findings`, and `scan_events` are kept.
-
-- **Storage cost** — `scan_events` grows fastest and is the most likely to be
-  trimmed first.
-- **Security exposure** — raw tool payloads may contain endpoints discovered on
-  the target, and possibly auth headers or tokens echoed back by the target. Longer
-  retention means a longer exposure window. Scrubbing at write time is the correct
-  fix; retention is a second line of defense.
-- **Product value** — a security posture trend needs history; a finding that
-  disappears undermines trust.
-- **Regulatory** — depends on the customer's jurisdiction and their own obligations.
-
-Open sub-questions: per-plan retention? user-visible deletion? an explicit "delete
-all my data" path?
-
-**Why it matters now:** retention is much cheaper to design into the Sprint 2
-tables than to retrofit, because the deletion job and its cascades must exist from
-the start.
+**Postura interina:** la limitación de tasa existe en el Sprint 2 para proteger
+el sistema; la _cuota_ como concepto de producto espera datos reales de costo.
 
 ---
 
-## Resolved since the start of the project
+## 5. Periodo de retención de los resultados de escaneo
 
-Kept here so the reasoning is not lost.
+**Estado:** Sin resolver.
 
-| Question                   | Resolution                                                                 | Where                                                    |
-| -------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Database hosting           | Local PostgreSQL 18 via pgAdmin 4 (Supabase documented as the alternative) | [local-postgres-setup.md](./local-postgres-setup.md)     |
-| Monorepo layout            | pnpm workspaces + Turborepo, Next.js App Router as the only TS backend     | [ADR 0001](./adr/0001-monorepo-and-runtime-split.md)     |
-| Auth library               | Better Auth + Drizzle, email + password, argon2id                          | [ADR 0002](./adr/0002-authentication.md)                 |
-| Design token strategy      | Tailwind v4 `@theme`, semantic tokens, color budget, never color-only      | [ADR 0003](./adr/0003-design-tokens-and-color-budget.md) |
-| Database provider coupling | Provider-neutral; one `DATABASE_URL` change to switch                      | [ADR 0004](./adr/0004-database-provider-neutrality.md)   |
-| Multi-tenancy timing       | Deferred to Sprint 4+ with a documented reconsideration trigger            | [ADR 0005](./adr/0005-deferred-multi-tenancy.md)         |
+Cuánto tiempo se conservan `scans`, `findings` y `scan_events`.
+
+- **Costo de almacenamiento** — `scan_events` crece más rápido y es lo más
+  probable que se recorte primero.
+- **Exposición de seguridad** — los payloads crudos de las herramientas pueden
+  contener endpoints descubiertos en el objetivo y, posiblemente, cabeceras de
+  autenticación o tokens reflejados por el objetivo. Una retención más larga
+  significa una ventana de exposición más larga. Depurar al escribir es la
+  corrección correcta; la retención es una segunda línea de defensa.
+- **Valor de producto** — una tendencia de postura de seguridad necesita
+  historial; un hallazgo que desaparece socava la confianza.
+- **Regulatorio** — depende de la jurisdicción del cliente y de sus propias
+  obligaciones.
+
+Subpreguntas abiertas: ¿retención por plan? ¿eliminación visible para el usuario?
+¿una ruta explícita de "eliminar todos mis datos"?
+
+**Por qué importa ahora:** la retención es mucho más barata de diseñar dentro de
+las tablas del Sprint 2 que de incorporar después, porque el trabajo de
+eliminación y sus cascadas deben existir desde el inicio.
+
+---
+
+## Resueltas desde el inicio del proyecto
+
+Se conservan aquí para que el razonamiento no se pierda.
+
+| Pregunta                                   | Resolución                                                                         | Dónde                                                    |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Alojamiento de la base de datos            | PostgreSQL 18 local mediante pgAdmin 4 (Supabase documentado como alternativa)     | [local-postgres-setup.md](./local-postgres-setup.md)     |
+| Estructura del monorepo                    | pnpm workspaces + Turborepo, Next.js App Router como único backend TS              | [ADR 0001](./adr/0001-monorepo-and-runtime-split.md)     |
+| Biblioteca de autenticación                | Better Auth + Drizzle, correo + contraseña, argon2id                               | [ADR 0002](./adr/0002-authentication.md)                 |
+| Estrategia de design tokens                | `@theme` de Tailwind v4, tokens semánticos, presupuesto de color, nunca solo color | [ADR 0003](./adr/0003-design-tokens-and-color-budget.md) |
+| Acoplamiento al proveedor de base de datos | Neutral respecto del proveedor; un solo cambio de `DATABASE_URL` para alternar     | [ADR 0004](./adr/0004-database-provider-neutrality.md)   |
+| Momento del multitenancy                   | Aplazado hasta el Sprint 4+ con un disparador de reconsideración documentado       | [ADR 0005](./adr/0005-deferred-multi-tenancy.md)         |

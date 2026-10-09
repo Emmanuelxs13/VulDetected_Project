@@ -1,214 +1,235 @@
-# VulDetected Roadmap
+# Hoja de ruta de VulDetected
 
-The authoritative plan for VulDetected. If a statement about scope exists in two
-places, this file wins.
+El plan autoritativo de VulDetected. Si una afirmación sobre el alcance aparece
+en dos lugares, gana este archivo.
 
-Last updated: Sprint 1, foundation commit.
+Última actualización: Sprint 1, commit de base.
 
-## Status legend
+## Leyenda de estados
 
-| Status          | Meaning                                                                   |
-| --------------- | ------------------------------------------------------------------------- |
-| **Planned**     | Committed to a sprint, not started.                                       |
-| **In progress** | Actively being built right now.                                           |
-| **Done**        | Implemented and verified; the exit criteria are met.                      |
-| **Blocked**     | Cannot proceed; waiting on an owner decision or an external dependency.   |
-| **Deferred**    | Deliberately pushed out of the MVP; recorded here so it is not forgotten. |
+| Estado          | Significado                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| **Planificado** | Comprometido con un sprint, no iniciado.                                                       |
+| **En curso**    | Se está construyendo activamente ahora.                                                        |
+| **Completado**  | Implementado y verificado; se cumplen los criterios de salida.                                 |
+| **Bloqueado**   | No se puede avanzar; a la espera de una decisión del propietario o de una dependencia externa. |
+| **Aplazado**    | Aplazado deliberadamente fuera del MVP; se registra aquí para que no se olvide.                |
 
-## Sprint map
+## Mapa de sprints
 
-| Sprint    | Focus                                                                | Status      |
-| --------- | -------------------------------------------------------------------- | ----------- |
-| Sprint 1  | Monorepo, design system, email + password authentication             | In progress |
-| Sprint 2  | URL input, domain ownership verification, scan worker, live progress | Planned     |
-| Sprint 3  | Severity classification, dashboard, per-vulnerability remediation    | Planned     |
-| Sprint 4+ | OAuth, billing, executive PDF exports, scheduled scans               | Deferred    |
+| Sprint    | Enfoque                                                                                    | Estado      |
+| --------- | ------------------------------------------------------------------------------------------ | ----------- |
+| Sprint 1  | Monorepo, sistema de diseño, autenticación con correo y contraseña                         | En curso    |
+| Sprint 2  | Entrada de URL, verificación de propiedad del dominio, worker de escaneo, progreso en vivo | Planificado |
+| Sprint 3  | Clasificación de severidad, panel, remediación por vulnerabilidad                          | Planificado |
+| Sprint 4+ | OAuth, facturación, exportaciones PDF ejecutivas, escaneos programados                     | Aplazado    |
 
 ---
 
-## Sprint 1 — Foundation, design system, authentication
+## Sprint 1 — Fundamentos, sistema de diseño, autenticación
 
-**Status:** In progress
+**Estado:** En curso
 
-**Goal:** a running local environment, a defensible architectural record, and a
-user who can register and sign in.
+**Objetivo:** un entorno local en funcionamiento, un registro arquitectónico
+defendible y un usuario que pueda registrarse e iniciar sesión.
 
-### Deliverables
+### Entregables
 
-- Monorepo skeleton: pnpm workspaces + Turborepo, Node 22, `.nvmrc`, formatting
-  and lint configuration shared across packages.
+- Esqueleto del monorepo: pnpm workspaces + Turborepo, Node 22, `.nvmrc`,
+  configuración de formato y lint compartida entre paquetes.
 - `infra/docker-compose.dev.yml`: Postgres 16, Mailpit, Redis.
-- Architecture Decision Records (ADR 0001–0005) covering the runtime split,
-  authentication, design tokens, database neutrality, and deferred multi-tenancy.
-- Threat model seed (`docs/security.md`) with every non-negotiable marked as
-  `Open (planned Sprint N)` or `Done`.
-- `apps/web`: Next.js App Router application.
-- `packages/db`: Drizzle schema and the first migrations — `users`, `sessions`,
-  `verification_tokens`, `audit_logs`.
-- `packages/ui`: Tailwind v4 CSS-first `@theme` semantic tokens plus the base
-  primitives (Button, Input, Card, Badge, Alert).
-- Authentication: email + password via Better Auth, argon2id password hashing,
-  hashed session tokens in Postgres.
-- Design system: semantic token layer, severity palette, WCAG-compliant badges
-  (color + icon + text), automated contrast test against the severity palette.
-- `README.md` (root), `docs/` set, and `docs/changelog.md` as the running record.
+- Architecture Decision Records (ADR 0001–0005) que cubren la separación de
+  runtimes, la autenticación, los design tokens, la neutralidad de la base de
+  datos y el multitenancy aplazado.
+- Versión inicial del modelo de amenazas (`docs/security.md`) con cada
+  condición innegociable marcada como `Open (planned Sprint N)` o `Done`.
+- `apps/web`: aplicación Next.js App Router.
+- `packages/db`: esquema Drizzle y las primeras migraciones — `users`,
+  `sessions`, `verification_tokens`, `audit_logs`.
+- `packages/ui`: tokens semánticos de `@theme` con enfoque CSS en Tailwind v4,
+  más las primitivas base (Button, Input, Card, Badge, Alert).
+- Autenticación: correo y contraseña mediante Better Auth, hash de contraseña
+  con argon2id, tokens de sesión hasheados en Postgres.
+- Sistema de diseño: capa de tokens semánticos, paleta de severidad, insignias
+  conformes a WCAG (color + icono + texto), prueba automatizada de contraste
+  contra la paleta de severidad.
+- `README.md` (raíz), el conjunto `docs/` y `docs/changelog.md` como registro
+  continuo.
 
-### Exit criteria
+### Criterios de salida
 
-- [ ] `pnpm install` completes cleanly on Node 22 with pnpm 10.
-- [ ] `docker compose -f infra/docker-compose.dev.yml up -d` brings up Postgres
-      healthy, Mailpit reachable, Redis reachable.
-- [ ] Drizzle migrations apply cleanly to an empty database and can be re-checked
-      with `drizzle-kit check` (after **owner sign-off**, see
-      [database.md](./database.md#db-touch-points--owner-decision-required)).
-- [ ] `pnpm check` (lint + typecheck + format:check) passes.
-- [ ] A user can register, receive a verification email in Mailpit, sign in, and
-      sign out, with the session surviving a page reload.
-- [ ] Session tokens are stored hashed; the raw token never touches the database.
-- [ ] The severity palette passes an automated contrast test (not a manual eyeball).
-- [ ] No `organization_id` column exists anywhere in the schema.
-- [ ] `docs/changelog.md` records everything added in this sprint.
+- [ ] `pnpm install` termina sin errores en Node 22 con pnpm 10.
+- [ ] `docker compose -f infra/docker-compose.dev.yml up -d` levanta Postgres
+      sano, Mailpit accesible y Redis accesible.
+- [ ] Las migraciones de Drizzle se aplican sin errores a una base de datos
+      vacía y pueden revalidarse con `drizzle-kit check` (después de la
+      **aprobación del propietario**, ver
+      [database.md](./database.md#puntos-de-contacto-en-la-db--se-requiere-decisión-del-propietario)).
+- [ ] `pnpm check` (lint + typecheck + format:check) pasa.
+- [ ] Un usuario puede registrarse, recibir un correo de verificación en
+      Mailpit, iniciar sesión y cerrarla, con la sesión que sobrevive a una
+      recarga de página.
+- [ ] Los tokens de sesión se guardan hasheados; el token en crudo nunca toca
+      la base de datos.
+- [ ] La paleta de severidad pasa una prueba automatizada de contraste (no una
+      revisión visual manual).
+- [ ] No existe ninguna columna `organization_id` en todo el esquema.
+- [ ] `docs/changelog.md` registra todo lo añadido en este sprint.
 
 ---
 
-## Sprint 2 — Input, ownership verification, scan worker, live progress
+## Sprint 2 — Entrada de URL, verificación de propiedad, worker de escaneo y progreso en vivo
 
-**Status:** Planned
+**Estado:** Planificado
 
-**Goal:** the moment the product becomes real — a user submits a URL they own
-and watches a scan run.
+**Objetivo:** el momento en que el producto se vuelve real — un usuario envía
+una URL de su propiedad y observa un escaneo en ejecución.
 
-### Deliverables
+### Entregables
 
-- URL input with normalization, and rejection of anything that is not a
-  well-formed public http(s) URL.
-- Domain ownership verification, **mandatory before any job is enqueued**:
-  - DNS `TXT` token challenge, and/or
-  - a `/.well-known/` file challenge,
-  - proof persisted with issue timestamp, method, and the verifying record.
-- Tables: `domains`, `scans`, `findings`, `scan_events`.
-- `services/scanner`: Python + Celery worker that orchestrates Nuclei and ZAP
-  against the verified domain.
-- SSRF hardening in the worker egress path: DNS resolution, rejection of
-  private / loopback / link-local ranges, re-validation after every redirect,
-  restricted port allowlist.
-- Worker network isolation: filtered egress, read-only root filesystem, dropped
-  capabilities.
-- Real-time progress streamed to the browser (server-sent events) via
+- Entrada de URL con normalización y rechazo de todo lo que no sea una URL
+  http(s) pública bien formada.
+- Verificación de la propiedad del dominio, **obligatoria antes de encolar
+  cualquier trabajo**:
+  - desafío de token `TXT` de DNS, y/o
+  - desafío de archivo `/.well-known/`,
+  - la prueba se persiste con la marca de tiempo del problema, el método y el
+    registro que la verificó.
+- Tablas: `domains`, `scans`, `findings`, `scan_events`.
+- `services/scanner`: worker Python + Celery que orquesta Nuclei y ZAP contra
+  el dominio verificado.
+- Endurecimiento SSRF en la ruta de salida del worker: resolución DNS, rechazo
+  de rangos privados / de loopback / link-local, revalidación después de cada
+  redirección, lista de permitidos de puertos restringida.
+- Aislamiento de red del worker: salida filtrada, sistema de archivos raíz de
+  solo lectura, capacidades retiradas.
+- Progreso en tiempo real transmitido al navegador (server-sent events) mediante
   `scan_events`.
-- Rate limiting on scan submission and on auth endpoints.
+- Limitación de tasa en el envío de escaneos y en los endpoints de
+  autenticación.
 
-### Exit criteria
+### Criterios de salida
 
-- [ ] A scan cannot be enqueued without a verified ownership proof; the guard is
-      covered by tests, not just by convention.
-- [ ] SSRF defenses hold against redirects to `127.0.0.1`, `169.254.169.254`
-      (cloud metadata), RFC1918 ranges, and IPv6 loopback — proven by tests.
-- [ ] The worker runs with a read-only filesystem and cannot reach the Postgres
-      credentials or the host's private network.
-- [ ] A user sees live progress within 2 seconds of job start.
-- [ ] Findings are stored in a normalized shape independent of the tool that
-      produced them (Nuclei and ZAP both map to the same record).
-- [ ] Scan submission is rate limited and the limit is enforced server-side.
-
----
-
-## Sprint 3 — Severity, dashboard, remediation with code
-
-**Status:** Planned
-
-**Goal:** turn a raw finding list into something each audience can act on.
-
-### Deliverables
-
-- Severity classification: Critical / High / Medium / Low / Info, with a
-  deterministic, documented mapping from tool findings — not a raw CVSS dump.
-- Remediation content model: per-vulnerability guidance addressed to a
-  developer, a sysadmin, and a business owner, including concrete fix code where
-  a code change is the actual remedy.
-- Content storage and versioning, so remediation guidance can be corrected without
-  invalidating historical findings.
-- Dashboard: scan history, per-domain posture trend, filterable finding list,
-  severity breakdown.
-- Finding detail view: description, evidence, affected endpoint, remediation
-  steps, and copyable fix code.
-- Export of findings to CSV/JSON for teams that need to file tickets.
-
-### Exit criteria
-
-- [ ] Every finding resolves to exactly one severity, with the mapping rule
-      visible in the UI (no unexplained scores).
-- [ ] Every Critical and High finding has remediation content; the build fails
-      if a severity-bearing record exists without it.
-- [ ] Remediation code samples are syntax-checked, not pasted from memory.
-- [ ] The dashboard loads a domain with 10k findings without degrading (paged or
-      cursor-based access, no unbounded query).
-- [ ] A sysadmin and a business owner can each read their own view without a
-      developer translating for them.
+- [ ] No se puede encolar un escaneo sin una prueba de propiedad verificada; la
+      salvaguarda está cubierta por pruebas, no solo por convención.
+- [ ] Las defensas SSRF resisten redirecciones a `127.0.0.1`,
+      `169.254.169.254` (metadatos de la nube), rangos RFC1918 y loopback IPv6 —
+      demostrado con pruebas.
+- [ ] El worker corre con un sistema de archivos de solo lectura y no puede
+      acceder a las credenciales de Postgres ni a la red privada del host.
+- [ ] Un usuario ve el progreso en vivo en menos de 2 segundos desde el inicio
+      del trabajo.
+- [ ] Los hallazgos se almacenan con una forma normalizada e independiente de la
+      herramienta que los produjo (Nuclei y ZAP se mapean al mismo registro).
+- [ ] El envío de escaneos tiene limitación de tasa y el límite se aplica en el
+      servidor.
 
 ---
 
-## Sprint 4+ — Deferred
+## Sprint 3 — Severidad, panel y remediación con código
 
-**Status:** Deferred
+**Estado:** Planificado
 
-Explicitly out of the MVP. Recorded so that "not built" is a decision rather than
-an omission.
+**Objetivo:** convertir una lista cruda de hallazgos en algo sobre lo que cada
+audiencia pueda actuar.
 
-| Capability            | Why deferred                                                                                                    | Trigger to revisit                                      |
-| --------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Google / GitHub OAuth | Email + password proves the auth plumbing; OAuth adds provider config and redirect surface before it is needed. | Sprint 4, or on first request for enterprise onboarding |
-| Stripe billing        | No metered value delivered yet — billing before scans work is premature.                                        | Sprint 4, after S3 proves retention and usage patterns  |
-| Executive PDF exports | Requires the severity model to be stable; generating PDFs against a moving classification wastes effort.        | After Sprint 3 exit criteria pass                       |
-| Scheduled scans       | Needs a scheduler with its own reliability story (retries, catch-up, timezone handling).                        | Sprint 4+ with the billing/metering model               |
+### Entregables
 
----
+- Clasificación de severidad: Crítica / Alta / Media / Baja / Info, con un
+  mapeo determinista y documentado desde los hallazgos de las herramientas —
+  no un volcado crudo de CVSS.
+- Modelo de contenido de remediación: orientación por vulnerabilidad dirigida a
+  un desarrollador, un administrador de sistemas y un responsable de negocio,
+  incluido el código de corrección concreto cuando el remedio real es un cambio
+  de código.
+- Almacenamiento y versionado del contenido, de modo que la orientación de
+  remediación pueda corregirse sin invalidar los hallazgos históricos.
+- Panel: historial de escaneos, tendencia de postura por dominio, lista de
+  hallazgos filtrable, desglose de severidad.
+- Vista de detalle del hallazgo: descripción, evidencia, endpoint afectado,
+  pasos de remediación y código de corrección copiable.
+- Exportación de hallazgos a CSV/JSON para equipos que necesitan crear tickets.
 
-## Deferred decisions
+### Criterios de salida
 
-These are open or deliberately postponed. See
-[decisions-pending.md](./decisions-pending.md) for the questions and
-[adr/](./adr/) for the reasoning behind the ones that are already resolved.
-
-### Supabase vs local Postgres — UNRESOLVED
-
-Not blocked on a technical decision. Because the data layer is provider-neutral
-(ADR 0004), the choice is a **single `DATABASE_URL` change**: Supabase's
-connection string replaces the local Docker one and nothing in the application
-code moves. What is still open is the _operational_ side — backup policy,
-connection pooling (Supabase's transaction pooler vs a direct connection),
-row-level security posture, and whether the free tier tolerates the scan volume
-Sprint 2 will generate. Those answers need real usage data, not speculation.
-
-The neutral position is deliberate: betting on one provider before the schema
-has survived two schema-changing sprints would be premature.
-
-### Multi-tenancy / organizations — deliberately deferred to S4+
-
-Rationale and the reconsideration trigger live in
-[ADR 0005](./adr/0005-deferred-multi-tenancy.md). Short version: adding
-`organization_id` now means a NOT NULL column and a backfill on every table that
-grows in Sprint 2 and Sprint 3, before a single real user has asked for it. The
-cost is deferred, not the capability.
-
-### Billing
-
-Deferred with the rest of Sprint 4+. Stripe is not merely a payment page: it
-forces a decision about quotas, metering, and what a "scan" costs, and that
-decision should follow evidence about how long a real scan runs and what users
-actually re-run.
-
-### Scheduled scanning
-
-Deferred. A scheduler introduces its own failure modes — missed runs, duplicate
-runs, catch-up after downtime — that deserve a dedicated sprint rather than a
-side feature in the MVP.
+- [ ] Cada hallazgo resuelve a exactamente una severidad, con la regla de
+      mapeo visible en la interfaz (sin puntuaciones sin explicar).
+- [ ] Cada hallazgo Crítico y Alto tiene contenido de remediación; la
+      compilación falla si existe un registro con severidad sin ese contenido.
+- [ ] Los ejemplos de código de remediación pasan verificación de sintaxis; no
+      se pegan de memoria.
+- [ ] El panel carga un dominio con 10 000 hallazgos sin degradarse (acceso
+      paginado o por cursor, sin consultas sin límite).
+- [ ] Un administrador de sistemas y un responsable de negocio pueden leer cada
+      uno su propia vista sin que un desarrollador se lo traduzca.
 
 ---
 
-## How this document evolves
+## Sprint 4+ — Aplazado
 
-- Statuses are updated **as work lands**, not at the end of a sprint.
-- New architectural decisions get a new ADR in `docs/adr/` and a link from here.
-- Scope changes are recorded here first, so the reasoning survives the person who
-  made it.
+**Estado:** Aplazado
+
+Explícitamente fuera del MVP. Se registra para que "no construido" sea una
+decisión y no una omisión.
+
+| Capacidad                    | Por qué se aplaza                                                                                                                                        | Disparador para revisarlo                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| OAuth con Google / GitHub    | Correo y contraseña demuestran la tubería de autenticación; OAuth añade configuración de proveedor y superficie de redirección antes de que se necesite. | Sprint 4, o en la primera solicitud de incorporación empresarial  |
+| Facturación con Stripe       | Aún no se entrega ningún valor medible — facturar antes de que los escaneos funcionen es prematuro.                                                      | Sprint 4, después de que S3 demuestre patrones de retención y uso |
+| Exportaciones PDF ejecutivas | Requiere que el modelo de severidad sea estable; generar PDFs contra una clasificación en movimiento desperdicia esfuerzo.                               | Después de que pasen los criterios de salida del Sprint 3         |
+| Escaneos programados         | Necesita un planificador con su propia historia de fiabilidad (reintentos, recuperación de atrasos, manejo de zonas horarias).                           | Sprint 4+ con el modelo de facturación y medición                 |
+
+---
+
+## Decisiones aplazadas
+
+Estas están abiertas o aplazadas deliberadamente. Consulte
+[decisions-pending.md](./decisions-pending.md) para las preguntas y
+[adr/](./adr/) para el razonamiento de las que ya están resueltas.
+
+### Supabase vs PostgreSQL local — SIN RESOLVER
+
+No está bloqueada por una decisión técnica. Como la capa de datos es neutral
+respecto del proveedor (ADR 0004), la elección es **un único cambio de
+`DATABASE_URL`**: la cadena de conexión de Supabase reemplaza a la local de
+Docker y nada del código de la aplicación se mueve. Lo que sigue abierto es el
+lado _operativo_ — la política de copias de seguridad, el agrupamiento de
+conexiones (el pooler transaccional de Supabase frente a una conexión directa),
+la postura de seguridad a nivel de fila y si el plan gratuito tolera el volumen
+de escaneos que generará el Sprint 2. Esas respuestas necesitan datos reales de
+uso, no especulación.
+
+La posición neutral es deliberada: apostar por un proveedor antes de que el
+esquema haya sobrevivido dos sprints con cambios de esquema sería prematuro.
+
+### Multitenancy / organizaciones — aplazado deliberadamente hasta S4+
+
+La justificación y el disparador de reconsideración están en
+[ADR 0005](./adr/0005-deferred-multi-tenancy.md). Versión corta: agregar
+`organization_id` ahora implica una columna NOT NULL y un backfill en cada tabla
+que crece en el Sprint 2 y el Sprint 3, antes de que un solo usuario real lo
+haya pedido. El costo se aplaza, no la capacidad.
+
+### Facturación
+
+Aplazada junto con el resto del Sprint 4+. Stripe no es solamente una página de
+pagos: obliga a decidir sobre cuotas, medición y cuánto cuesta un "escaneo", y
+esa decisión debe seguir a la evidencia sobre cuánto dura un escaneo real y qué
+vuelven a ejecutar los usuarios.
+
+### Escaneo programado
+
+Aplazado. Un planificador introduce sus propios modos de fallo — ejecuciones
+perdidas, ejecuciones duplicadas, recuperación tras un tiempo de inactividad —
+que merecen un sprint dedicado en lugar de una función secundaria en el MVP.
+
+---
+
+## Cómo evoluciona este documento
+
+- Los estados se actualizan **a medida que avanza el trabajo**, no al final de
+  un sprint.
+- Las nuevas decisiones arquitectónicas reciben un ADR nuevo en `docs/adr/` y
+  un enlace desde aquí.
+- Los cambios de alcance se registran primero aquí, de modo que el
+  razonamiento sobrevive a la persona que lo tomó.
