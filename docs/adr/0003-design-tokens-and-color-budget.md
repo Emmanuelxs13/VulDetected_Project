@@ -1,164 +1,179 @@
-# ADR 0003: Design tokens and color budget
+# ADR 0003: Design tokens y presupuesto de color
 
-- **Status:** Accepted
-- **Date:** Sprint 1
+- **Estado:** Aceptada
+- **Fecha:** Sprint 1
 
-## Context
+## Contexto
 
-VulDetected presents security findings to three audiences with different
-questions:
+VulDetected presenta hallazgos de seguridad a tres audiencias con preguntas
+distintas:
 
-- a **developer** — what is the vulnerable code path, what do I change?
-- a **sysadmin** — what is exposed, what do I patch at the infrastructure level?
-- a **business owner** — how bad is it, and what does it cost me?
+- un **desarrollador** — ¿cuál es la ruta de código vulnerable, qué cambio?
+- un **administrador de sistemas** — ¿qué está expuesto, qué parcheo a nivel de
+  infraestructura?
+- un **propietario de negocio** — ¿qué tan grave es, y cuánto me cuesta?
 
-They read the same data, so the visual language has to encode severity _once_,
-correctly, and legibly — including for the roughly 1 in 12 men with a color
-vision deficiency who will be looking at it. Urgency also creates a real risk:
-severity color is exactly the kind of signal that gets sprinkled around until the
-interface is a rainbow and nothing reads as urgent anymore.
+Leen los mismos datos, de modo que el lenguaje visual debe codificar la severidad
+_una sola vez_, correctamente y con legibilidad — incluso para el aproximadamente 1
+en 12 hombres con deficiencia en la visión del color que lo va a mirar. La
+urgencia además crea un riesgo real: el color de severidad es exactamente el tipo
+de señal que se salpica por todos lados hasta que la interfaz es un arcoíris y
+nada se lee como urgente.
 
-Tailwind v4 is CSS-first. Tokens live in a `@theme` block in CSS, are emitted as
-CSS custom properties, and utilities derive from those variables. That means the
-token layer and the utility layer are the same layer — which is precisely why it
-needs a written rule rather than "be tasteful."
+Tailwind v4 es CSS-first. Los tokens viven en un bloque `@theme` en CSS, se
+emiten como custom properties de CSS y las utilidades se derivan de esas
+variables. Eso significa que la capa de tokens y la capa de utilidades son la
+misma capa — y es precisamente la razón por la que necesita una regla escrita y no
+un "use buen gusto".
 
-## Decision
+## Decisión
 
-### 1. Semantic tokens are defined once, in Tailwind v4 `@theme`
+### 1. Los tokens semánticos se definen una sola vez, en el `@theme` de Tailwind v4
 
-A single `@theme` block in `packages/ui` declares the whole palette as semantic
-names:
+Un único bloque `@theme` en `packages/ui` declara la paleta completa con nombres
+semánticos:
 
-- **Surfaces** — `background`, `surface`, `surface-raised`, `surface-overlay`
-- **Content** — `foreground`, `foreground-muted`, `foreground-subtle`
-- **Lines** — `border`, `border-strong`, `border-subtle`
-- **Brand** — one `iris` ramp (the product accent)
-- **Severity** — `critical`, `high`, `medium`, `low`, `info`
+- **Superficies** — `background`, `surface`, `surface-raised`, `surface-overlay`
+- **Contenido** — `foreground`, `foreground-muted`, `foreground-subtle`
+- **Líneas** — `border`, `border-strong`, `border-subtle`
+- **Marca** — una rampa `iris` (el acento del producto)
+- **Severidad** — `critical`, `high`, `medium`, `low`, `info`
 
-Components consume **only** semantic names (`bg-surface`, `text-foreground-muted`,
-`border-border`). Raw palette steps (`bg-slate-800`, `text-zinc-400`) are banned
-in component code. Why this matters concretely: with raw palette references, a
-component that hardcodes `bg-slate-800` is correct in exactly one theme, so
-re-theming means auditing every component instead of changing one block of CSS.
+Los componentes consumen **solo** nombres semánticos (`bg-surface`,
+`text-foreground-muted`, `border-border`). Los pasos crudos de la paleta
+(`bg-slate-800`, `text-zinc-400`) están prohibidos en el código de componentes.
+Por qué esto importa concretamente: con referencias crudas a la paleta, un
+componente con `bg-slate-800` fijo es correcto en exactamente un tema, de modo
+que re-tematizar significa auditar cada componente en lugar de cambiar un bloque
+de CSS.
 
-### 2. No `dark:` variant sprinkling
+### 2. Sin salpicado de la variante `dark:`
 
-A `dark:` prefix on scattered elements means theme is decided at the _call site_,
-by whoever wrote that component, which is how half-themed UIs happen. Theme is
-decided at the _token_ layer.
+Un prefijo `dark:` en elementos dispersos significa que el tema se decide en el
+_lugar de llamada_, por quien escribió ese componente, y así es como ocurren las
+UIs a medio tematizar. El tema se decide en la capa de _tokens_.
 
-- Colors resolve to CSS variables that already carry the theme.
-- Theme switching is a single class or `data-theme` attribute on `<html>`.
-- Tokens themselves carry `light` and `dark` values; components never branch.
+- Los colores resuelven a variables de CSS que ya llevan el tema.
+- Cambiar de tema es una sola clase o un atributo `data-theme` en `<html>`.
+- Los tokens mismos llevan valores `light` y `dark`; los componentes nunca
+  ramifican.
 
-Re-theming therefore costs one edit in one file, and it is impossible for a
-component to be half-themed.
+Re-tematizar cuesta por lo tanto una edición en un solo archivo, y es imposible
+que un componente esté a medio tematizar.
 
-### 3. Color budget
+### 3. Presupuesto de color
 
-| Category                                  | Share of visible surface                            | Notes                                                                                     |
-| ----------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| **Neutrals** (surfaces, content, borders) | **≈95%**                                            | The default. Nearly every screen is neutral.                                              |
-| **Brand `iris`**                          | **≤3%**                                             | Primary actions, focus rings, active nav. Accent, not fill.                               |
-| **Severity colors**                       | **≤2%**, and **only where severity is the subject** | Never decoration. Never a background wash on a whole card just because it is "important". |
+| Categoría                                    | Porción de la superficie visible                  | Notas                                                                                         |
+| -------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **Neutros** (superficies, contenido, bordes) | **≈95%**                                          | Lo por defecto. Casi toda pantalla es neutra.                                                 |
+| **Marca `iris`**                             | **≤3%**                                           | Acciones primarias, anillos de foco, navegación activa. Acento, no relleno.                   |
+| **Colores de severidad**                     | **≤2%**, y **solo donde la severidad es el tema** | Nunca decoración. Nunca un lavado de fondo en una tarjeta entera solo porque es "importante". |
 
-"Only where severity is the subject" is the operative constraint: a Critical
-finding badge is severity-colored; a button on the same screen is not, no matter
-how important the button feels. Severity color is a scarce resource, and its
-meaning is destroyed the moment it decorates things.
+"Solo donde la severidad es el tema" es la restricción operativa: una insignia de
+hallazgo Crítico tiene color de severidad; un botón en la misma pantalla no, por
+importante que se sienta el botón. El color de severidad es un recurso escaso, y
+su significado se destruye en el momento en que decora cosas.
 
-### 4. Severity palette reuses Radix scale steps 9 and 10
+### 4. La paleta de severidad reutiliza los pasos 9 y 10 de la escala de Radix
 
-Severity colors are drawn from the Radix scales at step **9** (borders, icon
-fills, chips) and step **10** (the saturated foreground/text color), chosen so
-they sit at roughly 6:1 contrast against Radix `background` and `surface`.
+Los colores de severidad se toman de las escalas de Radix en el paso **9**
+(bordes, rellenos de íconos, chips) y el paso **10** (el color de texto/
+foreground saturado), elegidos para que queden en un contraste de aproximadamente
+6:1 contra `background` y `surface` de Radix.
 
-Why Radix steps rather than hand-picked hex values: Radix is the base of the UI
-primitives, and every Radix surface in the product derives from the same 12-step
-scales. Pulling severity colors from those same ramps means the foreground/background
-pair is guaranteed to come from one coherent system instead of two. Step 9/10 are
-specifically the steps Radix itself uses for borders and solid foregrounds, so
-we inherit its contrast discipline.
+Por qué pasos de Radix y no valores hex elegidos a mano: Radix es la base de las
+primitivas de UI, y toda superficie de Radix del producto se deriva de las mismas
+escalas de 12 pasos. Tomar los colores de severidad de esas mismas rampas
+significa que el par foreground/background viene garantizado de un solo sistema
+coherente en lugar de dos. Los pasos 9 y 10 son específicamente los pasos que
+Radix mismo usa para bordes y foregrounds sólidos, de modo que heredamos su
+disciplina de contraste.
 
-**This is a guarantee to be verified, not an assumption.** Ratio math from a color
-library is a starting point, not proof: what matters is the _rendered_ pair
-against the _actual_ rendered surface, in both themes. Sprint 1 therefore ships an
-automated contrast test that computes WCAG ratios for every severity token against
-every surface token it can appear on, in light and dark. A violation fails the
-build. Assuming contrast and then discovering it in production is the failure mode
-this rule exists to prevent.
+**Esto es una garantía por verificar, no un supuesto.** La aritmética de ratios
+de una librería de colores es un punto de partida, no una prueba: lo que importa
+es el par _renderizado_ contra la superficie _efectivamente renderizada_, en ambos
+temas. El Sprint 1 entrega por lo tanto una prueba automatizada de contraste que
+calcula los ratios WCAG de cada token de severidad contra cada token de superficie
+donde puede aparecer, en claro y en oscuro. Una violación hace fallar la
+compilación. Asumir el contraste y descubrirlo después en producción es el modo
+de fallo que esta regla existe para prevenir.
 
-### 5. Never color-only (WCAG 1.4.1)
+### 5. Nunca solo color (WCAG 1.4.1)
 
-Every severity badge carries **three** redundant channels:
+Cada insignia de severidad lleva **tres** canales redundantes:
 
-- **color** — the severity hue,
-- **icon** — a distinct glyph per severity (filled triangle, warning triangle,
-  shield, info circle),
-- **text** — the severity word itself (`Critical`, `High`, `Medium`, `Low`,
-  `Info`).
+- **color** — el tono de la severidad,
+- **ícono** — un glifo distinto por severidad (triángulo relleno, triángulo de
+  advertencia, escudo, círculo de información),
+- **texto** — la palabra de la severidad misma (`Critical`, `High`, `Medium`,
+  `Low`, `Info`).
 
-Drop any one channel and it still reads correctly. Consequences: severity survives
-color-blindness, survives monochrome printing and screenshot degradation, and
-survives grep-ability and screen-reader announcement. Text is non-negotiable —
-`bg-red-500` with no label communicates nothing to a screen reader.
+Quite cualquiera de los canales y aun así se lee correctamente. Consecuencias: la
+severidad sobrevive al daltonismo, sobrevive a la impresión en monocromo y a la
+degradación de capturas de pantalla, y sobrevive a la busquedad con grep y al
+anuncio de los lectores de pantalla. El texto es innegociable — `bg-red-500` sin
+etiqueta no comunica nada a un lector de pantalla.
 
-## Consequences
+## Consecuencias
 
-**Accepted benefits**
+**Beneficios aceptados**
 
-- One edit re-themes the entire product.
-- Severity color is consistent across the whole UI, which is what makes it
-  learnable — a user who learns "amber means Medium" in the dashboard reads it
-  correctly on a finding detail page.
-- Accessibility is enforced by a test instead of reviewed by eye, in both themes.
-- Screens stay calm: a 95%-neutral surface keeps the few colored elements
-  meaningful.
+- Una sola edición re-tematiza todo el producto.
+- El color de severidad es consistente en toda la UI, y eso es lo que lo vuelve
+  aprendible — un usuario que aprende "ámbar significa Medium" en el panel lo
+  lee correctamente en una página de detalle de hallazgo.
+- La accesibilidad la hace cumplir una prueba en lugar de revisarla a ojo, en
+  ambos temas.
+- Las pantallas se mantienen tranquilas: una superficie 95% neutra mantiene
+  significativos los pocos elementos con color.
 
-**Accepted costs**
+**Costos aceptados**
 
-- Semantic naming is more verbose than raw palette steps. `text-foreground-muted`
-  is longer than `text-zinc-400`. Enforced with an ESLint rule, because a rule
-  nobody enforces is a preference.
-- Theming is constrained to light/dark parity. Mid-flight theme variations
-  require new semantic tokens rather than a one-off utility class — deliberately
-  slower, because the alternative is the scattered `dark:` problem returning.
-- The contrast test is a real cost: every new semantic token must declare the
-  surfaces it may appear on, or the test cannot know what to check. New tokens
-  mean a deliberate test update.
-- Step 9/10 may need per-severity adjustment once real components exist. The
-  rule is the source of the adjustment, and the test is how it is validated.
+- La nomenclatura semántica es más verbosa que los pasos crudos de la paleta.
+  `text-foreground-muted` es más largo que `text-zinc-400`. Se aplica con una
+  regla de ESLint, porque una regla que nadie aplica es una preferencia.
+- El tematizado queda limitado a la paridad claro/oscuro. Variaciones de tema a
+  mitad de vuelo requieren tokens semánticos nuevos en lugar de una clase de
+  utilidad única — deliberadamente más lento, porque la alternativa es que
+  vuelva el problema del `dark:` disperso.
+- La prueba de contraste es un costo real: cada token semántico nuevo debe
+  declarar las superficies donde puede aparecer, o la prueba no sabe qué
+  verificar. Tokens nuevos implican una actualización deliberada de la prueba.
+- Los pasos 9/10 pueden necesitar ajuste por severidad una vez que existan
+  componentes reales. La regla es el origen del ajuste, y la prueba es cómo se
+  valida.
 
-## Alternatives considered
+## Alternativas consideradas
 
-### Utility-first theming with `dark:` variants per component
+### Tematizado utility-first con variantes `dark:` por componente
 
-Rejected. Decision at the call site; theme bugs become component bugs; auditing
-every component for every theme change. This is the default failure mode and it is
-exactly what rule 2 forbids.
+Rechazada. Decisión en el lugar de llamada; los bugs de tema se vuelven bugs de
+componente; auditar cada componente en cada cambio de tema. Ése es el modo de
+fallo por defecto y es exactamente lo que prohíbe la regla 2.
 
-### Runtime CSS-in-JS theming (e.g. a theme provider with computed values)
+### Tematizado CSS-in-JS en tiempo de ejecución (p. ej. un theme provider con valores computados)
 
-Rejected. It moves the token source of truth out of CSS into JavaScript, which
-means the design system is only visible when the app boots. That makes visual
-regression tests, SSR consistency, and static documentation of the palette all
-harder for no gain, given Tailwind v4 already resolves tokens to CSS variables.
+Rechazada. Mueve la fuente de verdad de los tokens fuera de CSS hacia
+JavaScript, lo que significa que el sistema de diseño solo es visible cuando la
+app arranca. Eso hace más difíciles las pruebas de regresión visual, la
+consistencia del SSR y la documentación estática de la paleta, sin ninguna
+ganancia, dado que Tailwind v4 ya resuelve los tokens a variables de CSS.
 
-### A larger brand palette
+### Una paleta de marca más grande
 
-Rejected. More brand colors do not create a stronger brand; they dilute it and
-make the ≤3% budget unachievable. One accent ramp, used sparingly, is stronger
-than five used everywhere.
+Rechazada. Más colores de marca no crean una marca más fuerte; la diluyen y
+vuelven inalcanzable el presupuesto de ≤3%. Una sola rampa de acento, usada con
+parcimonia, es más fuerte que cinco usadas en todos lados.
 
-### Severity colors outside the Radix ramps
+### Colores de severidad fuera de las rampas de Radix
 
-Rejected for the reasons in rule 4: two coexisting color systems invite
-near-misses that pass a casual eye and fail an audit. Sub-second changes per
-severity are worth less than a guaranteed, single-system relationship.
+Rechazada por las razones de la regla 4: dos sistemas de color que coexisten
+invitan a casi-aciertos que pasan un vistazo casual y fallan una auditoría. Los
+cambios de menos de un segundo por severidad valen menos que una relación
+garantizada de un solo sistema.
 
-### Icons alone, without color
+### Solo íconos, sin color
 
-Rejected as the sole channel. Icons alone are ambiguous at a glance — a triangle
-is "warning" but not "how bad". Icons plus text plus color is redundant on
-purpose; redundancy is the accessibility strategy.
+Rechazada como único canal. Los íconos solos son ambiguos de un vistazo — un
+triángulo es "advertencia" pero no "qué tan malo". Ícono más texto más color es
+redundante a propósito; la redundancia es la estrategia de accesibilidad.
