@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { accountStatusEnum, tokenPurposeEnum } from './enums';
+import { accountStatusEnum, scanStatusEnum, severityEnum, tokenPurposeEnum } from './enums';
 
 /**
  * Runner smoke test for the data layer.
@@ -18,5 +18,27 @@ describe('schema enums', () => {
 
   it('token_purpose reserves domain_ownership for the Sprint 2 challenge flow', () => {
     expect(tokenPurposeEnum.enumValues).toContain('domain_ownership');
+  });
+
+  it('scan_status fixes the Sprint 2 scan lifecycle vocabulary', () => {
+    expect(scanStatusEnum.enumValues).toEqual([
+      'queued',
+      'running',
+      'completed',
+      'failed',
+      'cancelled',
+    ]);
+  });
+
+  it('severity leads with unclassified — the only value Sprint 2 writes (DM-3)', () => {
+    expect(severityEnum.enumValues).toEqual([
+      'unclassified',
+      'info',
+      'low',
+      'medium',
+      'high',
+      'critical',
+    ]);
+    expect(severityEnum.enumValues[0]).toBe('unclassified');
   });
 });
