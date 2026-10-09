@@ -5,3 +5,12 @@ turbo/
 pnpm-lock.yaml
 .atl/
 *.sql
+
+# SDD planning artifacts are agent-authored tooling documents, not part of the
+# formatted source tree — same rationale as .atl/. Formatting them would put
+# unrelated reflow noise in code-review diffs.
+openspec/
+
+# Python tooling caches
+.pytest_cache/
+__pycache__/
