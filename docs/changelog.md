@@ -346,6 +346,45 @@ Sprint 1. Los tres eran invisibles para `tsc` y se habrían publicado.
   ha ejecutado contra una base de datos y de que el flujo de autenticación está
   sin probar hasta que así sea.
 
+### Añadido — Sprint 2: dominio de escaneo
+
+> El Sprint 2 _redacta_ el esquema de escaneo pero **no aplica ninguna
+> migración nueva**: `0003_scan_domain` está generada con `db:generate` y
+> bloqueada hasta la autorización del propietario. Nada de este Sprint 2 (datos)
+> se ha ejecutado contra una base de datos.
+
+- **Base de pruebas para el monorepo.** Vitest 5 configurado en la raíz
+  mediante `test.projects` (`apps/web`, `packages/db`), con config por
+  workspace, stub de `server-only` para los tests web y esqueleto pytest para
+  `services/scanner` (`pyproject.toml`, `tests/test_smoke.py`). Script `test`
+  en la raíz (`vitest run`); 6 tests verdes en Vitest + 1 en pytest.
+- **Esquema del dominio de escaneo en `packages/db`.** Cuatro tablas nuevas
+  (`domains`, `scans`, `findings`, `scan_events`) y dos enums (`scan_status`,
+  `severity`), con el patrón del Sprint 1: `uuid` + `gen_random_uuid()`,
+  `timestamptz`, FKs en cascada, migración aditiva sin backfill.
+- **Desviación deliberada `scan_events.id`:** `bigint GENERATED ALWAYS AS
+IDENTITY` en lugar de `uuid` — el stream append-only necesita un cursor
+  monotónico para el polling SSE (D2, documentado en la tabla).
+- **Unicidad GLOBAL de `normalized_hostname`** — decisión del propietario
+  incorporada a la migración `0003` (D2): la propiedad legal de un dominio es
+  excluyente de hecho; la segunda cuenta recibe "dominio ya verificado por otra
+  cuenta".
+- **Deduplicación de `findings` por clave estable** — `finding_key =
+sha256(domain_id | check_name | affected_url)`, índice único intra-escaneo
+  `(scan_id, finding_key)` con `ON CONFLICT DO NOTHING` y `findings_key_idx` no
+  único para la tendencia entre escaneos (D3).
+- **Migración aditiva `0003_scan_domain` generada, no aplicada.** Verificada con
+  `drizzle-kit check` ("todo en orden"); su ejecución (`db:migrate`) es un hito
+  de decisión del propietario, no una tarea de implementación.
+
+### Cambiado — Sprint 2: dominio de escaneo
+
+- `docs/database.md` documenta ahora el esquema real del Sprint 2 (las cuatro
+  tablas, los dos enums, los índices y su razón de ser) y corrige el estado de
+  migraciones: las del Sprint 1 (`0000`–`0002`) están ejecutadas y verificadas
+  contra la base local; la `0003` del Sprint 2 está generada y sin aplicar.
+- `docs/changelog.md` — este registro.
+
 ## [Hoja de ruta relevante sin publicar]
 
 El Sprint 2 continúa: entrega de correo (Mailpit), que activa
