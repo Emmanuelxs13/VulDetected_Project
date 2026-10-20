@@ -48,7 +48,10 @@ verificada. Una prueba afirma que todo intento de encolar sin una prueba falla.
 
 ## 2. Endurecimiento SSRF
 
-**Estado:** `Open (planned Sprint 2)`
+**Estado:** `Partially done` — la tabla de reglas de esta sección está
+implementada y probada en los dos lados (`apps/web/src/lib/ssrf.ts` con Vitest;
+`services/scanner/scanner/ssrf.py` con pytest). El cliente de salida del worker
+(timeouts, concurrencia, modo `strict`) llega con el task 4.4.
 
 **Amenaza.** El objetivo del escaneo lo aporta el usuario. Sin controles, es una
 primitiva clásica de falsificación de solicitudes del lado del servidor apuntada
@@ -72,18 +75,38 @@ interesante". No puede serlo.
 - **Revalidar después de cada redirección.** Una URL permitida que redirige a
   `169.254.169.254` elude por completo cualquier verificación única. Cada salto
   se resuelve y se vuelve a comprobar; las cadenas de redirección están acotadas.
-- **Puertos restringidos.** Una lista de permitidos explícita (80, 443 y lo que
-  una plantilla concreta de escaneo necesite legítimamente). Sin puertos
-  arbitrarios.
+- **Puertos restringidos.** Lista cerrada `80/443` (`ALLOWED_PORTS`), chequeada
+  antes de consultar el DNS; ampliarla exige cambiar la tabla de reglas y sus
+  dos suites de pruebas.
 - **Rebinding de DNS.** Resolver una vez, fijar la dirección validada para la
   conexión y no volver a resolver a mitad de la solicitud hacia una respuesta
   distinta.
 - **Tiempos de espera y límites de concurrencia** por objetivo, de modo que un
   objetivo lento no pueda ocupar una ranura del worker.
 
-**Verificado por pruebas, no por inspección.** El conjunto de pruebas debe
-incluir intentos de elusión mediante redirección y mediante IPv6; una prueba que
-pasa es la evidencia de que el control funciona.
+### Tabla de reglas (contrato único, D6)
+
+Una sola tabla, dos implementaciones: `apps/web/src/lib/ssrf.ts` (Vitest) y
+`services/scanner/scanner/ssrf.py` (pytest). Ambas suites afirman caso por caso
+esta tabla; si una regla cambia, cambia aquí primero y después en los dos lados.
+
+| #   | Regla                                | Detalle                                                                                                                                                                                                                                                                                         |
+| --- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Validar la dirección, no el hostname | La cadena la controla el atacante; la dirección es lo que se marca.                                                                                                                                                                                                                             |
+| 2   | Bloquear tras resolver               | IPv4: `0.0.0.0/8`, `10/8`, `127/8` (loopback), `169.254/16` (link-local y metadatos cloud), `172.16/12`, `192.168/16`, `224/4` (multicast). IPv6: `::/128`, `::1/128`, `fe80::/10`, `fc00::/7`, `ff00::/8` (multicast). Una dirección no parseable se rechaza: falla cerrada, nunca se permite. |
+| 3   | IPv4-mapped cae a IPv4               | `::ffff:127.0.0.1` y su forma hex `::ffff:7f00:1` se normalizan a `127.0.0.1` y vuelven a pasar por la tabla IPv4.                                                                                                                                                                              |
+| 4   | Solo literales canónicos             | Si el host es un literal IP: IPv4 dotted-decimal canónico (se rechazan decimal `2130706433`, octal `0177.0.0.1`, hex `0x7f000001`, corto `127.1`, cola con punto) o IPv6 canónico en minúsculas y comprimido RFC 5952 (se rechazan `0:0:0:0:0:0:0:1`, grupos rellenos y zone ids).              |
+| 5   | Conjunto completo, pin único         | Se resuelve una sola vez, se valida TODA la respuesta A/AAAA — una sola dirección bloqueada rechaza el host, que es exactamente el patrón rebinding — y se fija la primera pública. La conexión va a esa IP con `Host`/SNI = hostname original; no se re-resuelve a mitad de petición.          |
+| 6   | Redirects manuales                   | `follow_redirects=false` y bucle propio, máximo **5 saltos**; cada salto re-resuelve, re-valida y re-fija con esta misma tabla antes de abrir conexión.                                                                                                                                         |
+| 7   | Solo puertos `80` y `443`            | Lista cerrada `ALLOWED_PORTS`, chequeada antes de ningún DNS.                                                                                                                                                                                                                                   |
+| 8   | Solo `http`/`https`                  | Otros esquemas → rechazo `unsupported_scheme`; URL inválida → `invalid_url`.                                                                                                                                                                                                                    |
+| 9   | Timeouts del transporte              | connect 5 s / read 15 s en el guard Node; el cliente de salida del worker replica ambos en el task 4.4.                                                                                                                                                                                         |
+
+**Verificado por pruebas, no por inspección.** Las suites `apps/web` (Vitest:
+`src/lib/ssrf.test.ts`) y `services/scanner` (pytest: `tests/test_ssrf.py`)
+cubren intentos de elusión por redirección, por IPv6, por respuesta DNS
+rebinding y por puertos fuera de la lista; una prueba que pasa es la evidencia
+de que el control funciona.
 
 ## 3. Aislamiento de red y de sistema de archivos del worker
 
