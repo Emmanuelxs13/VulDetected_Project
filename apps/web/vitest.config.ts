@@ -19,8 +19,11 @@ export default defineConfig({
   resolve: {
     alias: {
       // Mirror the `@/*` -> `./src/*` mapping from tsconfig.json so tests import
-      // the same specifiers application code does.
+      // the same specifiers application code does. `@test/*` covers the shared
+      // test helpers in `test/` (e.g. `db-mock.ts`), which sit outside `src/`
+      // and therefore outside the `@` alias.
       '@': path.resolve(dirname, 'src'),
+      '@test': path.resolve(dirname, 'test'),
 
       /**
        * `server-only` throws by design when it is not consumed by a React Server

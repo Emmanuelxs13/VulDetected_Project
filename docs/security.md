@@ -19,7 +19,13 @@ documento.
 
 ## 1. Verificación de propiedad del dominio — precondición legal
 
-**Estado:** `Open (planned Sprint 2)`
+**Estado:** `Partially done` — el mecanismo de propiedad está implementado y
+probado en `apps/web/src/features/scans/`: emisión de challenge, verificación
+por DNS `TXT` y por `/.well-known/`, y el guard estructural
+`requireVerifiedDomain` (DO-2, DO-3, DO-4 y DO-5 con pruebas Vitest). La
+puerta completa sobre el encolado llega con el task 4.2, cuando
+`submitScanAction` invoca ese guard; la limitación de tasa y los eventos de
+auditoría `domain.ownership.*` llegan con el task 4.3.
 
 **Amenaza.** VulDetected escanea aplicaciones web a solicitud. Si un usuario
 puede enviar cualquier hostname, el producto es un servicio de escaneo de

@@ -40,7 +40,7 @@ Chain strategy: pending
 
 - [x] 3.1 RED+impl SSRF Node en `apps/web/src/lib/ssrf.ts` + reglas en `docs/security.md` (loopback/metadata/RFC1918/`::1`; pin; hops; 80/443).
 - [x] 3.2 RED+impl SSRF pytest en `services/scanner/scanner/ssrf.py` (redirect, IPv6, rebinding, puertos).
-- [ ] 3.3 `apps/web/src/features/scans/schema.ts` + `apps/web/src/features/scans/actions.ts`: ownership (`verification-tokens.ts` read-only) + guard `requireVerifiedDomain`; DO-2/DO-4/DO-5.
+- [x] 3.3 `apps/web/src/features/scans/schema.ts` + `apps/web/src/features/scans/actions.ts`: ownership (`verification-tokens.ts` read-only) + guard `requireVerifiedDomain`; DO-2/DO-4/DO-5.
 
 ## Fase 4 — Envío, worker, wiring web
 
