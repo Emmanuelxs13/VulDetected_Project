@@ -373,16 +373,22 @@ IDENTITY` en lugar de `uuid` — el stream append-only necesita un cursor
 sha256(domain_id | check_name | affected_url)`, índice único intra-escaneo
   `(scan_id, finding_key)` con `ON CONFLICT DO NOTHING` y `findings_key_idx` no
   único para la tendencia entre escaneos (D3).
-- **Migración aditiva `0003_scan_domain` generada, no aplicada.** Verificada con
-  `drizzle-kit check` ("todo en orden"); su ejecución (`db:migrate`) es un hito
-  de decisión del propietario, no una tarea de implementación.
+- **Migración aditiva `0003_scan_domain` generada y aplicada.** Generada con
+  `db:generate` y verificada con `drizzle-kit check` ("todo en orden");
+  **aplicada a mano en pgAdmin** contra la base local `vuldetected` tras la
+  autorización del propietario, con la propiedad de tablas, tipos y secuencias
+  reasignada al rol `vuldetected`. No se ejecutó `db:migrate` (su journal es
+  ajeno a las migraciones aplicadas a mano).
 
 ### Cambiado — Sprint 2: dominio de escaneo
 
 - `docs/database.md` documenta ahora el esquema real del Sprint 2 (las cuatro
   tablas, los dos enums, los índices y su razón de ser) y corrige el estado de
-  migraciones: las del Sprint 1 (`0000`–`0002`) están ejecutadas y verificadas
-  contra la base local; la `0003` del Sprint 2 está generada y sin aplicar.
+  migraciones: las del Sprint 1 (`0000`–`0002`) y la `0003` del Sprint 2 están
+  **ejecutadas y verificadas** contra la base local. Se corrigió además la
+  afirmación errónea de que las migraciones se aplicaban con `drizzle-kit`: la
+  vía real es a mano en pgAdmin, y `db:migrate` está prohibido hasta reconciliar
+  ambos historiales (ver `docs/local-postgres-setup.md` §361).
 - `docs/changelog.md` — este registro.
 
 ## [Hoja de ruta relevante sin publicar]

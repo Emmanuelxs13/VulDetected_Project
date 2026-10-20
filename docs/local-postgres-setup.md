@@ -1,10 +1,10 @@
 # Configuración local de PostgreSQL y prueba de humo del Sprint 1
 
-**Estado: EJECUTADO hasta §8.** El rol de acceso, la base de datos
-`vuldetected`, las tres migraciones, la prueba de solo-append, la conexión de la
-aplicación y la prueba de humo (T1–T15, 17/17) se completaron contra el servidor
-local de PostgreSQL 18.3. **El Sprint 1 está versionado en el repositorio
-(§11).**
+**Estado: EJECUTADO hasta §8, más §12.** El rol de acceso, la base de datos
+`vuldetected`, las migraciones `0000`–`0003`, la prueba de solo-append, la
+conexión de la aplicación y la prueba de humo (T1–T15, 17/17) se completaron
+contra el servidor local de PostgreSQL 18.3. **El Sprint 1 está versionado en el
+repositorio (§11); la migración del Sprint 2 está aplicada y verificada (§12).**
 
 Este es el camino en uso. [`supabase-setup.md`](./supabase-setup.md) se conserva
 como la alternativa documentada para cuando el proyecto pase a un proveedor
@@ -21,9 +21,11 @@ gestionado.
 - [x] §7 — la aplicación arranca y renderiza `/dashboard`
 - [x] §8 — prueba de humo T1–T15, incluidas las pruebas de oráculo de enumeración T10–T12
 - [x] §11 — Sprint 1 versionado en el repositorio
+- [x] §12 — migración `0003_scan_domain` (Sprint 2) aplicada en pgAdmin y propiedad de los objetos nuevos reasignada a `vuldetected`
 
 Todas las casillas de arriba están marcadas: este runbook es evidencia, y el
-Sprint 1 está verificado.
+Sprint 1 está verificado. La migración del Sprint 2 (`0003_scan_domain`) también
+está **aplicada y verificada** contra esta base — ver §12.
 
 Relacionado: [ADR 0004](./adr/0004-database-provider-neutrality.md) ·
 [database.md](./database.md) · [security.md](./security.md)
@@ -509,3 +511,71 @@ raíz sin importar el paquete que los inicie:
 Eso deliberadamente **no** se ha hecho todavía. Cambia la forma en que cada
 paquete resuelve la configuración, y es mejor introducirlo como un cambio
 propio que mezclarlo en una ejecución de verificación.
+
+---
+
+## 12. Migración del Sprint 2 (`0003_scan_domain`)
+
+La migración `0003_scan_domain.sql` sigue el mismo procedimiento que §3, y por las
+mismas razones: **se aplica a mano en pgAdmin Query Tool**, conectado como el rol
+`vuldetected`, contra la base `vuldetected`. Ejecute el archivo completo
+(`packages/db/drizzle/0003_scan_domain.sql`) con **Execute (F5)** y confirme
+`Query returned successfully`.
+
+Crea cuatro tablas (`domains`, `scans`, `findings`, `scan_events`), dos enums
+(`scan_status`, `severity`), cuatro foreign keys, los índices de consulta y la
+secuencia de identidad `scan_events_id_seq`.
+
+### 12b. La propiedad de los objetos nuevos
+
+Si la Query Tool estaba conectada como `postgres` — que es el valor por defecto
+para las pestañas nuevas —, los objetos nuevos quedan con el dueño equivocado y
+la aplicación recibe `permiso denegado a la tabla domains` en su primera
+consulta. Es el mismo gotcha de §4b, con los objetos de esta migración. Conectado
+como `postgres`, contra `vuldetected`:
+
+```sql
+ALTER TABLE public.domains      OWNER TO vuldetected;
+ALTER TABLE public.scans        OWNER TO vuldetected;
+ALTER TABLE public.findings     OWNER TO vuldetected;
+ALTER TABLE public.scan_events  OWNER TO vuldetected;
+ALTER TYPE public.scan_status   OWNER TO vuldetected;
+ALTER TYPE public.severity      OWNER TO vuldetected;
+ALTER SEQUENCE public.scan_events_id_seq OWNER TO vuldetected;
+```
+
+Confirme que no quedó nada atrás:
+
+```sql
+select relkind, relname, pg_get_userbyid(relowner) as owner
+from pg_class
+where relnamespace = 'public'::regnamespace
+  and pg_get_userbyid(relowner) <> 'vuldetected'
+order by relkind, relname;
+```
+
+Esperado: cero filas.
+
+### 12c. Verificación
+
+```sql
+-- Las tablas nuevas existen (esperado: las 4)
+select table_name
+from information_schema.tables
+where table_schema = 'public' and table_type = 'BASE TABLE'
+  and table_name in ('domains', 'scans', 'findings', 'scan_events')
+order by table_name;
+
+-- Los enums nuevos y sus valores (esperado: scan_status 5, severity 6)
+select t.typname, e.enumlabel
+from pg_type t
+join pg_enum e on e.enumtypid = t.oid
+where t.typname in ('scan_status', 'severity')
+order by t.typname, e.enumsortorder;
+```
+
+**Sigue sin ejecutarse `db:migrate`.** El journal de `drizzle-kit` no tiene
+noticia de las migraciones aplicadas a mano aquí, de modo que intentaría aplicar
+`0000` de nuevo y fallaría. Reconciliar ambos historiales es una decisión
+explícita del propietario, nunca algo que se descubre por errores — ver la nota
+en §361.

@@ -1,23 +1,29 @@
 # Base de datos
 
 Referencia del esquema de VulDetected y de las decisiones que lo respaldan.
-Documenta el esquema del Sprint 1 (aplicado y verificado) y el del Sprint 2
-(generado, sin aplicar). Los puntos de contacto que requieren decisión del
-propietario se enumeran en
+Documenta el esquema del Sprint 1 y el del Sprint 2, ambos aplicados y
+verificados. Los puntos de contacto que requieren decisión del propietario se
+enumeran en
 [Puntos de contacto en la DB — se requiere decisión del propietario](#puntos-de-contacto-en-la-db--se-requiere-decisión-del-propietario).
 
-> **El Sprint 1 verificó sus migraciones contra una base de datos real; el
-> Sprint 2 no ha aplicado nada.** Las migraciones `0000`–`0002` se ejecutaron
-> contra la base local `vuldetected` y se verificaron contra `information_schema`
-> y `pg_trigger` (registrado en [`docs/changelog.md`](./changelog.md)). La
-> migración del Sprint 2 `0003_scan_domain` está **generada con `db:generate`,
-> no aplicada** — ejecutar `db:migrate` está bloqueado hasta la autorización del
-> propietario. El esquema del Sprint 2 que sigue es el diseño de referencia, no
-> la descripción de una base de datos en funcionamiento.
+> **Las migraciones de los Sprints 1 y 2 están aplicadas y verificadas contra una
+> base de datos real.** Las migraciones `0000`–`0003` se ejecutaron contra la base
+> local `vuldetected` y se verificaron contra `information_schema`, `pg_trigger`
+> y `pg_tables` (registrado en [`docs/changelog.md`](./changelog.md)). La
+> migración del Sprint 2 `0003_scan_domain` fue **generada con `db:generate` y
+> aplicada a mano en pgAdmin** tras la autorización del propietario, con la
+> propiedad de tablas, tipos y secuencias reasignada al rol `vuldetected`.
 
-El acceso siempre se realiza a través de `DATABASE_URL`. Las migraciones se
-aplican con drizzle-kit contra esa URL — ver
-[ADR 0004](./adr/0004-database-provider-neutrality.md).
+El acceso siempre se realiza a través de `DATABASE_URL`.
+
+**Las migraciones se aplican a mano en pgAdmin**, ejecutando el archivo SQL
+generado contra la base `vuldetected` (ver
+[`docs/local-postgres-setup.md`](./local-postgres-setup.md) §3 y §4b). **No se
+ejecuta `db:migrate`**: `drizzle-kit` mantiene su propia tabla de registro y no
+tiene noticia de las migraciones aplicadas a mano, de modo que intentaría aplicar
+`0000` de nuevo y fallaría. Reconciliar ambos historiales es una decisión
+explícita del propietario, nunca algo que se descubre por errores (ver
+[ADR 0004](./adr/0004-database-provider-neutrality.md)).
 
 ## Decisiones DDL ya tomadas
 
@@ -268,9 +274,9 @@ los dos índices anteriores.
 
 > **Esta sección documenta el esquema tal como se generó en
 > `packages/db/drizzle/`, verificado leyendo `0003_scan_domain.sql`.**
-> La migración está generada con `db:generate` y **no aplicada** — corresponde al
-> Sprint 2, cuyo esquema es el diseño de referencia (ver la nota al principio de
-> este documento y [Puntos de contacto en la DB](#puntos-de-contacto-en-la-db--se-requiere-decisión-del-propietario)).
+> La migración está **aplicada y verificada** contra la base local `vuldetected`
+> (ver la nota al principio de este documento y
+> [Puntos de contacto en la DB](#puntos-de-contacto-en-la-db--se-requiere-decisión-del-propietario)).
 > Donde un borrador anterior discrepaba del SQL generado, ganaba el SQL.
 
 ### `domains`
@@ -402,17 +408,17 @@ los dos índices anteriores.
 > toque los elementos que siguen.** No revisarla después — redactarla. Una
 > migración escrita sin aviso es una decisión tomada por accidente.
 >
-> **Estado de migraciones hasta hoy:** las del Sprint 1 (`0000`–`0002`) están
-> **ejecutadas y verificadas** contra la base local `vuldetected` (`docs/changelog.md`).
-> La del Sprint 2 (`0003_scan_domain`) está **generada con `db:generate` pero NO
-> aplicada** — ejecutarla queda bloqueada hasta la autorización del propietario.
+> **Estado de migraciones hasta hoy:** las del Sprint 1 (`0000`–`0002`) y la del
+> Sprint 2 (`0003_scan_domain`) están **ejecutadas y verificadas** contra la base
+> local `vuldetected` (`docs/changelog.md`). `0003` se aplicó a mano en pgAdmin
+> tras la autorización del propietario, con la propiedad de los objetos nuevos
+> reasignada al rol `vuldetected`.
 
 ### Sprint 2 — dominio de escaneo
 
-Tablas nuevas, sin backfill. **La migración `0003_scan_domain` está redactada
-(generada con `db:generate`) pero NO aplicada** — ejecutarla requiere la
-autorización del propietario. El esquema completo se documenta arriba en
-[Esquema actual (Sprint 2)](#esquema-actual-sprint-2).
+Tablas nuevas, sin backfill. **La migración `0003_scan_domain` está aplicada y
+verificada** contra la base local `vuldetected`. El esquema completo se documenta
+arriba en [Esquema actual (Sprint 2)](#esquema-actual-sprint-2).
 
 **Decisiones del propietario RESUELTAS e incorporadas a la migración redactada:**
 
