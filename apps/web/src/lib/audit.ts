@@ -32,7 +32,14 @@ import { db } from './db';
 
 /** The closed set of actions. A union, not a string, so a typo cannot ship. */
 export type AuditAction =
-  'user.registered' | 'auth.login_succeeded' | 'auth.login_failed' | 'auth.logged_out';
+  | 'user.registered'
+  | 'auth.login_succeeded'
+  | 'auth.login_failed'
+  | 'auth.logged_out'
+  | 'scan.enqueued'
+  | 'scan.failed'
+  | 'domain.ownership.verified'
+  | 'domain.ownership.challenge_issued';
 
 export interface AuditEvent {
   action: AuditAction;

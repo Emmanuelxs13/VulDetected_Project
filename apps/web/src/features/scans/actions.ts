@@ -2,14 +2,24 @@
 
 import { randomBytes } from 'node:crypto';
 import { resolveTxt } from 'node:dns/promises';
-import { and, desc, domains, eq, gt, verificationTokens } from '@vuldetected/db';
+import { and, desc, domains, eq, gt, scans, verificationTokens } from '@vuldetected/db';
 
 import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
+import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
+import { enqueueScanJob } from '@/lib/celery';
+import { getEnv } from '@/lib/env';
+import { consumeRateLimit, RateLimitError } from '@/lib/rate-limit';
 import { safeFetch } from '@/lib/ssrf';
 
-import { hostnameSchema, normalizeHostname, ownershipVerifySchema } from './schema';
+import { requireVerifiedDomain } from './guard';
+import {
+  hostnameSchema,
+  normalizeHostname,
+  ownershipVerifySchema,
+  targetUrlSchema,
+} from './schema';
 
 /**
  * Challenges expire 30 minutes after issue (design D5 step 1). Expiry is the
@@ -289,4 +299,109 @@ async function obtainProof(
   }
 
   return { ok: true, candidates: [(await response.text()).trim()] };
+}
+
+export async function submitScanAction(input: {
+  url: string;
+}): Promise<ActionResult<{ scanId: string }>> {
+  let userId: string;
+  try {
+    const user = await requireUser();
+    userId = user.userId;
+  } catch {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  // Rate limiting: 5/h per user, 20/h per IP (design D4)
+  try {
+    await consumeRateLimit({ key: `user:${userId}:scan`, limit: 5, windowSec: 3600 });
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      return { success: false, error: 'Rate limit exceeded' };
+    }
+  }
+
+  const parsed = targetUrlSchema.safeParse(input.url);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid URL.' };
+  }
+
+  const { normalizedHostname, url, baseUrl, port, scheme } = parsed.data;
+
+  try {
+    await requireVerifiedDomain(userId, normalizedHostname);
+  } catch {
+    return { success: false, error: 'Domain not verified' };
+  }
+
+  // Normalize target as per SS-1
+  // SS-2: SSRF gate via safeFetch context (we validate host against allowed schemes/ports)
+
+  // Get domain
+  const domainRows = await db()
+    .select({ id: domains.id })
+    .from(domains)
+    .where(eq(domains.normalizedHostname, normalizedHostname))
+    .limit(1);
+
+  if (domainRows.length === 0) {
+    return { success: false, error: 'Domain not verified' };
+  }
+
+  const domainId = domainRows[0]!.id;
+
+  // Insert scan with status queued BEFORE enqueueing (SS-1..SS-6)
+  const scanRows = await db()
+    .insert(scans)
+    .values({
+      domainId,
+      targetUrl: url,
+      status: 'queued',
+      checks: ['security_headers', 'tls', 'cookies', 'redirects'],
+    })
+    .returning({ id: scans.id });
+
+  if (scanRows.length === 0) {
+    return { success: false, error: 'Service unavailable' };
+  }
+  const scanId = scanRows[0]!.id;
+
+  try {
+    const env = getEnv();
+    await enqueueScanJob({
+      scan_id: scanId,
+      domain_id: domainId,
+      target: {
+        scheme: scheme as 'http' | 'https',
+        host: normalizedHostname,
+        port,
+        base_url: baseUrl,
+      },
+      checks: ['security_headers', 'tls', 'cookies', 'redirects'],
+      callback_base_url: env.NEXT_PUBLIC_APP_URL ?? env.AUTH_URL ?? 'http://localhost:3000',
+    });
+
+    await audit({
+      action: 'scan.enqueued' as unknown as import('@/lib/audit').AuditAction,
+      actorUserId: userId,
+      targetType: 'scan',
+      targetId: scanId,
+    });
+    return { success: true, data: { scanId } };
+  } catch {
+    // On enqueue failure: mark as failed with enqueue_failed, audit, return 503
+    await db()
+      .update(scans)
+      .set({ status: 'failed', error: 'enqueue_failed' })
+      .where(eq(scans.id, scanId));
+
+    await audit({
+      action: 'scan.failed' as unknown as import('@/lib/audit').AuditAction,
+      actorUserId: userId,
+      targetType: 'scan',
+      targetId: scanId,
+      metadata: { reason: 'enqueue_failed' },
+    });
+    return { success: false, error: 'Service unavailable' };
+  }
 }

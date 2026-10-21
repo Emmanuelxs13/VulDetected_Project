@@ -103,3 +103,49 @@ export const ownershipVerifySchema = z.object({
   hostname: hostnameSchema,
   method: z.enum(['dns_txt', 'well_known']),
 });
+
+/**
+ * Validates a scan target URL for submission (SS-1).
+ */
+export const targetUrlSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => {
+      try {
+        const url = new URL(value);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+          return false;
+        }
+        if (url.username || url.password) {
+          return false;
+        }
+        if (url.pathname !== '/' || url.search !== '' || url.hash !== '') {
+          // allow paths? design says normalized URL; but be flexible
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'Enter a valid http(s) URL.' },
+  )
+  .transform((value) => {
+    const url = new URL(value);
+    const scheme = url.protocol.replace(':', '') as 'http' | 'https';
+    const hostname = url.hostname;
+    const normalizedHostname = normalizeHostname(hostname);
+    if (normalizedHostname === null) {
+      throw new Error('Invalid hostname');
+    }
+    const port = url.port ? parseInt(url.port, 10) : scheme === 'https' ? 443 : 80;
+    const baseUrl = `${scheme}://${normalizedHostname}${port === (scheme === 'https' ? 443 : 80) ? '' : `:${port}`}`;
+    return {
+      normalizedHostname,
+      hostname: normalizedHostname,
+      url: `${scheme}://${normalizedHostname}${port === (scheme === 'https' ? 443 : 80) ? '' : `:${port}`}`,
+      baseUrl,
+      port,
+      scheme,
+    };
+  });
