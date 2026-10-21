@@ -1,8 +1,8 @@
 # Apply Progress — sprint-2-scanner
 
-Progreso acumulado de la fase apply. Lotes: WU4 (tasks 3.1–3.2, SSRF) y WU5
-(task 3.3, ownership). Fase 3 completa; las tareas 4.x y 5.x quedan pendientes
-para lotes posteriores.
+Progreso acumulado de la fase apply. Lotes: WU4 (tasks 3.1–3.2, SSRF), WU5
+(task 3.3, ownership), WU6 (4.1–4.3 y 4.5–4.6), fixture SS-4 y WU7 (4.4,
+worker). Fases 3 y 4 completas; quedan las tareas 5.1–5.5.
 
 - **Modo**: Standard (`strict_tdd: false` en `openspec/config.yaml`). Las tasks
   3.1 y 3.2 exigían explícitamente RED-first y se ejecutaron en ese orden.
@@ -91,14 +91,76 @@ DO-4 (persistencia), DO-5 (guard testeado).
 | `pnpm check` (lint + typecheck + format:check) | pass (exit 0) |
 | `python -m pytest -q` (services/scanner) | 42 pass |
 
+## Fase 4 — Envío, worker, wiring web (tasks 4.1–4.6)
+
+### WU6 — wiring web (4.1, 4.2, 4.3, 4.5, 4.6)
+
+**Commit**: `776e8ed` — `feat(scans): add submission wiring, celery publisher, rate limit and callback/sse routes`
+
+- `lib/redis.ts`, `lib/celery.ts` (wire protocol Kombu/Celery 5.x que el
+  worker python consume), `lib/rate-limit.ts`, `lib/audit.ts`
+  (`scan.enqueued`, `scan.failed`, `domain.ownership.*`); env en `lib/env.ts`.
+- `submitScanAction` (SS-1..SS-6): estado `queued` persistido **antes** de
+  encolar; fallo del broker → 503.
+- Limiter IP en `api/auth/[...all]/route.ts`.
+- Callback `api/scans/[scanId]/callback/route.ts`: Bearer +
+  `timingSafeEqual` (401), idempotencia en estados terminales y
+  `onConflictDoNothing` para findings/eventos.
+- SSE `api/scans/[scanId]/events/route.ts`: polling con cursor y
+  autorización (SP-3).
+- Fixture dorado SS-4 en `apps/web/test/fixtures/ss-4.json` (`1dcec8c`).
+
+### WU7 — worker Python (4.4)
+
+**Commit**: `311f3b4` (12 archivos, +389/−18). El writer del lote se
+interrumpió a mitad de ejecución; el trabajo quedó en disco y el orquestador
+verificó y cerró el lote (no se relanzó un segundo writer).
+
+- `scanner/tasks.py`: consume `scanner.tasks.run_scan`, revalida el target
+  con `ssrf.resolve_url` (SW-1) y emite `scan.started` / `check.*` /
+  `scan.completed` / `scan.failed`.
+- `scanner/egress.py`: todo el tráfico saliente pasa por el guard SSRF con
+  revalidación por hop; `follow_redirects=False`.
+- `scanner/report.py`: callback con Bearer; reintenta solo en 5xx.
+- `scanner/checks/{security_headers,cookies,redirects,tls}.py` (tabla D6).
+- `scanner/celery_app.py` + `Dockerfile` (usuario no root, secretos solo vía
+  env).
+
+### Verificación (Fase 4 completa)
+
+| Comando | Resultado |
+|---|---|
+| `pnpm test` (raíz) | 7 archivos / 93 pruebas pass |
+| `pnpm check` | exit 0 |
+| `python -m pytest -q` | 42 pass |
+| Verificador independiente vs `design.md` + `scan-worker/spec.md` | PASS, sin gaps bloqueantes (SW-1..SW-6) |
+
+### Huecos de cobertura (no bloqueantes, follow-up)
+
+Sin pruebas unitarias para SW-1 (consumo/revalidación de la tarea), SW-2
+(los 4 checks) y SW-5 (cliente de callback). La task 5.3 (E2E) recorre el
+camino completo encolar→consumir→callback→filas; si se quiere cobertura de
+unidad antes del E2E, requiere lote propio.
+
+### Cierre del ledger SDD
+
+El intento de "Fase 4 completa" se registró `failed` (798 líneas; 4.4 sin
+implementar). Se cerró con `rescope` a solo la 4.4 (objetivo generación 3) y
+settle `passed` con `--remediates-evidence-revision sha256:893afed0…` y
+evidencia distinta. RDD quedó `off` a nivel clone (consentimiento v3 del
+review no representable en este runtime); la revisión pasa a la política
+ordinaria del repo.
+
 ## Presupuesto de revisión
 
 | Lote | Líneas autorizadas (add+del) | Recomendación |
 |---|---|---|
 | WU4 (`e569949`) | 1.410 | `size:exception` — implementación honesta del contrato de reglas D6 en dos lenguajes con sus suites; no se puede partir sin perder la paridad nodo/python en un solo review |
 | WU5 (este lote) | 930 | `size:exception` — 426 son pruebas y helper de test; producción ~500 (schema+actions+guard con su documentación) |
+| WU6 (`776e8ed`) | 798 | `size:exception` — un solo contrato de envío partido en 5 tareas de la misma frontera; no se puede cortar sin desacoplar callback/SSE del productor |
+| Fixture + 4.4 (`1dcec8c`, `311f3b4`) | ~422 | Sin excepción: worker acotado (~350 L de producción) más fixture |
 
 ## Bloqueos
 
-Ninguno. Las tasks pendientes son 4.1–4.6 y 5.1–5.5 (dependen de este lote ya
-completado).
+Ninguno. Las tasks pendientes son 5.1–5.5 (dependen de las fases 3 y 4, ya
+completadas).
