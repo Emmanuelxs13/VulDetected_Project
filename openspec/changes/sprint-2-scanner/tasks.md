@@ -44,12 +44,12 @@ Chain strategy: pending
 
 ## Fase 4 — Envío, worker, wiring web
 
-- [ ] 4.1 `apps/web/src/lib/{redis,celery,rate-limit}.ts`; env en `apps/web/src/lib/env.ts`; fixture dorado (SS-4).
-- [ ] 4.2 `submitScanAction` en `apps/web/src/features/scans/actions.ts` (SS-1..SS-6): `queued` antes de encolar; fallo → 503.
-- [ ] 4.3 Limiter IP en `apps/web/src/app/api/auth/[...all]/route.ts`; `apps/web/src/lib/audit.ts` (`scan.enqueued`, `scan.failed`, `domain.ownership.*`).
-- [ ] 4.4 Worker `services/scanner/scanner/{__init__,tasks,egress,report}.py`, `checks/*`, `Dockerfile` (Bearer; read-only; cap_drop).
-- [ ] 4.5 RED callback `apps/web/src/app/api/scans/[scanId]/callback/route.ts`: `timingSafeEqual`, 401, idempotencia.
-- [ ] 4.6 RED SSE `apps/web/src/app/api/scans/[scanId]/events/route.ts`: polling 1s, cursor, autorización (SP-3).
+- [x] 4.1 `apps/web/src/lib/{redis,celery,rate-limit}.ts`; env en `apps/web/src/lib/env.ts`; fixture dorado (SS-4).
+- [x] 4.2 `submitScanAction` en `apps/web/src/features/scans/actions.ts` (SS-1..SS-6): `queued` antes de encolar; fallo → 503.
+- [x] 4.3 Limiter IP en `apps/web/src/app/api/auth/[...all]/route.ts`; `apps/web/src/lib/audit.ts` (`scan.enqueued`, `scan.failed`, `domain.ownership.*`).
+- [x] 4.4 Worker `services/scanner/scanner/{__init__,tasks,egress,report}.py`, `checks/*`, `Dockerfile` (Bearer; read-only; cap_drop).
+- [x] 4.5 RED callback `apps/web/src/app/api/scans/[scanId]/callback/route.ts`: `timingSafeEqual`, 401, idempotencia.
+- [x] 4.6 RED SSE `apps/web/src/app/api/scans/[scanId]/events/route.ts`: polling 1s, cursor, autorización (SP-3).
 
 ## Fase 5 — UI, integración, docs
 
