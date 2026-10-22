@@ -39,6 +39,7 @@ export async function SiteNav() {
 
             <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
               <NavLink href="/dashboard">Dashboard</NavLink>
+              <NavLink href="/scans">Escaneos</NavLink>
               <NavLink href="/dev/sprint-1">Sprint 1</NavLink>
             </nav>
           </div>
