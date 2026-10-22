@@ -6,7 +6,8 @@
   "description": "VulDetected data layer — Drizzle schema, connection factory and migrations (provider-neutral).",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts"
+    "./schema": "./src/schema/index.ts",
+    "./testing/pglite": "./src/testing/pglite.ts"
   },
   "files": [
     "src",
@@ -23,6 +24,7 @@
     "postgres": "^3.4.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
     "@types/node": "^22.18.6",
     "drizzle-kit": "^0.31.5",
     "typescript": "^5.9.3",

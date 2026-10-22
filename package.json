@@ -13,6 +13,7 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "vitest run",
+    "test:e2e": "pnpm --filter @vuldetected/web exec vitest run --config vitest.e2e.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm lint && pnpm typecheck && pnpm format:check"

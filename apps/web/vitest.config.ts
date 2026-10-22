@@ -1,9 +1,6 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { defineConfig } from 'vitest/config';
 
-const dirname = path.dirname(fileURLToPath(import.meta.url));
+import { alias } from './vitest.shared.ts';
 
 /**
  * Vitest configuration for the web app.
@@ -16,25 +13,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
  * every file.
  */
 export default defineConfig({
-  resolve: {
-    alias: {
-      // Mirror the `@/*` -> `./src/*` mapping from tsconfig.json so tests import
-      // the same specifiers application code does. `@test/*` covers the shared
-      // test helpers in `test/` (e.g. `db-mock.ts`), which sit outside `src/`
-      // and therefore outside the `@` alias.
-      '@': path.resolve(dirname, 'src'),
-      '@test': path.resolve(dirname, 'test'),
-
-      /**
-       * `server-only` throws by design when it is not consumed by a React Server
-       * Component bundle. Vitest runs in plain Node, so importing any of the
-       * server modules under test (`lib/env`, `lib/db`, `lib/audit`, the scan
-       * actions) would throw before a single assertion runs. The wall is enforced
-       * by Next.js at build time; in tests it is replaced with an empty module.
-       */
-      'server-only': path.resolve(dirname, 'test/server-only.stub.ts'),
-    },
-  },
+  resolve: { alias },
   test: {
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
