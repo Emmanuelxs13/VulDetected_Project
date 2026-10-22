@@ -2,12 +2,13 @@
 
 import { Alert, Button, Field, Input } from '@vuldetected/ui';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 // React 19 moved `useFormStatus` out of `react` and into `react-dom`.
 import { useFormStatus } from 'react-dom';
 
 import { registerAction } from './actions';
-import { MIN_PASSWORD_LENGTH } from './schema';
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './schema';
 
 /**
  * Registration form.
@@ -27,23 +28,37 @@ import { MIN_PASSWORD_LENGTH } from './schema';
  * Inline under the field ("Email already taken") is the most natural UI for this
  * and it is exactly the leak. A form-level alert cannot be attributed to one
  * field, so it cannot become a per-field oracle.
+ *
+ * ## WHY THE ACTION RETURNS KEYS
+ *
+ * `actions.ts` and `schema.ts` run on the server, where the request locale is
+ * available but a client component is not. They return `auth.*` message keys and
+ * this form translates them, so validation and auth failures follow the language
+ * switch like every other string on the page.
  */
 export function RegisterForm() {
+  const t = useTranslations('auth');
   const [state, formAction] = useActionState(registerAction, null);
+
+  const translate = (key: string) =>
+    t.has(key) ? t(key, { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH }) : key;
+  const fieldError = (key: string | undefined) => (key ? translate(key) : undefined);
 
   return (
     <form action={formAction} className="flex flex-col gap-4" noValidate>
       <div aria-live="polite" aria-atomic="true">
-        {state && !state.success ? <Alert variant="critical" title={state.error} /> : null}
+        {state && !state.success ? (
+          <Alert variant="critical" title={translate(state.error)} />
+        ) : null}
       </div>
 
       <Field
-        label="Name"
+        label={t('fields.name')}
         // Optional, not required: email-only signup must not demand a name.
         // Demanding one measurably raises signup abandonment and an account does
         // not become more secure by having a name attached.
-        description="Optional. Used to address you in the dashboard."
-        error={state && !state.success ? state.fieldErrors?.name : undefined}
+        description={t('register.nameDescription')}
+        error={state && !state.success ? fieldError(state.fieldErrors?.name) : undefined}
       >
         {(control) => (
           <Input
@@ -59,9 +74,9 @@ export function RegisterForm() {
       </Field>
 
       <Field
-        label="Email"
+        label={t('fields.email')}
         required
-        error={state && !state.success ? state.fieldErrors?.email : undefined}
+        error={state && !state.success ? fieldError(state.fieldErrors?.email) : undefined}
       >
         {(control) => (
           <Input
@@ -76,10 +91,10 @@ export function RegisterForm() {
       </Field>
 
       <Field
-        label="Password"
+        label={t('fields.password')}
         required
-        description={`At least ${MIN_PASSWORD_LENGTH} characters. Length is what matters — capital letters, symbols and digits are not required.`}
-        error={state && !state.success ? state.fieldErrors?.password : undefined}
+        description={t('register.passwordHint', { min: MIN_PASSWORD_LENGTH })}
+        error={state && !state.success ? fieldError(state.fieldErrors?.password) : undefined}
       >
         {(control) => (
           <Input
@@ -91,30 +106,31 @@ export function RegisterForm() {
             // correct — the field is for choosing a new secret, not repeating one.
             autoComplete="new-password"
             minLength={MIN_PASSWORD_LENGTH}
-            maxLength={128}
+            maxLength={MAX_PASSWORD_LENGTH}
             required
           />
         )}
       </Field>
 
-      <SubmitButton label="Create account" />
+      <SubmitButton />
 
       <p className="text-xs text-text-muted">
-        Already registered?{' '}
+        {t('register.haveAccount')}{' '}
         <Link href="/login" className="font-medium text-brand underline underline-offset-2">
-          Sign in
+          {t('register.signIn')}
         </Link>
       </p>
     </form>
   );
 }
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton() {
+  const t = useTranslations('auth');
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" variant="primary" fullWidth loading={pending}>
-      {pending ? 'Creating…' : label}
+      {pending ? t('register.submitting') : t('register.submit')}
     </Button>
   );
 }

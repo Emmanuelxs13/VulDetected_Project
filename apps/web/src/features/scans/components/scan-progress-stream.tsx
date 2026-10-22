@@ -1,6 +1,7 @@
 'use client';
 
 import { Progress } from '@vuldetected/ui';
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -46,6 +47,7 @@ export function ScanProgressStream({
   initialStatus: ScanStatus;
 }) {
   const router = useRouter();
+  const t = useTranslations('scan');
   const [events, setEvents] = useState<ScanStreamEvent[]>(initialEvents);
   const [status, setStatus] = useState<ScanStatus>(initialStatus);
   const [connection, setConnection] = useState<Connection>('connecting');
@@ -122,21 +124,48 @@ export function ScanProgressStream({
   const total = checks.length;
   const percent = total > 0 ? Math.round((completedChecks.size / total) * 100) : 0;
 
+  const connectionLabels: Record<Connection, string> = {
+    connecting: t('progress.connection.connecting'),
+    live: t('progress.connection.live'),
+    lost: t('progress.connection.lost'),
+  };
+
+  function describeEvent(event: ScanStreamEvent): string {
+    const check = readCheckName(event.payload);
+
+    switch (event.type) {
+      case 'scan.started':
+        return t('progress.event.started');
+      case 'scan.completed':
+        return t('progress.event.completed');
+      case 'scan.failed':
+        return t('progress.event.failed');
+      case 'check.started':
+        return t('progress.event.checkStarted', { check: check ?? '—' });
+      case 'check.completed':
+        return t('progress.event.checkCompleted', { check: check ?? '—' });
+      case 'scan.progress':
+        return t('progress.event.progress');
+      default:
+        return event.type;
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <ScanStatusBadge status={status} />
-        <span className="text-xs text-text-muted">{connectionLabel(connection)}</span>
+        <span className="text-xs text-text-muted">{connectionLabels[connection]}</span>
       </div>
 
-      {total > 0 ? <Progress value={percent} label="Comprobaciones completadas" showValue /> : null}
+      {total > 0 ? (
+        <Progress value={percent} label={t('progress.checksCompleted')} showValue />
+      ) : null}
 
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-text-muted">Eventos</span>
+        <span className="text-xs font-medium text-text-muted">{t('progress.events')}</span>
         {events.length === 0 ? (
-          <p className="text-xs text-text-muted">
-            Todavía no hay eventos. El escaneo empieza cuando el worker toma la tarea.
-          </p>
+          <p className="text-xs text-text-muted">{t('progress.noEvents')}</p>
         ) : (
           <ul aria-live="polite" className="flex flex-col">
             {events.map((event) => (
@@ -158,39 +187,6 @@ export function ScanProgressStream({
       </div>
     </div>
   );
-}
-
-function connectionLabel(connection: Connection): string {
-  switch (connection) {
-    case 'connecting':
-      return 'Conectando con el flujo de eventos…';
-    case 'live':
-      return 'Actualización en vivo';
-    case 'lost':
-      return 'Conexión interrumpida. Reintentando…';
-  }
-}
-
-/** Human-readable description of one event (design D9 feed). */
-function describeEvent(event: ScanStreamEvent): string {
-  const check = readCheckName(event.payload);
-
-  switch (event.type) {
-    case 'scan.started':
-      return 'Escaneo iniciado';
-    case 'scan.completed':
-      return 'Escaneo completado';
-    case 'scan.failed':
-      return 'Escaneo fallido';
-    case 'check.started':
-      return `Comprobación iniciada: ${check ?? '—'}`;
-    case 'check.completed':
-      return `Comprobación finalizada: ${check ?? '—'}`;
-    case 'scan.progress':
-      return 'Progreso actualizado';
-    default:
-      return event.type;
-  }
 }
 
 /** The status the event implies, if any. */

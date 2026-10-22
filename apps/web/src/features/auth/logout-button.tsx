@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@vuldetected/ui';
+import { useTranslations } from 'next-intl';
 // React 19 moved `useFormStatus` out of `react` and into `react-dom`.
 import { useFormStatus } from 'react-dom';
 
@@ -27,11 +28,12 @@ export function LogoutButton() {
 }
 
 function LogoutSubmit() {
+  const t = useTranslations('nav');
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" variant="secondary" size="sm" loading={pending}>
-      Sign out
+      {t('signOut')}
     </Button>
   );
 }

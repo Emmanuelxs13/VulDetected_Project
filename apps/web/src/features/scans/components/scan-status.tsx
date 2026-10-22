@@ -1,4 +1,7 @@
+'use client';
+
 import { Badge, Spinner } from '@vuldetected/ui';
+import { useTranslations } from 'next-intl';
 
 /**
  * Scan lifecycle vocabulary (design D9).
@@ -10,22 +13,14 @@ import { Badge, Spinner } from '@vuldetected/ui';
  * would drift within a sprint, and a user would see "En cola" in one place and
  * "queued" in another. The mapping is written once, here.
  *
- * ## WHY THIS FILE HAS NO `'use client'`
+ * ## WHY THIS FILE IS NOW A CLIENT COMPONENT
  *
- * It imports nothing server-only, so a client component can import it and get
- * the same component in the browser bundle. Marking it `'use client'` would
- * make it a client component everywhere; leaving it unmarked keeps it usable
- * from both sides without duplicating the mapping.
+ * The labels come from `next-intl`, and `useTranslations` is a client hook.
+ * The badge is rendered from a server page and from a client stream, and a
+ * server component may render a client component, so marking it `'use client'`
+ * keeps both call sites working without duplicating the mapping.
  */
 export type ScanStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
-
-const STATUS_LABEL: Record<ScanStatus, string> = {
-  queued: 'En cola',
-  running: 'Escaneando',
-  completed: 'Completado',
-  failed: 'Fallido',
-  cancelled: 'Cancelado',
-};
 
 /**
  * Severity mapping for the scan status.
@@ -55,11 +50,12 @@ export function isActiveStatus(status: ScanStatus): boolean {
 }
 
 export function ScanStatusBadge({ status }: { status: ScanStatus }) {
+  const t = useTranslations('scan.status');
   const active = isActiveStatus(status);
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge>
+      <Badge variant={STATUS_VARIANT[status]}>{t(status)}</Badge>
       {/*
         The spinner sits NEXT TO the badge, not inside it: the badge already
         carries the severity glyph, and two glyphs in the same 20px pill would

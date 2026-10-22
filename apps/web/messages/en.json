@@ -1,0 +1,333 @@
+{
+  "metadata": {
+    "description": "Scan verified domains, follow live progress and review the security findings for your applications."
+  },
+  "common": {
+    "skipToContent": "Skip to content"
+  },
+  "nav": {
+    "mainLabel": "Main",
+    "dashboard": "Dashboard",
+    "scans": "Scans",
+    "sprint1": "Sprint 1",
+    "badge": "Sprint 2",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "signOut": "Sign out"
+  },
+  "home": {
+    "badge": "Sprint 2 · data layer, authentication and scanning",
+    "title": "Vulnerability intelligence for the stacks you actually ship.",
+    "intro": "VulDetected scans a target, normalises what it finds, and tells you which vulnerabilities are real for your stack. Authentication, domain ownership verification and live scan progress work today; CVE correlation and integrations come later.",
+    "actions": {
+      "dashboard": "Go to dashboard",
+      "createAccount": "Create an account",
+      "signIn": "Sign in",
+      "seeWhatWorks": "See what works"
+    },
+    "worked": {
+      "title": "What works today",
+      "items": {
+        "schema": "PostgreSQL schema with five tables and generated migrations",
+        "auth": "Email-and-password registration, sign-in and sign-out",
+        "hashing": "Passwords hashed with argon2id at OWASP minimum parameters",
+        "audit": "Append-only audit log, enforced by a database trigger",
+        "lockout": "Progressive account lockout and user-enumeration-safe errors",
+        "ownership": "Domain ownership verification by DNS TXT record or /.well-known/ file",
+        "scanQueue": "Scan queueing for verified domains, with a per-user rate limit",
+        "scanChecks": "Security header, TLS, cookie and redirect checks",
+        "liveProgress": "Live progress over server-sent events, with findings recorded per scan"
+      }
+    },
+    "notBuilt": {
+      "title": "Not built yet",
+      "description": "CVE correlation and integrations are not built yet. Everything else on this page works today: you can verify a domain, queue a scan, follow its progress live and review the findings it records."
+    },
+    "signInPrompt": {
+      "title": "Sign in to see your account",
+      "description": "The dashboard reads the session on the server, so an unauthenticated request never reaches protected content.",
+      "action": "Sign in"
+    }
+  },
+  "auth": {
+    "fields": {
+      "email": "Email",
+      "password": "Password",
+      "name": "Name"
+    },
+    "login": {
+      "title": "Sign in",
+      "description": "Use the email and password you registered with.",
+      "submit": "Sign in",
+      "submitting": "Working…",
+      "noAccount": "No account yet?",
+      "createOne": "Create one"
+    },
+    "register": {
+      "title": "Create an account",
+      "description": "Email verification is disabled for now, so you can sign in straight away.",
+      "nameDescription": "Optional. Used to address you in the dashboard.",
+      "passwordHint": "At least {min} characters. Length is what matters: capital letters, symbols and digits are not required.",
+      "submit": "Create account",
+      "submitting": "Creating…",
+      "haveAccount": "Already registered?",
+      "signIn": "Sign in"
+    },
+    "errors": {
+      "checkFields": "Check the highlighted fields.",
+      "genericLogin": "We could not sign you in with those details. Check the email and password and try again.",
+      "genericRegister": "We could not create that account. If the address is already registered, try signing in instead.",
+      "createFailed": "We could not create that account. Try again in a moment."
+    },
+    "validation": {
+      "emailRequired": "Email is required.",
+      "emailTooLong": "Email is too long.",
+      "emailInvalid": "Enter a valid email address.",
+      "passwordMin": "Use at least {min} characters. Length beats complexity rules.",
+      "passwordMax": "Use at most {max} characters.",
+      "passwordOnlySpaces": "Password cannot be only spaces.",
+      "passwordRequired": "Password is required.",
+      "nameEmpty": "Name cannot be empty.",
+      "nameTooLong": "Name is too long."
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "noSession": {
+      "title": "No active session",
+      "description": "Sign in to see your account."
+    },
+    "fallbackName": "Your account",
+    "account": {
+      "title": "Account",
+      "description": "Read from the `users` row behind your session.",
+      "email": "Email",
+      "verified": "Verified",
+      "notVerified": "Not verified",
+      "status": "Status",
+      "locale": "Locale",
+      "userId": "User ID",
+      "memberSince": "Member since"
+    },
+    "findings": {
+      "title": "Findings are not aggregated here yet",
+      "description": "Open a scan to see its findings. CVE correlation is not built yet."
+    }
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "That route does not exist in this build. Use the navigation to reach the pages that do.",
+    "backToStart": "Back to start"
+  },
+  "scan": {
+    "metadata": {
+      "listTitle": "Scans",
+      "detailTitle": "Scan details"
+    },
+    "list": {
+      "title": "Scans",
+      "description": "To scan a domain you first have to prove you control it: request a challenge, publish the proof, and verify ownership. Only then can you queue a scan.",
+      "sessionRequired": {
+        "title": "No active session",
+        "description": "Sign in to see your scans and create new ones."
+      },
+      "newScan": {
+        "title": "New scan",
+        "description": "Ownership verification and target submission, in that order."
+      },
+      "yourScans": {
+        "title": "Your scans",
+        "description": "The last 50 scans of the domains you have verified."
+      },
+      "empty": {
+        "title": "No scans yet",
+        "description": "Use the form above to verify a domain and queue your first scan."
+      },
+      "table": {
+        "target": "Target",
+        "domain": "Domain",
+        "status": "Status",
+        "created": "Created",
+        "detail": "Detail",
+        "viewDetails": "View details"
+      }
+    },
+    "status": {
+      "queued": "Queued",
+      "running": "Scanning",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "form": {
+      "domain": {
+        "label": "Domain",
+        "description": "The domain you control. Verification runs against it, so it must be exactly the domain that will serve the proof.",
+        "placeholder": "example.com",
+        "invalid": "Enter a valid domain name.",
+        "submit": "Request verification challenge",
+        "submitting": "Requesting challenge…"
+      },
+      "challenge": {
+        "intro": "Publish proof of ownership for {hostname} using either method, then verify again. The challenge expires in 30 minutes.",
+        "token": {
+          "label": "Token",
+          "hint": "The value to publish, exactly as shown, in the TXT record or the file."
+        },
+        "txtName": {
+          "label": "DNS TXT record name",
+          "hint": "Create a TXT record with this name and the token as its value."
+        },
+        "wellKnown": {
+          "label": "Well-known file URL",
+          "hint": "Serve the token as plain text at this URL over HTTPS."
+        },
+        "copy": "Copy",
+        "copied": "Copied",
+        "copiedAnnouncement": "{label} copied to the clipboard."
+      },
+      "method": {
+        "legend": "Verification method",
+        "dnsTxt": "DNS TXT record",
+        "wellKnown": "Well-known file (/.well-known/)",
+        "verify": "Verify ownership",
+        "verifying": "Verifying…",
+        "changeDomain": "Change domain"
+      },
+      "target": {
+        "verifiedDomainLabel": "Verified domain:",
+        "label": "Target URL",
+        "description": "The address to scan. Only public http or https targets are accepted.",
+        "placeholder": "https://example.com",
+        "submit": "Scan",
+        "submitting": "Queuing…",
+        "scanAnother": "Scan another domain",
+        "invalid": "Enter a valid http(s) URL."
+      }
+    },
+    "errors": {
+      "challengeFailed": "Could not issue the verification challenge.",
+      "verifyFailed": "Could not verify domain ownership.",
+      "submitFailed": "Could not submit the scan."
+    },
+    "queued": {
+      "title": "Scan queued",
+      "description": "The scan is queued. Its progress updates in real time on the detail page.",
+      "action": "View scan progress"
+    },
+    "detail": {
+      "title": "Scan",
+      "targetLabel": "Target:",
+      "verifiedDomainLabel": "Verified domain:",
+      "checksLabel": "Checks:",
+      "errorLabel": "Error:",
+      "sessionRequired": {
+        "title": "No active session",
+        "description": "Sign in to see the progress of your scans."
+      },
+      "progress": {
+        "title": "Progress",
+        "description": "The worker publishes events and the web app records them. Only the web app changes scan state."
+      },
+      "findings": {
+        "title": "Findings",
+        "description": "In Sprint 2 every finding is recorded as “Unclassified”; classification arrives in Sprint 3."
+      }
+    },
+    "progress": {
+      "connection": {
+        "connecting": "Connecting to the event stream…",
+        "live": "Live updates",
+        "lost": "Connection lost. Reconnecting…"
+      },
+      "checksCompleted": "Checks completed",
+      "events": "Events",
+      "noEvents": "No events yet. The scan starts when the worker picks up the job.",
+      "event": {
+        "started": "Scan started",
+        "completed": "Scan completed",
+        "failed": "Scan failed",
+        "checkStarted": "Check started: {check}",
+        "checkCompleted": "Check completed: {check}",
+        "progress": "Progress updated"
+      }
+    },
+    "findings": {
+      "empty": {
+        "title": "No findings",
+        "description": "This scan recorded no findings. A completed scan with no findings is a valid result, not an error."
+      },
+      "table": {
+        "severity": "Severity",
+        "check": "Check",
+        "finding": "Finding",
+        "affectedUrl": "Affected URL"
+      },
+      "severity": {
+        "unclassified": "Unclassified"
+      }
+    }
+  },
+  "dev": {
+    "metadataTitle": "Sprint 1 status",
+    "badge": "Sprint 1",
+    "title": "What this build does",
+    "intro": "Live rows below are read from PostgreSQL during this request. Declared values are configuration this codebase commits to.",
+    "live": {
+      "title": "Live — read from the database",
+      "description": "Empty values mean no session, which is the expected state for a visitor who has not signed in."
+    },
+    "declared": {
+      "title": "Declared — configuration, not verified state",
+      "description": "Values below are literals from the source. They state intent; they do not read the live cookie or the live environment."
+    },
+    "table": {
+      "fact": "Fact",
+      "value": "Value",
+      "control": "Control",
+      "where": "Where"
+    },
+    "facts": {
+      "session": "Session",
+      "userId": "User ID",
+      "email": "Email",
+      "emailVerified": "Email verified",
+      "accountStatus": "Account status",
+      "locale": "Locale",
+      "sessionExpires": "Session expires",
+      "sessionCreated": "Session created"
+    },
+    "values": {
+      "present": "present",
+      "none": "none",
+      "yes": "yes",
+      "no": "no"
+    },
+    "controls": {
+      "passwordHashing": "Password hashing",
+      "passwordHashingValue": "argon2id · 19 MiB · 2 iterations · parallelism 1",
+      "minPasswordLength": "Minimum password length",
+      "minPasswordLengthValue": "12 characters, no composition rules",
+      "sessionTtl": "Session TTL",
+      "sessionTtlValue": "7 days, absolute",
+      "sessionCookie": "Session cookie",
+      "sessionCookieValue": "HttpOnly · SameSite=Lax · Secure off only for http",
+      "failedLoginLadder": "Failed-login ladder",
+      "failedLoginLadderValue": "5 → 1 min · 8 → 15 min · 11+ → 60 min",
+      "emailVerification": "Email verification required",
+      "emailVerificationValue": "no (open product question)",
+      "auditLog": "Audit log",
+      "auditLogValue": "append-only via BEFORE UPDATE/DELETE trigger"
+    },
+    "alerts": {
+      "plaintext": {
+        "title": "Session and verification tokens are stored in plaintext",
+        "description": "Better Auth derives the session cookie from the token it reads back from the database, so hashing at rest would put the digest in the cookie. Documented as Open in docs/security.md; the mitigations are a 7-day absolute expiry, real revocation, and account-state hooks."
+      },
+      "rateLimit": {
+        "title": "No rate limiting at the edge yet",
+        "description": "Per-account lockout exists, but there is no IP-level limiter in front of the auth route. Server-side throttling is a Sprint 2 item and is required before this is exposed publicly."
+      }
+    }
+  }
+}

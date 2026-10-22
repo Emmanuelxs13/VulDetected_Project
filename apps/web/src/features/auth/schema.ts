@@ -15,6 +15,14 @@ import { z } from 'zod';
  * Every action re-parses with the SAME schema on the server side. Client-side
  * validation is a convenience for the user's feedback loop; the server-side
  * check is the security boundary, and it is the one that counts.
+ *
+ * ## Messages are dictionary keys, not copy
+ *
+ * A schema is a pure module and cannot read the request locale. Its failures
+ * therefore carry a stable key from `auth.validation.*` (or `auth.errors.*` for
+ * the generic auth errors) and the UI translates it. This keeps the schema
+ * framework-agnostic while ensuring the reader never sees an English literal in
+ * a Spanish build.
  */
 
 /**
@@ -36,12 +44,12 @@ export const MAX_PASSWORD_LENGTH = 128;
 const emailSchema = z
   .string()
   .trim()
-  .min(1, 'Email is required.')
-  .max(320, 'Email is too long.') // RFC 5321 path limit
+  .min(1, 'validation.emailRequired')
+  .max(320, 'validation.emailTooLong') // RFC 5321 path limit
   // Deliberately permissive. A strict RFC 5322 regex rejects valid addresses and
   // buys nothing: a syntactically odd address is not an attack, and the only
   // addresses that matter for existence are the ones that resolve to a mailbox.
-  .email('Enter a valid email address.');
+  .email('validation.emailInvalid');
 
 /**
  * Lowercased for lookup.
@@ -56,13 +64,10 @@ const normalizedEmail = emailSchema.transform((value) => value.toLowerCase());
 
 const passwordSchema = z
   .string()
-  .min(
-    MIN_PASSWORD_LENGTH,
-    `Use at least ${MIN_PASSWORD_LENGTH} characters. Length beats complexity rules.`,
-  )
-  .max(MAX_PASSWORD_LENGTH, `Use at most ${MAX_PASSWORD_LENGTH} characters.`)
+  .min(MIN_PASSWORD_LENGTH, 'validation.passwordMin')
+  .max(MAX_PASSWORD_LENGTH, 'validation.passwordMax')
   // No complexity rules, deliberately. See the note above.
-  .refine((value) => value.trim().length > 0, 'Password cannot be only spaces.');
+  .refine((value) => value.trim().length > 0, 'validation.passwordOnlySpaces');
 
 /**
  * A display name is optional. Email-only signup must not demand a name; demanding
@@ -72,8 +77,8 @@ const passwordSchema = z
 const nameSchema = z
   .string()
   .trim()
-  .min(1, 'Name cannot be empty.')
-  .max(120, 'Name is too long.')
+  .min(1, 'validation.nameEmpty')
+  .max(120, 'validation.nameTooLong')
   .optional();
 
 export const registerSchema = z.object({
@@ -86,7 +91,7 @@ export type RegisterValues = z.output<typeof registerSchema>;
 
 export const loginSchema = z.object({
   email: normalizedEmail,
-  password: z.string().min(1, 'Password is required.').max(MAX_PASSWORD_LENGTH),
+  password: z.string().min(1, 'validation.passwordRequired').max(MAX_PASSWORD_LENGTH),
 });
 export type LoginInput = z.input<typeof loginSchema>;
 export type LoginValues = z.output<typeof loginSchema>;
@@ -104,8 +109,6 @@ export type LoginValues = z.output<typeof loginSchema>;
  * to keep both properties: the user is not confused, and the attacker learns
  * nothing, because the observable behaviour is identical in both cases.
  */
-export const GENERIC_AUTH_ERROR =
-  'We could not sign you in with those details. Check the email and password and try again.';
+export const GENERIC_AUTH_ERROR = 'errors.genericLogin';
 
-export const GENERIC_REGISTER_ERROR =
-  'We could not create that account. If the address is already registered, try signing in instead.';
+export const GENERIC_REGISTER_ERROR = 'errors.genericRegister';

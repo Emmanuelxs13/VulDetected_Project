@@ -15,10 +15,15 @@ import {
   TableHeader,
   TableRow,
 } from '@vuldetected/ui';
+import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
 
-export const metadata: Metadata = { title: 'Sprint 1 status' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('dev');
+
+  return { title: t('metadataTitle') };
+}
 
 /**
  * `/dev/sprint-1` — the verification surface.
@@ -39,48 +44,65 @@ export const metadata: Metadata = { title: 'Sprint 1 status' };
  *     would look like a verification while being a copy of a literal.
  *
  * Labelling which is which is the whole point of the page.
+ *
+ * ## THE RATE-LIMIT ALERT IS GONE ON PURPOSE
+ *
+ * The dictionary still says there is "no rate limiting at the edge yet", but
+ * `app/api/auth/[...all]/route.ts` enforces 30 requests per 15 minutes per IP
+ * through `consumeRateLimit`. That copy is false, and there is no accurate
+ * dictionary key to replace it with, so the stale warning was removed rather
+ * than re-rendered. See the change report for the missing key.
  */
 export default async function SprintOneDevPage() {
+  const t = await getTranslations('dev');
   const session = await getServerSession();
   const user = session?.user;
 
   return (
     <Container size="default" className="flex flex-col gap-6 py-12">
       <div className="flex flex-col gap-2">
-        <Badge variant="info">Sprint 1</Badge>
-        <h1 className="text-2xl font-semibold tracking-tight">What this build does</h1>
-        <p className="max-w-prose text-sm text-text-muted">
-          Live rows below are read from PostgreSQL during this request. Declared values are
-          configuration this codebase commits to.
-        </p>
+        <Badge variant="info">{t('badge')}</Badge>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
+        <p className="max-w-prose text-sm text-text-muted">{t('intro')}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Live — read from the database</CardTitle>
-          <CardDescription>
-            Empty values mean no session, which is the expected state for a visitor who has not
-            signed in.
-          </CardDescription>
+          <CardTitle>{t('live.title')}</CardTitle>
+          <CardDescription>{t('live.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fact</TableHead>
-                <TableHead>Value</TableHead>
+                <TableHead>{t('table.fact')}</TableHead>
+                <TableHead>{t('table.value')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <Fact label="Session" value={user ? 'present' : 'none'} />
-              <Fact label="User ID" value={user?.id ?? null} mono />
-              <Fact label="Email" value={user?.email ?? null} />
-              <Fact label="Email verified" value={user?.emailVerified ? 'yes' : 'no'} />
-              <Fact label="Account status" value={user?.status ?? null} />
-              <Fact label="Locale" value={user?.locale ?? null} />
+              <Fact
+                label={t('facts.session')}
+                value={user ? t('values.present') : t('values.none')}
+              />
+              <Fact label={t('facts.userId')} value={user?.id ?? null} mono />
+              <Fact label={t('facts.email')} value={user?.email ?? null} />
+              <Fact
+                label={t('facts.emailVerified')}
+                value={user?.emailVerified ? t('values.yes') : t('values.no')}
+              />
+              <Fact label={t('facts.accountStatus')} value={user?.status ?? null} />
+              <Fact label={t('facts.locale')} value={user?.locale ?? null} />
               {/* `getSession` returns `{ session, user }`, not a flattened row. */}
-              <Fact label="Session expires" value={iso(session?.session.expiresAt)} mono />
-              <Fact label="Session created" value={iso(session?.session.createdAt)} mono />
+              <Fact
+                label={t('facts.sessionExpires')}
+                value={iso(session?.session.expiresAt)}
+                mono
+              />
+              <Fact
+                label={t('facts.sessionCreated')}
+                value={iso(session?.session.createdAt)}
+                mono
+              />
             </TableBody>
           </Table>
         </CardContent>
@@ -88,51 +110,52 @@ export default async function SprintOneDevPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Declared — configuration, not verified state</CardTitle>
-          <CardDescription>
-            Values below are literals from the source. They state intent; they do not read the live
-            cookie or the live environment.
-          </CardDescription>
+          <CardTitle>{t('declared.title')}</CardTitle>
+          <CardDescription>{t('declared.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Control</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Where</TableHead>
+                <TableHead>{t('table.control')}</TableHead>
+                <TableHead>{t('table.value')}</TableHead>
+                <TableHead>{t('table.where')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <FactWithSource
-                label="Password hashing"
-                value="argon2id · 19 MiB · 2 iterations · parallelism 1"
+                label={t('controls.passwordHashing')}
+                value={t('controls.passwordHashingValue')}
                 source="lib/password.ts"
               />
               <FactWithSource
-                label="Minimum password length"
-                value="12 characters, no composition rules"
+                label={t('controls.minPasswordLength')}
+                value={t('controls.minPasswordLengthValue')}
                 source="features/auth/schema.ts"
               />
-              <FactWithSource label="Session TTL" value="7 days, absolute" source="lib/auth.ts" />
               <FactWithSource
-                label="Session cookie"
-                value="HttpOnly · SameSite=Lax · Secure off only for http"
+                label={t('controls.sessionTtl')}
+                value={t('controls.sessionTtlValue')}
                 source="lib/auth.ts"
               />
               <FactWithSource
-                label="Failed-login ladder"
-                value="5 → 1 min · 8 → 15 min · 11+ → 60 min"
+                label={t('controls.sessionCookie')}
+                value={t('controls.sessionCookieValue')}
+                source="lib/auth.ts"
+              />
+              <FactWithSource
+                label={t('controls.failedLoginLadder')}
+                value={t('controls.failedLoginLadderValue')}
                 source="features/auth/actions.ts"
               />
               <FactWithSource
-                label="Email verification required"
-                value="no (open product question)"
+                label={t('controls.emailVerification')}
+                value={t('controls.emailVerificationValue')}
                 source="lib/auth.ts"
               />
               <FactWithSource
-                label="Audit log"
-                value="append-only via BEFORE UPDATE/DELETE trigger"
+                label={t('controls.auditLog')}
+                value={t('controls.auditLogValue')}
                 source="packages/db/drizzle/0002"
               />
             </TableBody>
@@ -141,20 +164,14 @@ export default async function SprintOneDevPage() {
       </Card>
 
       {/*
-        The two findings that are NOT resolved, stated on the page itself. A status
-        page that only lists successes is a marketing page; the open items are the
+        The finding that is NOT resolved, stated on the page itself. A status
+        page that only lists successes is a marketing page; the open item is the
         useful part for whoever picks this up.
       */}
       <Alert
         variant="warning"
-        title="Session and verification tokens are stored in plaintext"
-        description="Better Auth derives the session cookie from the token it reads back from the database, so hashing at rest would put the digest in the cookie. Documented as Open in docs/security.md; the mitigations are a 7-day absolute expiry, real revocation, and account-state hooks."
-      />
-
-      <Alert
-        variant="info"
-        title="No rate limiting at the edge yet"
-        description="Per-account lockout exists, but there is no IP-level limiter in front of the auth route. Server-side throttling is a Sprint 2 item and is required before this is exposed publicly."
+        title={t('alerts.plaintext.title')}
+        description={t('alerts.plaintext.description')}
       />
     </Container>
   );

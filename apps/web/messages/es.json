@@ -1,0 +1,333 @@
+{
+  "metadata": {
+    "description": "Escanea dominios verificados, sigue el progreso en vivo y revisa los hallazgos de seguridad de tus aplicaciones."
+  },
+  "common": {
+    "skipToContent": "Saltar al contenido"
+  },
+  "nav": {
+    "mainLabel": "Principal",
+    "dashboard": "Panel",
+    "scans": "Escaneos",
+    "sprint1": "Sprint 1",
+    "badge": "Sprint 2",
+    "signIn": "Iniciar sesión",
+    "createAccount": "Crear cuenta",
+    "signOut": "Cerrar sesión"
+  },
+  "home": {
+    "badge": "Sprint 2 · capa de datos, autenticación y escaneos",
+    "title": "Inteligencia de vulnerabilidades para los stacks que realmente despliegas.",
+    "intro": "VulDetected escanea un objetivo, normaliza lo que encuentra y te dice qué vulnerabilidades son reales para tu stack. La autenticación, la verificación de propiedad de dominios y el progreso de los escaneos en vivo ya funcionan; la correlación de CVE y las integraciones llegan más adelante.",
+    "actions": {
+      "dashboard": "Ir al panel",
+      "createAccount": "Crear una cuenta",
+      "signIn": "Iniciar sesión",
+      "seeWhatWorks": "Ver lo que funciona"
+    },
+    "worked": {
+      "title": "Lo que funciona hoy",
+      "items": {
+        "schema": "Esquema PostgreSQL con cinco tablas y migraciones generadas",
+        "auth": "Registro, inicio y cierre de sesión con correo y contraseña",
+        "hashing": "Contraseñas con hash argon2id según los parámetros mínimos de OWASP",
+        "audit": "Registro de auditoría de solo anexado, garantizado por un disparador de base de datos",
+        "lockout": "Bloqueo progresivo de cuentas y errores que no revelan si un usuario existe",
+        "ownership": "Verificación de propiedad del dominio mediante registro DNS TXT o archivo /.well-known/",
+        "scanQueue": "Encolado de escaneos para dominios verificados, con límite de solicitudes por usuario",
+        "scanChecks": "Comprobaciones de cabeceras de seguridad, TLS, cookies y redirecciones",
+        "liveProgress": "Progreso en vivo mediante eventos enviados por el servidor, con hallazgos registrados por escaneo"
+      }
+    },
+    "notBuilt": {
+      "title": "Todavía no está implementado",
+      "description": "La correlación de CVE y las integraciones todavía no están implementadas. Todo lo demás de esta página ya funciona: puedes verificar un dominio, encolar un escaneo, seguir su progreso en vivo y revisar los hallazgos que registra."
+    },
+    "signInPrompt": {
+      "title": "Inicia sesión para ver tu cuenta",
+      "description": "El panel lee la sesión en el servidor, así que una solicitud sin autenticar nunca llega a contenido protegido.",
+      "action": "Iniciar sesión"
+    }
+  },
+  "auth": {
+    "fields": {
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "name": "Nombre"
+    },
+    "login": {
+      "title": "Iniciar sesión",
+      "description": "Usa el correo y la contraseña con los que te registraste.",
+      "submit": "Iniciar sesión",
+      "submitting": "Procesando…",
+      "noAccount": "¿Todavía no tienes cuenta?",
+      "createOne": "Crea una"
+    },
+    "register": {
+      "title": "Crear una cuenta",
+      "description": "La verificación por correo está desactivada por ahora, así que puedes iniciar sesión de inmediato.",
+      "nameDescription": "Opcional. Se usa para dirigirse a ti en el panel.",
+      "passwordHint": "Al menos {min} caracteres. La longitud es lo que importa: no se exigen mayúsculas, símbolos ni dígitos.",
+      "submit": "Crear cuenta",
+      "submitting": "Creando…",
+      "haveAccount": "¿Ya tienes una cuenta?",
+      "signIn": "Inicia sesión"
+    },
+    "errors": {
+      "checkFields": "Revisa los campos marcados.",
+      "genericLogin": "No pudimos iniciar sesión con esos datos. Revisa el correo y la contraseña e inténtalo de nuevo.",
+      "genericRegister": "No pudimos crear esa cuenta. Si la dirección ya está registrada, inicia sesión.",
+      "createFailed": "No pudimos crear esa cuenta. Inténtalo de nuevo en un momento."
+    },
+    "validation": {
+      "emailRequired": "El correo electrónico es obligatorio.",
+      "emailTooLong": "El correo electrónico es demasiado largo.",
+      "emailInvalid": "Introduce una dirección de correo válida.",
+      "passwordMin": "Usa al menos {min} caracteres. La longitud importa más que las reglas de complejidad.",
+      "passwordMax": "Usa como máximo {max} caracteres.",
+      "passwordOnlySpaces": "La contraseña no puede contener solo espacios.",
+      "passwordRequired": "La contraseña es obligatoria.",
+      "nameEmpty": "El nombre no puede estar vacío.",
+      "nameTooLong": "El nombre es demasiado largo."
+    }
+  },
+  "dashboard": {
+    "title": "Panel",
+    "noSession": {
+      "title": "Sesión no activa",
+      "description": "Inicia sesión para ver tu cuenta."
+    },
+    "fallbackName": "Tu cuenta",
+    "account": {
+      "title": "Cuenta",
+      "description": "Leído de la fila `users` asociada a tu sesión.",
+      "email": "Correo electrónico",
+      "verified": "Verificado",
+      "notVerified": "Sin verificar",
+      "status": "Estado",
+      "locale": "Idioma",
+      "userId": "ID de usuario",
+      "memberSince": "Miembro desde"
+    },
+    "findings": {
+      "title": "Los hallazgos todavía no se agregan aquí",
+      "description": "Abre un escaneo para ver sus hallazgos. La correlación de CVE todavía no está implementada."
+    }
+  },
+  "notFound": {
+    "title": "Página no encontrada",
+    "description": "Esa ruta no existe en esta versión. Usa la navegación para llegar a las páginas disponibles.",
+    "backToStart": "Volver al inicio"
+  },
+  "scan": {
+    "metadata": {
+      "listTitle": "Escaneos",
+      "detailTitle": "Detalle del escaneo"
+    },
+    "list": {
+      "title": "Escaneos",
+      "description": "Para escanear un dominio primero debes demostrar que lo controlas: solicitas un reto, publicas la prueba y verificas la propiedad. Solo después puedes encolar un escaneo.",
+      "sessionRequired": {
+        "title": "Sesión no activa",
+        "description": "Inicia sesión para ver tus escaneos y crear nuevos."
+      },
+      "newScan": {
+        "title": "Nuevo escaneo",
+        "description": "Verificación de propiedad y envío del objetivo, en ese orden."
+      },
+      "yourScans": {
+        "title": "Tus escaneos",
+        "description": "Los últimos 50 escaneos de los dominios que has verificado."
+      },
+      "empty": {
+        "title": "Todavía no hay escaneos",
+        "description": "En el formulario de arriba puedes verificar un dominio y encolar tu primer escaneo."
+      },
+      "table": {
+        "target": "Objetivo",
+        "domain": "Dominio",
+        "status": "Estado",
+        "created": "Creado",
+        "detail": "Detalle",
+        "viewDetails": "Ver detalle"
+      }
+    },
+    "status": {
+      "queued": "En cola",
+      "running": "Escaneando",
+      "completed": "Completado",
+      "failed": "Fallido",
+      "cancelled": "Cancelado"
+    },
+    "form": {
+      "domain": {
+        "label": "Dominio",
+        "description": "El dominio que controlas. La verificación se hace sobre él, así que debe ser exactamente el dominio que publicará la prueba.",
+        "placeholder": "example.com",
+        "invalid": "Introduce un nombre de dominio válido.",
+        "submit": "Solicitar reto de verificación",
+        "submitting": "Solicitando reto…"
+      },
+      "challenge": {
+        "intro": "Publica la prueba de propiedad de {hostname} con uno de los dos métodos y vuelve a verificar. El reto caduca en 30 minutos.",
+        "token": {
+          "label": "Token",
+          "hint": "Valor que debes publicar, tal cual, en el registro TXT o en el archivo."
+        },
+        "txtName": {
+          "label": "Nombre del registro DNS TXT",
+          "hint": "Crea un registro TXT con este nombre y el token como valor."
+        },
+        "wellKnown": {
+          "label": "URL del archivo well-known",
+          "hint": "Sirve el token como texto plano en esta URL, servida por HTTPS."
+        },
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "copiedAnnouncement": "{label} copiado al portapapeles."
+      },
+      "method": {
+        "legend": "Método de verificación",
+        "dnsTxt": "Registro DNS TXT",
+        "wellKnown": "Archivo /.well-known/",
+        "verify": "Verificar propiedad",
+        "verifying": "Verificando…",
+        "changeDomain": "Cambiar dominio"
+      },
+      "target": {
+        "verifiedDomainLabel": "Dominio verificado:",
+        "label": "URL objetivo",
+        "description": "Dirección que se escaneará. Solo se admiten destinos públicos en http o https.",
+        "placeholder": "https://example.com",
+        "submit": "Escanear",
+        "submitting": "Encolando…",
+        "scanAnother": "Escanear otro dominio",
+        "invalid": "Introduce una URL http(s) válida."
+      }
+    },
+    "errors": {
+      "challengeFailed": "No se pudo emitir el reto de verificación.",
+      "verifyFailed": "No se pudo verificar la propiedad del dominio.",
+      "submitFailed": "No se pudo enviar el escaneo."
+    },
+    "queued": {
+      "title": "Escaneo en cola",
+      "description": "El escaneo está encolado. Su progreso se actualiza en tiempo real en la página de detalle.",
+      "action": "Ver progreso del escaneo"
+    },
+    "detail": {
+      "title": "Escaneo",
+      "targetLabel": "Objetivo:",
+      "verifiedDomainLabel": "Dominio verificado:",
+      "checksLabel": "Comprobaciones:",
+      "errorLabel": "Error:",
+      "sessionRequired": {
+        "title": "Sesión no activa",
+        "description": "Inicia sesión para ver el progreso de tus escaneos."
+      },
+      "progress": {
+        "title": "Progreso",
+        "description": "Los eventos los publica el worker y los escribe la web, que es la única que modifica el estado del escaneo."
+      },
+      "findings": {
+        "title": "Hallazgos",
+        "description": "En el Sprint 2 todo hallazgo se registra como «Sin clasificar»; la clasificación llega en el Sprint 3."
+      }
+    },
+    "progress": {
+      "connection": {
+        "connecting": "Conectando con el flujo de eventos…",
+        "live": "Actualización en vivo",
+        "lost": "Conexión interrumpida. Reintentando…"
+      },
+      "checksCompleted": "Comprobaciones completadas",
+      "events": "Eventos",
+      "noEvents": "Todavía no hay eventos. El escaneo empieza cuando el worker toma la tarea.",
+      "event": {
+        "started": "Escaneo iniciado",
+        "completed": "Escaneo completado",
+        "failed": "Escaneo fallido",
+        "checkStarted": "Comprobación iniciada: {check}",
+        "checkCompleted": "Comprobación finalizada: {check}",
+        "progress": "Progreso actualizado"
+      }
+    },
+    "findings": {
+      "empty": {
+        "title": "Sin hallazgos",
+        "description": "Este escaneo no registró hallazgos. Un escaneo completado sin hallazgos es un resultado válido, no un error."
+      },
+      "table": {
+        "severity": "Severidad",
+        "check": "Comprobación",
+        "finding": "Hallazgo",
+        "affectedUrl": "URL afectada"
+      },
+      "severity": {
+        "unclassified": "Sin clasificar"
+      }
+    }
+  },
+  "dev": {
+    "metadataTitle": "Estado del Sprint 1",
+    "badge": "Sprint 1",
+    "title": "Qué hace esta versión",
+    "intro": "Las filas en vivo se leen de PostgreSQL durante esta solicitud. Los valores declarados son configuración que este código asume.",
+    "live": {
+      "title": "En vivo: leído de la base de datos",
+      "description": "Los valores vacíos indican que no hay sesión, el estado esperado para un visitante que no ha iniciado sesión."
+    },
+    "declared": {
+      "title": "Declarado: configuración, no estado verificado",
+      "description": "Los valores siguientes son literales del código fuente. Declaran una intención; no leen la cookie ni el entorno en vivo."
+    },
+    "table": {
+      "fact": "Dato",
+      "value": "Valor",
+      "control": "Control",
+      "where": "Dónde"
+    },
+    "facts": {
+      "session": "Sesión",
+      "userId": "ID de usuario",
+      "email": "Correo electrónico",
+      "emailVerified": "Correo verificado",
+      "accountStatus": "Estado de la cuenta",
+      "locale": "Idioma",
+      "sessionExpires": "La sesión caduca",
+      "sessionCreated": "Sesión creada"
+    },
+    "values": {
+      "present": "presente",
+      "none": "ninguna",
+      "yes": "sí",
+      "no": "no"
+    },
+    "controls": {
+      "passwordHashing": "Hash de contraseñas",
+      "passwordHashingValue": "argon2id · 19 MiB · 2 iteraciones · paralelismo 1",
+      "minPasswordLength": "Longitud mínima de la contraseña",
+      "minPasswordLengthValue": "12 caracteres, sin reglas de composición",
+      "sessionTtl": "TTL de la sesión",
+      "sessionTtlValue": "7 días, absoluto",
+      "sessionCookie": "Cookie de sesión",
+      "sessionCookieValue": "HttpOnly · SameSite=Lax · Secure desactivado solo para http",
+      "failedLoginLadder": "Escalada de inicios de sesión fallidos",
+      "failedLoginLadderValue": "5 → 1 min · 8 → 15 min · 11+ → 60 min",
+      "emailVerification": "Verificación por correo obligatoria",
+      "emailVerificationValue": "no (decisión de producto pendiente)",
+      "auditLog": "Registro de auditoría",
+      "auditLogValue": "solo anexado mediante disparador BEFORE UPDATE/DELETE"
+    },
+    "alerts": {
+      "plaintext": {
+        "title": "Los tokens de sesión y verificación se almacenan en texto plano",
+        "description": "Better Auth deriva la cookie de sesión del token que vuelve a leer de la base de datos, así que aplicar hash en reposo pondría el resumen en la cookie. Documentado como abierto en docs/security.md; las mitigaciones son una caducidad absoluta de 7 días, revocación real y hooks de estado de cuenta."
+      },
+      "rateLimit": {
+        "title": "Todavía no hay limitación de tasa en el perímetro",
+        "description": "Existe bloqueo por cuenta, pero no hay un limitador por IP delante de la ruta de autenticación. La limitación del lado del servidor es una tarea del Sprint 2 y es obligatoria antes de exponer esto públicamente."
+      }
+    }
+  }
+}

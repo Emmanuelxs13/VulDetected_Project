@@ -2,6 +2,7 @@
 
 import { Alert, Button, Field, Input } from '@vuldetected/ui';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import {
@@ -37,6 +38,7 @@ import { OwnershipChallengePanel } from './ownership-challenge';
  * endpoint); the schemas imported below are the first, fast layer.
  */
 export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
+  const t = useTranslations('scan');
   const [step, setStep] = useState<'ownership' | 'proof' | 'target'>('ownership');
   const [hostname, setHostname] = useState('');
   const [hostnameError, setHostnameError] = useState<string | undefined>(undefined);
@@ -55,7 +57,9 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
 
     const parsed = hostnameSchema.safeParse(hostname);
     if (!parsed.success) {
-      setHostnameError(parsed.error.issues[0]?.message ?? 'Introduce un nombre de dominio válido.');
+      // The schema message is written for developers; the reader gets the
+      // translated copy from the dictionary.
+      setHostnameError(t('form.domain.invalid'));
       return;
     }
     setHostnameError(undefined);
@@ -77,7 +81,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
 
     if (!result.success) {
       setFailure({
-        title: 'No se pudo emitir el reto de verificación.',
+        title: t('errors.challengeFailed'),
         detail: result.error,
       });
       return;
@@ -99,7 +103,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
 
     if (!result.success) {
       setFailure({
-        title: 'No se pudo verificar la propiedad del dominio.',
+        title: t('errors.verifyFailed'),
         detail: result.error,
       });
       return;
@@ -113,7 +117,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
     event.preventDefault();
     setFailure(null);
 
-    const parsed = safeParseTarget(targetUrl);
+    const parsed = safeParseTarget(targetUrl, t('form.target.invalid'));
     if (!parsed.ok) {
       setTargetError(parsed.error);
       return;
@@ -126,7 +130,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
 
     if (!result.success) {
       setFailure({
-        title: 'No se pudo enviar el escaneo.',
+        title: t('errors.submitFailed'),
         detail: result.error,
       });
       return;
@@ -155,13 +159,9 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
 
       {queuedScanId ? (
         <div aria-live="polite" aria-atomic="true">
-          <Alert
-            variant="success"
-            title="Escaneo en cola"
-            description="El escaneo está encolado. Su progreso se actualiza en tiempo real en la página de detalle."
-          >
+          <Alert variant="success" title={t('queued.title')} description={t('queued.description')}>
             <Button asChild variant="primary" size="sm" className="mt-2">
-              <Link href={`/scans/${queuedScanId}`}>Ver progreso del escaneo</Link>
+              <Link href={`/scans/${queuedScanId}`}>{t('queued.action')}</Link>
             </Button>
           </Alert>
         </div>
@@ -170,9 +170,9 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
       {step === 'ownership' ? (
         <form onSubmit={requestChallenge} className="flex flex-col gap-4" noValidate>
           <Field
-            label="Dominio"
+            label={t('form.domain.label')}
             required
-            description="El dominio que controlas. La verificación se hace sobre él, así que debe ser exactamente el dominio que publicará la prueba."
+            description={t('form.domain.description')}
             error={hostnameError}
           >
             {(control) => (
@@ -182,7 +182,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
                 type="text"
                 inputMode="url"
                 autoComplete="url"
-                placeholder="example.com"
+                placeholder={t('form.domain.placeholder')}
                 value={hostname}
                 onChange={(event) => setHostname(event.target.value)}
                 required
@@ -191,7 +191,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
           </Field>
 
           <Button type="submit" variant="primary" loading={busy}>
-            {busy ? 'Solicitando reto…' : 'Solicitar reto de verificación'}
+            {busy ? t('form.domain.submitting') : t('form.domain.submit')}
           </Button>
         </form>
       ) : null}
@@ -201,7 +201,9 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
           <OwnershipChallengePanel challenge={challenge} />
 
           <fieldset className="flex flex-col gap-2">
-            <legend className="text-xs font-medium text-text-muted">Método de verificación</legend>
+            <legend className="text-xs font-medium text-text-muted">
+              {t('form.method.legend')}
+            </legend>
             <label className="flex items-center gap-2 text-sm text-text">
               <input
                 type="radio"
@@ -211,7 +213,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
                 onChange={() => setMethod('dns_txt')}
                 className="h-4 w-4 accent-brand"
               />
-              <span>Registro DNS TXT</span>
+              <span>{t('form.method.dnsTxt')}</span>
             </label>
             <label className="flex items-center gap-2 text-sm text-text">
               <input
@@ -222,16 +224,16 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
                 onChange={() => setMethod('well_known')}
                 className="h-4 w-4 accent-brand"
               />
-              <span>Archivo /.well-known/</span>
+              <span>{t('form.method.wellKnown')}</span>
             </label>
           </fieldset>
 
           <div className="flex items-center gap-2">
             <Button type="button" variant="primary" loading={busy} onClick={verifyProof}>
-              {busy ? 'Verificando…' : 'Verificar propiedad'}
+              {busy ? t('form.method.verifying') : t('form.method.verify')}
             </Button>
             <Button type="button" variant="ghost" onClick={restart}>
-              Cambiar dominio
+              {t('form.method.changeDomain')}
             </Button>
           </div>
         </div>
@@ -240,13 +242,14 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
       {step === 'target' ? (
         <form onSubmit={submitScan} className="flex flex-col gap-4" noValidate>
           <p className="text-xs text-text-muted">
-            Dominio verificado: <span className="font-mono text-text">{verifiedHost}</span>
+            {t('form.target.verifiedDomainLabel')}{' '}
+            <span className="font-mono text-text">{verifiedHost}</span>
           </p>
 
           <Field
-            label="URL objetivo"
+            label={t('form.target.label')}
             required
-            description="Dirección que se escaneará. Solo se admiten destinos públicos en http o https."
+            description={t('form.target.description')}
             error={targetError}
           >
             {(control) => (
@@ -256,7 +259,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
                 type="url"
                 inputMode="url"
                 autoComplete="url"
-                placeholder="https://example.com"
+                placeholder={t('form.target.placeholder')}
                 value={targetUrl}
                 onChange={(event) => setTargetUrl(event.target.value)}
                 required
@@ -266,10 +269,10 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
 
           <div className="flex items-center gap-2">
             <Button type="submit" variant="primary" loading={busy}>
-              {busy ? 'Encolando…' : 'Escanear'}
+              {busy ? t('form.target.submitting') : t('form.target.submit')}
             </Button>
             <Button type="button" variant="ghost" onClick={restart}>
-              Escanear otro dominio
+              {t('form.target.scanAnother')}
             </Button>
           </div>
         </form>
@@ -286,17 +289,17 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
  * validation failure Zod can report, so the call is guarded: an unexpected
  * exception becomes an ordinary validation message instead of a broken form.
  */
-function safeParseTarget(value: string): { ok: true; url: string } | { ok: false; error: string } {
+function safeParseTarget(
+  value: string,
+  invalidMessage: string,
+): { ok: true; url: string } | { ok: false; error: string } {
   try {
     const parsed = targetUrlSchema.safeParse(value);
     if (!parsed.success) {
-      return {
-        ok: false,
-        error: parsed.error.issues[0]?.message ?? 'Introduce una URL http(s) válida.',
-      };
+      return { ok: false, error: invalidMessage };
     }
     return { ok: true, url: parsed.data.url };
   } catch {
-    return { ok: false, error: 'Introduce una URL http(s) válida.' };
+    return { ok: false, error: invalidMessage };
   }
 }

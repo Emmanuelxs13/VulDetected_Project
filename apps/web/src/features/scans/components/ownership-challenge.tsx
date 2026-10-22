@@ -1,9 +1,19 @@
 'use client';
 
 import { Button } from '@vuldetected/ui';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import type { OwnershipChallenge } from '../actions';
+
+type CopyTarget = 'token' | 'txtName' | 'wellKnown';
+
+/** Label key per copy target, so the live announcement is translated too. */
+const LABEL_KEYS: Record<CopyTarget, string> = {
+  token: 'form.challenge.token.label',
+  txtName: 'form.challenge.txtName.label',
+  wellKnown: 'form.challenge.wellKnown.label',
+};
 
 /**
  * The ownership proof the user has to publish.
@@ -18,14 +28,15 @@ import type { OwnershipChallenge } from '../actions';
  * One click per value removes that failure mode.
  */
 export function OwnershipChallengePanel({ challenge }: { challenge: OwnershipChallenge }) {
-  const [copied, setCopied] = useState<string | null>(null);
+  const t = useTranslations('scan');
+  const [copied, setCopied] = useState<CopyTarget | null>(null);
 
-  async function copy(label: string, value: string) {
+  async function copy(target: CopyTarget, value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setCopied(label);
+      setCopied(target);
       window.setTimeout(() => {
-        setCopied((current) => (current === label ? null : current));
+        setCopied((current) => (current === target ? null : current));
       }, 2500);
     } catch {
       // Clipboard access can be denied (insecure context, permissions). The
@@ -37,36 +48,34 @@ export function OwnershipChallengePanel({ challenge }: { challenge: OwnershipCha
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs leading-5 text-text-muted">
-        Publica la prueba de propiedad de{' '}
-        <span className="font-mono text-text">{challenge.normalizedHostname}</span> con uno de los
-        dos métodos y vuelve a verificar. El reto caduca en 30 minutos.
+        {t('form.challenge.intro', { hostname: challenge.normalizedHostname })}
       </p>
 
       <CopyableValue
-        label="Token"
-        hint="Valor que debes publicar, tal cual, en el registro TXT o en el archivo."
+        label={t('form.challenge.token.label')}
+        hint={t('form.challenge.token.hint')}
         value={challenge.token}
-        copied={copied === 'Token'}
-        onCopy={() => copy('Token', challenge.token)}
+        copied={copied === 'token'}
+        onCopy={() => copy('token', challenge.token)}
       />
       <CopyableValue
-        label="Nombre del registro DNS TXT"
-        hint="Crea un registro TXT con este nombre y el token como valor."
+        label={t('form.challenge.txtName.label')}
+        hint={t('form.challenge.txtName.hint')}
         value={challenge.txtName}
-        copied={copied === 'Nombre del registro DNS TXT'}
-        onCopy={() => copy('Nombre del registro DNS TXT', challenge.txtName)}
+        copied={copied === 'txtName'}
+        onCopy={() => copy('txtName', challenge.txtName)}
       />
       <CopyableValue
-        label="URL del archivo well-known"
-        hint="Sirve el token como texto plano en esta URL, servida por HTTPS."
+        label={t('form.challenge.wellKnown.label')}
+        hint={t('form.challenge.wellKnown.hint')}
         value={challenge.wellKnownUrl}
-        copied={copied === 'URL del archivo well-known'}
-        onCopy={() => copy('URL del archivo well-known', challenge.wellKnownUrl)}
+        copied={copied === 'wellKnown'}
+        onCopy={() => copy('wellKnown', challenge.wellKnownUrl)}
       />
 
       {/* The copy confirmation is announced, not only shown. */}
       <span aria-live="polite" className="sr-only">
-        {copied ? `${copied} copiado al portapapeles.` : ''}
+        {copied ? t('form.challenge.copiedAnnouncement', { label: t(LABEL_KEYS[copied]) }) : ''}
       </span>
     </div>
   );
@@ -85,6 +94,8 @@ function CopyableValue({
   copied: boolean;
   onCopy: () => void;
 }) {
+  const t = useTranslations('scan');
+
   return (
     <div className="flex flex-col gap-1 rounded-md border border-border bg-surface p-3">
       <div className="flex items-start justify-between gap-2">
@@ -93,7 +104,7 @@ function CopyableValue({
           <span className="text-xs text-text-muted">{hint}</span>
         </div>
         <Button type="button" variant="secondary" size="sm" onClick={onCopy}>
-          {copied ? 'Copiado' : 'Copiar'}
+          {copied ? t('form.challenge.copied') : t('form.challenge.copy')}
         </Button>
       </div>
       <code className="break-all font-mono text-xs text-text">{value}</code>

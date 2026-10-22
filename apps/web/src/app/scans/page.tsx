@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@vuldetected/ui';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
 import { NewScanForm } from '@/features/scans/components/new-scan-form';
@@ -24,7 +25,11 @@ import { ScanStatusBadge } from '@/features/scans/components/scan-status';
 import type { ScanStatus } from '@/features/scans/components/scan-status';
 import { db } from '@/lib/db';
 
-export const metadata: Metadata = { title: 'Escaneos' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('scan');
+
+  return { title: t('metadata.listTitle') };
+}
 
 /**
  * Scans list and the entry point of the ownership flow.
@@ -44,14 +49,15 @@ export const metadata: Metadata = { title: 'Escaneos' };
  * authorises a scan (DO-1, SS-3).
  */
 export default async function ScansPage() {
+  const t = await getTranslations('scan');
   const session = await getServerSession();
 
   if (!session?.user) {
     return (
       <Container size="narrow" className="py-12">
         <EmptyState
-          title="Sesión no activa"
-          description="Inicia sesión para ver tus escaneos y crear nuevos."
+          title={t('list.sessionRequired.title')}
+          description={t('list.sessionRequired.description')}
         />
       </Container>
     );
@@ -83,19 +89,14 @@ export default async function ScansPage() {
   return (
     <Container size="default" className="flex flex-col gap-6 py-12">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Escaneos</h1>
-        <p className="max-w-prose text-sm text-text-muted">
-          Para escanear un dominio primero debes demostrar que lo controlas: solicitas un reto,
-          publicas la prueba y verificas la propiedad. Solo después puedes encolar un escaneo.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('list.title')}</h1>
+        <p className="max-w-prose text-sm text-text-muted">{t('list.description')}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Nuevo escaneo</CardTitle>
-          <CardDescription>
-            Verificación de propiedad y envío del objetivo, en ese orden.
-          </CardDescription>
+          <CardTitle>{t('list.newScan.title')}</CardTitle>
+          <CardDescription>{t('list.newScan.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <NewScanForm verifiedHosts={verifiedDomains.map((domain) => domain.hostname)} />
@@ -104,27 +105,22 @@ export default async function ScansPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Tus escaneos</CardTitle>
-          <CardDescription>
-            Los últimos 50 escaneos de los dominios que has verificado.
-          </CardDescription>
+          <CardTitle>{t('list.yourScans.title')}</CardTitle>
+          <CardDescription>{t('list.yourScans.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           {scanRows.length === 0 ? (
-            <EmptyState
-              title="Todavía no hay escaneos"
-              description="En el formulario de arriba puedes verificar un dominio y encolar tu primer escaneo."
-            />
+            <EmptyState title={t('list.empty.title')} description={t('list.empty.description')} />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Objetivo</TableHead>
-                  <TableHead>Dominio</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Creado</TableHead>
+                  <TableHead>{t('list.table.target')}</TableHead>
+                  <TableHead>{t('list.table.domain')}</TableHead>
+                  <TableHead>{t('list.table.status')}</TableHead>
+                  <TableHead>{t('list.table.created')}</TableHead>
                   <TableHead>
-                    <span className="sr-only">Detalle</span>
+                    <span className="sr-only">{t('list.table.detail')}</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -150,7 +146,7 @@ export default async function ScansPage() {
                     </TableCell>
                     <TableCell>
                       <Button asChild variant="ghost" size="sm">
-                        <Link href={`/scans/${scan.id}`}>Ver detalle</Link>
+                        <Link href={`/scans/${scan.id}`}>{t('list.table.viewDetails')}</Link>
                       </Button>
                     </TableCell>
                   </TableRow>

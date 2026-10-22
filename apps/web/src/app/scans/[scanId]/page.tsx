@@ -11,6 +11,7 @@ import {
   EmptyState,
 } from '@vuldetected/ui';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
 import { FindingsList } from '@/features/scans/components/findings-list';
@@ -21,7 +22,11 @@ import { ScanStatusBadge } from '@/features/scans/components/scan-status';
 import type { ScanStatus } from '@/features/scans/components/scan-status';
 import { db } from '@/lib/db';
 
-export const metadata: Metadata = { title: 'Detalle del escaneo' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('scan');
+
+  return { title: t('metadata.detailTitle') };
+}
 
 /**
  * Detail of one scan: live progress and findings.
@@ -42,6 +47,7 @@ export const metadata: Metadata = { title: 'Detalle del escaneo' };
  */
 export default async function ScanDetailPage({ params }: { params: Promise<{ scanId: string }> }) {
   const { scanId } = await params;
+  const t = await getTranslations('scan');
 
   const session = await getServerSession();
 
@@ -49,8 +55,8 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
     return (
       <Container size="narrow" className="py-12">
         <EmptyState
-          title="Sesión no activa"
-          description="Inicia sesión para ver el progreso de tus escaneos."
+          title={t('detail.sessionRequired.title')}
+          description={t('detail.sessionRequired.description')}
         />
       </Container>
     );
@@ -126,39 +132,45 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
 
   const checks = Array.isArray(scan.checks) ? (scan.checks as string[]) : [];
 
+  // The stored value is a machine code (`enqueue_failed`, the worker's own
+  // reason string, …). It is never rendered: the reader gets a translated
+  // message and the raw value stays in the database for diagnostics.
+  const errorMessage = scan.error
+    ? scan.error === 'enqueue_failed'
+      ? t('errors.submitFailed')
+      : t('status.failed')
+    : null;
+
   return (
     <Container size="default" className="flex flex-col gap-6 py-12">
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">Escaneo</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('detail.title')}</h1>
           <ScanStatusBadge status={scan.status as ScanStatus} />
         </div>
         <p className="text-sm text-text-muted">
-          Objetivo: <span className="font-mono text-text">{scan.targetUrl}</span>
+          {t('detail.targetLabel')} <span className="font-mono text-text">{scan.targetUrl}</span>
         </p>
         <p className="text-xs text-text-muted">
-          Dominio verificado: <span className="font-mono">{scan.hostname}</span>
+          {t('detail.verifiedDomainLabel')} <span className="font-mono">{scan.hostname}</span>
         </p>
         {checks.length > 0 ? (
           <p className="text-xs text-text-muted">
-            Comprobaciones: <span className="font-mono">{checks.join(', ')}</span>
+            {t('detail.checksLabel')} <span className="font-mono">{checks.join(', ')}</span>
           </p>
         ) : null}
       </div>
 
-      {scan.error ? (
+      {errorMessage ? (
         <div aria-live="polite" aria-atomic="true">
-          <Badge variant="critical">Error: {scan.error}</Badge>
+          <Badge variant="critical">{errorMessage}</Badge>
         </div>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Progreso</CardTitle>
-          <CardDescription>
-            Los eventos los publica el worker y los escribe la web, que es la única que modifica el
-            estado del escaneo.
-          </CardDescription>
+          <CardTitle>{t('detail.progress.title')}</CardTitle>
+          <CardDescription>{t('detail.progress.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <ScanProgressStream
@@ -172,11 +184,8 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
 
       <Card>
         <CardHeader>
-          <CardTitle>Hallazgos</CardTitle>
-          <CardDescription>
-            En el Sprint 2 todo hallazgo se registra como «Sin clasificar»; la clasificación llega
-            en el Sprint 3.
-          </CardDescription>
+          <CardTitle>{t('detail.findings.title')}</CardTitle>
+          <CardDescription>{t('detail.findings.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <FindingsList findings={findingList} />

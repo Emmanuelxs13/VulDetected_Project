@@ -1,6 +1,8 @@
 import { Badge, Button, Container } from '@vuldetected/ui';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
+import { LocaleSwitcher } from '@/components/locale-switcher';
 import { LogoutButton } from '@/features/auth/logout-button';
 import { getServerSession } from '@/features/auth/session';
 
@@ -18,8 +20,20 @@ import { getServerSession } from '@/features/auth/session';
  * shell that stays usable without a database. `getServerSession()` is wrapped in
  * React's `cache()`, so the navigation this component links to can also ask for
  * the session in the same render pass and still cost one query.
+ *
+ * The nav stays a Server Component: `getTranslations` is the server entry point.
+ * Only `LocaleSwitcher` is a client island, because it needs the pending state
+ * around the locale server action.
+ *
+ * ## ONE SPRINT 1 AFFORDANCE
+ *
+ * The audit saw "Sprint 1 Sprint 1" because the nav link and the status badge
+ * carried the same label. The badge is now `nav.badge` ("Sprint 2") and is a
+ * status marker, not a link. `/dev/sprint-1` keeps exactly one affordance, with
+ * its label from `nav.sprint1`.
  */
 export async function SiteNav() {
+  const t = await getTranslations('nav');
   const session = await getServerSession();
 
   return (
@@ -37,20 +51,27 @@ export async function SiteNav() {
               <span className="text-sm font-semibold">VulDetected</span>
             </Link>
 
-            <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
-              <NavLink href="/dashboard">Dashboard</NavLink>
-              <NavLink href="/scans">Escaneos</NavLink>
-              <NavLink href="/dev/sprint-1">Sprint 1</NavLink>
+            <nav aria-label={t('mainLabel')} className="hidden items-center gap-1 sm:flex">
+              <NavLink href="/dashboard">{t('dashboard')}</NavLink>
+              <NavLink href="/scans">{t('scans')}</NavLink>
             </nav>
           </div>
 
           <div className="flex items-center gap-2">
             {/*
-              Sprint 1 has exactly one implemented feature, so the nav says so
-              rather than linking to pages that would 404. A nav full of dead
-              links is how a demo starts lying.
+              The single `/dev/sprint-1` affordance. It sits next to the status
+              badge but is deliberately a link, not a second badge: the audit
+              defect was two identical labels, not one link plus one status.
+              Hidden on the narrowest screens where the header has no room; the
+              landing page keeps the same link for those readers.
             */}
-            <Badge variant="info">Sprint 1</Badge>
+            <NavLink href="/dev/sprint-1" className="hidden sm:inline-block">
+              {t('sprint1')}
+            </NavLink>
+
+            <Badge variant="info">{t('badge')}</Badge>
+
+            <LocaleSwitcher />
 
             {session?.user ? (
               <div className="flex items-center gap-2">
@@ -62,10 +83,10 @@ export async function SiteNav() {
             ) : (
               <>
                 <Button asChild variant="ghost" size="sm">
-                  <Link href="/login">Sign in</Link>
+                  <Link href="/login">{t('signIn')}</Link>
                 </Button>
                 <Button asChild variant="primary" size="sm">
-                  <Link href="/register">Create account</Link>
+                  <Link href="/register">{t('createAccount')}</Link>
                 </Button>
               </>
             )}
@@ -76,11 +97,19 @@ export async function SiteNav() {
   );
 }
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <Link
       href={href}
-      className="focus-ring rounded-md px-2 py-1 text-sm text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text"
+      className={`focus-ring rounded-md px-2 py-1 text-sm text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text ${className ?? ''}`}
     >
       {children}
     </Link>
