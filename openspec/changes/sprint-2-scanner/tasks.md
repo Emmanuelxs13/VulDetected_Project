@@ -56,5 +56,5 @@ Chain strategy: pending
 - [x] 5.1 Páginas `apps/web/src/app/scans/page.tsx`, `apps/web/src/app/scans/[scanId]/page.tsx` + `features/scans/components/*`; copy español.
 - [x] 5.2 Servicio `scanner` en `infra/docker-compose.dev.yml`; `.env.example` (+`SCANNER_CALLBACK_SECRET`, `SCANNER_EGRESS_MODE=strict`; −`SCANNER_SERVICE_URL`).
 - [x] 5.3 E2E `SCANNER_EGRESS_MODE=test`: encolar→consumir→callback→filas; dedup `ON CONFLICT`.
-- [ ] 5.4 Docs `docs/database.md`, `docs/architecture.md`, `docs/security.md`, `docs/codebase-map.md`, `docs/changelog.md`; citas TB1–TB6, Badge `unknown` (`packages/ui` read-only), puerto 6543.
+- [x] 5.4 Docs `docs/database.md`, `docs/architecture.md`, `docs/security.md`, `docs/codebase-map.md`, `docs/changelog.md`; citas TB1–TB6, Badge `unknown` (`packages/ui` read-only), puerto 6543.
 - [ ] 5.5 Gate final: `pnpm check`, `pnpm test:e2e`, `pytest`.

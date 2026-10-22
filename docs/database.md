@@ -279,6 +279,13 @@ los dos índices anteriores.
 > [Puntos de contacto en la DB](#puntos-de-contacto-en-la-db--se-requiere-decisión-del-propietario)).
 > Donde un borrador anterior discrepaba del SQL generado, ganaba el SQL.
 
+Las cuatro tablas tienen un solo escritor: `apps/web`, la única pieza con
+`DATABASE_URL` ([TB3]). El worker de `services/scanner` no abre conexiones: envía
+progreso y resultados por callback HTTP autenticado, y la web los persiste
+([TB4]). Por eso la idempotencia del pipeline vive en constraints de PostgreSQL y
+no en la memoria del worker; el flujo completo está en
+[`architecture.md`](./architecture.md#flujo-de-escaneo--implementado-sprint-2).
+
 ### `domains`
 
 | Columna               | Tipo          | Null | Valor por defecto   | Notas                                                                                                                                                                                                        |
@@ -339,7 +346,7 @@ los dos índices anteriores.
 | -------------- | ------------- | ---- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`           | `uuid`        | no   | `gen_random_uuid()` | Clave primaria.                                                                                                                                                                                                               |
 | `scan_id`      | `uuid`        | no   | —                   | FK → `scans`, `ON DELETE CASCADE`. El escaneo que produjo el hallazgo.                                                                                                                                                        |
-| `finding_key`  | `text`        | no   | —                   | `sha256(domain_id                                                                                                                                                                                                             | check_name | affected_url)`— la calcula el worker (D3). Es estable entre re-escaneos y **no** incluye`scan_id`. |
+| `finding_key`  | `text`        | no   | —                   | `sha256(domain_id \| check_name \| affected_url)` — la calcula el worker (D3). Es estable entre re-escaneos y **no** incluye `scan_id`.                                                                                       |
 | `severity`     | `severity`    | no   | `'unclassified'`    | Único valor escrito en S2 (DM-3): `unclassified`. La clasificación con reglas y proveniencia llega en S3.                                                                                                                     |
 | `check_name`   | `text`        | no   | —                   | Qué comprobación determinista produjo el hallazgo (p. ej. `security_headers`).                                                                                                                                                |
 | `title`        | `text`        | no   | —                   | Título legible por humanos.                                                                                                                                                                                                   |
@@ -352,7 +359,7 @@ los dos índices anteriores.
 
 **Por qué existe cada columna sensible**
 
-- `finding_key` — la deduplicación central (D3): el índice único parcial
+- `finding_key` — la deduplicación central (D3): el índice único
   `(scan_id, finding_key)` descarta el segundo hallazgo igual **dentro** del
   mismo scan (con `ON CONFLICT DO NOTHING` al insertar), y `findings_key_idx`
   (no único) agrupa las ocurrencias **entre** escaneos para la tendencia de S3.
