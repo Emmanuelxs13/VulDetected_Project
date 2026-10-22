@@ -53,6 +53,44 @@ export const tokenPurposeEnum = pgEnum('token_purpose', [
 ]);
 
 /**
+ * Scan lifecycle state (Sprint 2, DM-2).
+ *
+ * A database enum rather than free text for the same reason `account_status` is
+ * one: an unknown status must be rejected at the boundary that stores it, not by
+ * a UI `switch` that silently renders nothing for a value it does not recognise.
+ *
+ * `cancelled` is RESERVED — there is no UI trigger and no worker kill in Sprint 2
+ * (design D9). The value exists so the vocabulary is fixed before the feature
+ * that needs it, rather than forcing an enum migration then.
+ */
+export const scanStatusEnum = pgEnum('scan_status', [
+  'queued',
+  'running',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+/**
+ * Finding severity vocabulary (Sprint 2, DM-3; ADR 0003).
+ *
+ * `unclassified` is deliberately the FIRST value and the ONLY one Sprint 2 ever
+ * writes: the deterministic checks classify nothing, and inventing a severity
+ * from a missing-header check would be a false claim. Classification rules and
+ * provenance arrive in Sprint 3; the column and its full vocabulary exist now so
+ * that work is a data change, not a migration. `unclassified` is also the ADR
+ * 0003 `Badge unknown` mapping.
+ */
+export const severityEnum = pgEnum('severity', [
+  'unclassified',
+  'info',
+  'low',
+  'medium',
+  'high',
+  'critical',
+]);
+
+/**
  * `inet` — a validated IP address, in either family.
  *
  * A `text` column accepts "not-an-ip", "1.2.3.4.5", and "::ffff:1.2.3.4" with
@@ -71,3 +109,5 @@ export const inet = customType<{ data: string }>({
 
 export type AccountStatus = (typeof accountStatusEnum.enumValues)[number];
 export type TokenPurpose = (typeof tokenPurposeEnum.enumValues)[number];
+export type ScanStatus = (typeof scanStatusEnum.enumValues)[number];
+export type Severity = (typeof severityEnum.enumValues)[number];

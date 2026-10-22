@@ -10,6 +10,7 @@ import {
   EmptyState,
 } from '@vuldetected/ui';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
 
@@ -19,72 +20,68 @@ import { getServerSession } from '@/features/auth/session';
  * ## THE HONEST VERSION
  *
  * This page lists what actually works. Sprint 1 shipped the data layer and
- * authentication — no scanning, no findings, no integrations. A landing page that
- * implies otherwise is not marketing, it is a false capability claim to anyone
- * evaluating the project, and it makes the empty dashboard look broken rather than
- * early.
+ * authentication; Sprint 2 added domain ownership verification and the scan
+ * pipeline. CVE correlation and integrations are still not built. A landing page
+ * that implies otherwise is not marketing, it is a false capability claim to
+ * anyone evaluating the project, and it makes the empty dashboard look broken
+ * rather than early.
  *
  * So the feature list is real, and the not-real part is stated plainly.
  */
 export default async function HomePage() {
+  const t = await getTranslations('home');
   const session = await getServerSession();
 
   return (
     <Container size="narrow" className="flex flex-col gap-8 py-12">
       <section className="flex flex-col gap-4">
-        <Badge variant="neutral">Sprint 1 · data layer and authentication</Badge>
+        <Badge variant="neutral">{t('badge')}</Badge>
 
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Vulnerability intelligence for the stacks you actually ship.
-        </h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t('title')}</h1>
 
-        <p className="max-w-prose text-sm leading-6 text-text-muted">
-          VulDetected scans a target, normalises what it finds, and tells you which vulnerabilities
-          are real for your stack. This repository is at the foundation: the provider-neutral
-          PostgreSQL schema, the append-only audit trail, and authentication built on argon2id.
-        </p>
+        <p className="max-w-prose text-sm leading-6 text-text-muted">{t('intro')}</p>
 
         <div className="flex flex-wrap items-center gap-2">
           {session?.user ? (
             <Button asChild variant="primary">
-              <Link href="/dashboard">Go to dashboard</Link>
+              <Link href="/dashboard">{t('actions.dashboard')}</Link>
             </Button>
           ) : (
             <>
               <Button asChild variant="primary">
-                <Link href="/register">Create an account</Link>
+                <Link href="/register">{t('actions.createAccount')}</Link>
               </Button>
               <Button asChild variant="secondary">
-                <Link href="/login">Sign in</Link>
+                <Link href="/login">{t('actions.signIn')}</Link>
               </Button>
             </>
           )}
           <Button asChild variant="ghost">
-            <Link href="/dev/sprint-1">See what works</Link>
+            <Link href="/dev/sprint-1">{t('actions.seeWhatWorks')}</Link>
           </Button>
         </div>
       </section>
 
       <Card>
         <CardHeader>
-          <CardTitle>What works today</CardTitle>
+          <CardTitle>{t('worked.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="flex flex-col gap-2 text-sm text-text-muted">
-            <Worked item="PostgreSQL schema with five tables and generated migrations" />
-            <Worked item="Email-and-password registration, sign-in and sign-out" />
-            <Worked item="Passwords hashed with argon2id at OWASP minimum parameters" />
-            <Worked item="Append-only audit log, enforced by a database trigger" />
-            <Worked item="Progressive account lockout and user-enumeration-safe errors" />
+            <Worked item={t('worked.items.schema')} />
+            <Worked item={t('worked.items.auth')} />
+            <Worked item={t('worked.items.hashing')} />
+            <Worked item={t('worked.items.audit')} />
+            <Worked item={t('worked.items.lockout')} />
+            <Worked item={t('worked.items.ownership')} />
+            <Worked item={t('worked.items.scanQueue')} />
+            <Worked item={t('worked.items.scanChecks')} />
+            <Worked item={t('worked.items.liveProgress')} />
           </ul>
         </CardContent>
       </Card>
 
-      <Alert
-        variant="info"
-        title="Not built yet"
-        description="Target scanning, CVE correlation, findings, and integrations are later sprints. The dashboard is empty by design, not because something failed."
-      />
+      <Alert variant="info" title={t('notBuilt.title')} description={t('notBuilt.description')} />
 
       {/*
         The `/dev/sprint-1` page is the answer to "how do I verify this works?"
@@ -92,11 +89,11 @@ export default async function HomePage() {
       */}
       {!session?.user ? (
         <EmptyState
-          title="Sign in to see your account"
-          description="The dashboard reads the session on the server, so an unauthenticated request never reaches protected content."
+          title={t('signInPrompt.title')}
+          description={t('signInPrompt.description')}
           action={
             <Button asChild variant="primary" size="sm">
-              <Link href="/login">Sign in</Link>
+              <Link href="/login">{t('signInPrompt.action')}</Link>
             </Button>
           }
         />

@@ -19,7 +19,13 @@ documento.
 
 ## 1. Verificación de propiedad del dominio — precondición legal
 
-**Estado:** `Open (planned Sprint 2)`
+**Estado:** `Done (Sprint 2)` — el mecanismo de propiedad está implementado y
+probado en `apps/web/src/features/scans/`: emisión de challenge, verificación por
+DNS `TXT` y por `/.well-known/`, y el guard estructural `requireVerifiedDomain`
+(DO-2, DO-3, DO-4 y DO-5 con pruebas Vitest). `submitScanAction` invoca el guard
+**antes** de insertar la fila y de encolar, aplica el límite de 5 escaneos por
+hora y usuario, y audita `scan.enqueued` / `scan.failed`. La auditoría de
+`domain.ownership.*` cubre la emisión del challenge y la verificación exitosa.
 
 **Amenaza.** VulDetected escanea aplicaciones web a solicitud. Si un usuario
 puede enviar cualquier hostname, el producto es un servicio de escaneo de
@@ -48,7 +54,12 @@ verificada. Una prueba afirma que todo intento de encolar sin una prueba falla.
 
 ## 2. Endurecimiento SSRF
 
-**Estado:** `Open (planned Sprint 2)`
+**Estado:** `Done (Sprint 2)` — la tabla de reglas está implementada y probada en
+los dos lados (`apps/web/src/lib/ssrf.ts` con Vitest;
+`services/scanner/scanner/ssrf.py` con pytest) y el cliente de salida del worker
+(`services/scanner/scanner/egress.py`) aplica timeouts, redirects manuales y el
+modo `strict`. Queda un matiz de implementación en el pin de la conexión, anotado
+al final de esta sección.
 
 **Amenaza.** El objetivo del escaneo lo aporta el usuario. Sin controles, es una
 primitiva clásica de falsificación de solicitudes del lado del servidor apuntada
@@ -72,44 +83,85 @@ interesante". No puede serlo.
 - **Revalidar después de cada redirección.** Una URL permitida que redirige a
   `169.254.169.254` elude por completo cualquier verificación única. Cada salto
   se resuelve y se vuelve a comprobar; las cadenas de redirección están acotadas.
-- **Puertos restringidos.** Una lista de permitidos explícita (80, 443 y lo que
-  una plantilla concreta de escaneo necesite legítimamente). Sin puertos
-  arbitrarios.
+- **Puertos restringidos.** Lista cerrada `80/443` (`ALLOWED_PORTS`), chequeada
+  antes de consultar el DNS; ampliarla exige cambiar la tabla de reglas y sus
+  dos suites de pruebas.
 - **Rebinding de DNS.** Resolver una vez, fijar la dirección validada para la
   conexión y no volver a resolver a mitad de la solicitud hacia una respuesta
-  distinta.
+  distinta. El guard Node lo hace así (`safeFetch` conecta a la IP fijada y
+  conserva `Host`/SNI). En el worker Python la validación se repite en cada salto,
+  pero `httpx` abre la conexión por URL; el pin de socket no está aplicado (ver el
+  hallazgo al final de esta sección).
 - **Tiempos de espera y límites de concurrencia** por objetivo, de modo que un
-  objetivo lento no pueda ocupar una ranura del worker.
+  objetivo lento no pueda ocupar una ranura del worker. El cliente usa connect
+  5 s / read 15 s / write 5 s / pool 5 s; el worker corre con `--concurrency=2` y
+  `worker_prefetch_multiplier=1`, de modo que un objetivo lento ocupa como mucho
+  una de las dos ranuras.
 
-**Verificado por pruebas, no por inspección.** El conjunto de pruebas debe
-incluir intentos de elusión mediante redirección y mediante IPv6; una prueba que
-pasa es la evidencia de que el control funciona.
+### Tabla de reglas (contrato único, D6)
+
+Una sola tabla, dos implementaciones: `apps/web/src/lib/ssrf.ts` (Vitest) y
+`services/scanner/scanner/ssrf.py` (pytest). Ambas suites afirman caso por caso
+esta tabla; si una regla cambia, cambia aquí primero y después en los dos lados.
+
+| #   | Regla                                | Detalle                                                                                                                                                                                                                                                                                         |
+| --- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Validar la dirección, no el hostname | La cadena la controla el atacante; la dirección es lo que se marca.                                                                                                                                                                                                                             |
+| 2   | Bloquear tras resolver               | IPv4: `0.0.0.0/8`, `10/8`, `127/8` (loopback), `169.254/16` (link-local y metadatos cloud), `172.16/12`, `192.168/16`, `224/4` (multicast). IPv6: `::/128`, `::1/128`, `fe80::/10`, `fc00::/7`, `ff00::/8` (multicast). Una dirección no parseable se rechaza: falla cerrada, nunca se permite. |
+| 3   | IPv4-mapped cae a IPv4               | `::ffff:127.0.0.1` y su forma hex `::ffff:7f00:1` se normalizan a `127.0.0.1` y vuelven a pasar por la tabla IPv4.                                                                                                                                                                              |
+| 4   | Solo literales canónicos             | Si el host es un literal IP: IPv4 dotted-decimal canónico (se rechazan decimal `2130706433`, octal `0177.0.0.1`, hex `0x7f000001`, corto `127.1`, cola con punto) o IPv6 canónico en minúsculas y comprimido RFC 5952 (se rechazan `0:0:0:0:0:0:0:1`, grupos rellenos y zone ids).              |
+| 5   | Conjunto completo, pin único         | Se resuelve una sola vez, se valida TODA la respuesta A/AAAA — una sola dirección bloqueada rechaza el host, que es exactamente el patrón rebinding — y se fija la primera pública. La conexión va a esa IP con `Host`/SNI = hostname original; no se re-resuelve a mitad de petición.          |
+| 6   | Redirects manuales                   | `follow_redirects=false` y bucle propio, máximo **5 saltos**; cada salto re-resuelve, re-valida y re-fija con esta misma tabla antes de abrir conexión.                                                                                                                                         |
+| 7   | Solo puertos `80` y `443`            | Lista cerrada `ALLOWED_PORTS`, chequeada antes de ningún DNS.                                                                                                                                                                                                                                   |
+| 8   | Solo `http`/`https`                  | Otros esquemas → rechazo `unsupported_scheme`; URL inválida → `invalid_url`.                                                                                                                                                                                                                    |
+| 9   | Timeouts del transporte              | connect 5 s / read 15 s en el guard Node; el cliente de salida del worker replica ambos en el task 4.4.                                                                                                                                                                                         |
+
+**Verificado por pruebas, no por inspección.** Las suites `apps/web` (Vitest:
+`src/lib/ssrf.test.ts`) y `services/scanner` (pytest: `tests/test_ssrf.py`)
+cubren intentos de elusión por redirección, por IPv6, por respuesta DNS
+rebinding y por puertos fuera de la lista; una prueba que pasa es la evidencia
+de que el control funciona.
+
+**Hallazgo abierto (Sprint 2).** El guard Node fija la IP validada, pero el
+cliente de salida del worker resuelve y valida cada URL y cada redirect y luego
+deja que `httpx` resuelva de nuevo al conectar. Entre la validación y la conexión
+existe una ventana de rebinding de DNS; cerrarla exige conectar a la IP fijada
+(transporte con `lookup` o `socket` fijado) y preservar `Host`/SNI. Hasta
+entonces, la defensa del worker es la revalidación por salto, no el pin. El
+worker corre aislado y sin credenciales de base de datos (§3), lo que acota el
+impacto de una conexión equivocada.
 
 ## 3. Aislamiento de red y de sistema de archivos del worker
 
-**Estado:** `Open (planned Sprint 2)`
+**Estado:** `Done (Sprint 2)` — el servicio `scanner` de
+`infra/docker-compose.dev.yml` aplica las condiciones de esta sección.
 
 **Amenaza.** El worker ejecuta herramientas de escaneo de terceros contra
-objetivos elegidos por el atacante. Una comprometimiento ahí está a un paso del
-resto de la plataforma.
+objetivos elegidos por el atacante. Un compromiso ahí está a un paso del resto de
+la plataforma.
 
 **Mitigación.**
 
-- **Red separada con salida filtrada.** El worker alcanza internet (debe
-  hacerlo), pero no la base de datos, ni las credenciales del broker Redis en un
-  archivo legible, ni la red privada del host.
+- **Red separada.** El worker vive en la red `vuldetected-scanner`, compartida
+  solo con Redis, y no tiene puerto publicado: no alcanza PostgreSQL ni Mailpit.
+  La red no puede ser `internal: true` porque el worker debe salir a internet.
+  En desarrollo se añade `host.docker.internal` para llegar a la web que corre
+  con `pnpm dev`; es una concesión del entorno local, no del despliegue.
 - **Sin credenciales de la base de datos en el worker.** Consume trabajos y
   publica resultados por un canal estrecho. Un worker que puede escribir en
   `users` o `sessions` tiene el radio de impacto de todo el producto.
-- **Sistema de archivos raíz de solo lectura**, `tmpfs` en `/tmp`. Un escáner
-  que escribe en su propia imagen es un mecanismo de persistencia.
-- **Capacidades retiradas**, `no-new-privileges`.
-- **Sin montajes del sistema de archivos ni de sockets del host.** Acceder al
-  socket de Docker dentro del worker equivale a ser root en el host.
-- **Límites de recursos** — CPU, memoria y un tiempo de espera duro por escaneo.
-- **Sin acceso a shell desde la ruta de solicitud.** La entrada del usuario
-  nunca debe llegar a una cadena de shell; los argumentos se pasan como un
-  arreglo argv.
+- **Sistema de archivos raíz de solo lectura**, `tmpfs` en `/tmp`, con el proceso
+  como UID 1000 (`user: '1000:1000'`). Un escáner que escribe en su propia imagen
+  es un mecanismo de persistencia.
+- **Capacidades retiradas** (`cap_drop: ALL`) y `no-new-privileges:true`.
+- **Sin montajes del sistema de archivos ni de sockets del host.** El servicio no
+  declara `volumes`; montar el socket de Docker dentro del worker equivaldría a
+  ser root en el host.
+- **Límites de recursos** — 2 CPU y 1 GB de memoria en el compose, más un
+  `timelimit` duro de 300 s por tarea en el mensaje Celery.
+- **Sin acceso a shell desde la ruta de solicitud.** Los checks del Sprint 2 son
+  Python puro: no hay `subprocess` ni argumentos de shell. Cuando lleguen Nuclei
+  y ZAP, sus argumentos deberán pasarse como argv, nunca como una cadena.
 
 ## 4. Seguridad de la sesión
 
@@ -207,7 +259,7 @@ error en el punto en que se produjo el fallo.
 | Sin bloqueo de cuenta en la ruta de registro (por diseño — permitiría que cualquiera bloqueara a una víctima)                                   | Info      | Deliberado; la limitación de tasa del endpoint de registro es el control que corresponde ahí                                                                                                                   |
 | Verificación de correo no exigida antes del primer inicio de sesión                                                                             | Info      | Decisión de producto abierta, `docs/decisions-pending.md`                                                                                                                                                      |
 | Sin Content-Security-Policy                                                                                                                     | Media     | Abierta — aplazada deliberadamente; una CSP adivinada rompe el arranque en línea de Next o se "arregla" con `unsafe-inline`, que no es una política. Medir primero en modo solo informe. Ver `next.config.ts`. |
-| Sin limitación de tasa por IP en las acciones de autenticación ni en el registro                                                                | Media     | Abierta, planificada en el Sprint 2. El bloqueo por cuenta está implementado y no cubre estas rutas                                                                                                            |
+| Sin limitación de tasa por IP en el registro                                                                                                    | Media     | Parcialmente cerrada en el Sprint 2: el catch-all de Better Auth limita 30/15 min por IP (incluye registro). Falta el límite por IP en el envío de escaneos                                                    |
 
 ## 5. Secretos nunca en git
 
@@ -236,8 +288,10 @@ la conserva.
 
 ## 6. Limitación de tasa
 
-**Estado:** `Partially done` — el bloqueo por cuenta está implementado en el
-Sprint 1; la limitación global por IP sigue `Open (planned Sprint 2)`
+**Estado:** `Partially done` — el bloqueo por cuenta (Sprint 1) y el limitador de
+ventana fija sobre Redis (Sprint 2) están implementados, con fallo cerrado. Queda
+abierto el límite **por IP en el envío de escaneos**; el de autenticación ya está
+aplicado.
 
 **Amenaza.** Los endpoints sin limitación invitan al relleno de credenciales, al
 spray de contraseñas, al agotamiento de recursos mediante el envío de escaneos y
@@ -276,21 +330,60 @@ a la enumeración.
   otro fallo de autenticación, de modo que no puede usarse para confirmar que una
   dirección está registrada.
 
+### Implementado en el Sprint 2
+
+- **Limitador de ventana fija sobre Redis** (`lib/rate-limit.ts`). La clave es
+  explícita, de modo que cada ruta elige su dimensión: `ip:<ip>:auth` en el
+  catch-all de Better Auth (30 intentos / 15 min) y `user:<id>:scan` en
+  `submitScanAction` (5 escaneos / hora). Un escaneo es un control de costos
+  tanto como un control de abuso.
+- **Fallo cerrado.** Si Redis no responde, el limitador lanza `RateLimitError` y
+  la ruta responde 429/503 en lugar de dejar pasar la solicitud.
+
 ### Aún abierto (Sprint 2)
 
-- **La limitación por IP no está implementada.** El limitador integrado de Better
-  Auth usa como clave solo el endpoint de inicio de sesión; la ruta de Server
-  Action y el endpoint de registro no están cubiertos por él.
-- **El envío de escaneos tiene limitación de tasa** — por usuario y por IP. Un
-  escaneo es un control de costos tanto como un control de abuso: un escaneo es
-  caro y el atacante puede no ser el cliente.
-- **Fallo cerrado ante indisponibilidad del limitador.** Si el limitador no está
-  disponible, el endpoint queda cerrado en lugar de abierto.
+- **El envío de escaneos no tiene límite por IP.** Solo se aplica el límite por
+  usuario; un atacante con muchas cuentas gratuitas puede multiplicar el costo.
+  El diseño D4 prevé 20/hora por IP; falta conectarlo en `submitScanAction`.
 - **Interacción señalada:** argon2id es lento a propósito, lo que hace de la
   limitación de tasa una mitigación real de denegación de servicio y no una
   higiene opcional. La verificación con señuelo de trabajo constante en las
   direcciones desconocidas hereda este costo a propósito, y se memoriza por
   proceso para que no pueda convertirse en un vector de amplificación.
+
+## 7. Autenticación del callback y autorización del progreso
+
+**Estado:** `Done (Sprint 2)`
+
+**Amenaza.** El worker reporta por HTTP a la web. Sin autenticación, cualquiera
+que conozca el id de un escaneo podría inyectar eventos o hallazgos en un escaneo
+ajeno. El progreso se lee por SSE: sin autorización, un id —que no es secreto—
+expondría el historial de otro usuario, incluidos los hosts escaneados.
+
+**Mitigación.**
+
+- **Secreto compartido en el header `Authorization`.** Tanto
+  `POST /api/scans/{id}/events` como `POST /api/scans/{id}/callback` exigen
+  `Bearer <SCANNER_CALLBACK_SECRET>`. Ausente o incorrecto → 401; el escaneo
+  desconocido → 404; el cuerpo inválido → 400.
+- **Comparación en tiempo constante.** Se usa `crypto.timingSafeEqual`, con una
+  comprobación previa de longitud porque la función lanza si los buffers difieren
+  de tamaño. El secreto se lee del entorno de ambos procesos y **nunca viaja por
+  el broker** ([TB4]); si no está configurado, la ruta responde 401 en vez de
+  aceptar.
+- **Idempotencia como parte del contrato.** `UNIQUE (scan_id, seq)` +
+  `ON CONFLICT DO NOTHING` absorben los reintentos de progreso, y
+  `UNIQUE (scan_id, finding_key)` evita duplicar hallazgos. Un callback terminal
+  repetido responde `{ok, already_applied: true}` sin escribir nada.
+- **Autorización de lectura.** `GET /api/scans/{id}/events` exige sesión (401) y
+  comprueba que el escaneo pertenece a un dominio del usuario (403). La página
+  `/scans/{id}` aplica el mismo filtro en la consulta, no solo en la UI.
+- **El estado solo lo mueve la web.** El worker informa, pero no escribe
+  `scans.status` ni `findings`: la transición a `running` y el cierre terminal
+  ocurren dentro de las rutas autenticadas ([TB3], SP-2).
+
+Un id de escaneo es un identificador, no una capacidad: la autorización se
+comprueba contra la fila de `domains`, no contra el conocimiento del UUID.
 
 ---
 
@@ -299,7 +392,7 @@ a la enumeración.
 | Control                                                      | Estado                    | Notas                                                                                                                            |
 | ------------------------------------------------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Rastro de auditoría para eventos de seguridad (OWASP A09)    | `Done` (esquema)          | `audit_logs` es solo-append; se puebla durante los flujos de autenticación del Sprint 1.                                         |
-| Autorización impuesta en la capa de datos                    | `Open (planned Sprint 1)` | No solo middleware.                                                                                                              |
+| Autorización impuesta en la capa de datos                    | `Done (Sprint 2)`         | Cada ruta valida la sesión y el SSE filtra por dueño del dominio; no se confía en el middleware.                                 |
 | La severidad nunca se comunica solo con color (WCAG 1.4.1)   | `Done` (diseño)           | Color + icono + texto en cada insignia de severidad; ver [ADR 0003](./adr/0003-design-tokens-and-color-budget.md).               |
 | Prueba automatizada de contraste para la paleta de severidad | `Open (planned Sprint 1)` | Define lo que significa "contraste garantizado"; una violación hace fallar la compilación.                                       |
 | La tabla de hallazgos no contiene credenciales               | `Open (planned Sprint 2)` | La salida de la herramienta puede incluir cabeceras de autenticación o tokens del objetivo; debe depurarse antes de almacenarla. |

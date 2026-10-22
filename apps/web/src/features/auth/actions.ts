@@ -51,10 +51,12 @@ export type ActionResult<T = undefined> =
   | { success: false; error: string; fieldErrors?: Record<string, string> };
 
 /**
- * Maps a Zod failure onto per-field messages.
+ * Maps a Zod failure onto per-field message keys.
  *
- * Only the FIRST issue per field is surfaced. Rendering three messages under one
- * input is noise, and the first is the actionable one.
+ * The schema emits keys from `auth.validation.*` (see `schema.ts`), not copy;
+ * the form translates them. Only the FIRST issue per field is surfaced.
+ * Rendering three messages under one input is noise, and the first is the
+ * actionable one.
  */
 function fieldErrorsOf(error: { issues: { path: PropertyKey[]; message: string }[] }) {
   const result: Record<string, string> = {};
@@ -100,7 +102,7 @@ export async function registerAction(
   if (!parsed.success) {
     return {
       success: false,
-      error: 'Check the highlighted fields.',
+      error: 'errors.checkFields',
       fieldErrors: fieldErrorsOf(parsed.error),
     };
   }
@@ -208,7 +210,7 @@ export async function registerAction(
     // only reachable when the address did NOT exist a moment ago.
     return {
       success: false,
-      error: 'We could not create that account. Try again in a moment.',
+      error: 'errors.createFailed',
     };
   }
 
@@ -265,7 +267,7 @@ export async function loginAction(
   if (!parsed.success) {
     return {
       success: false,
-      error: 'Check the highlighted fields.',
+      error: 'errors.checkFields',
       fieldErrors: fieldErrorsOf(parsed.error),
     };
   }

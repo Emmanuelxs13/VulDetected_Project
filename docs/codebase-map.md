@@ -13,18 +13,19 @@ VulDetected_Project            pnpm + Turborepo monorepo (ADR 0001)
 ├─ apps/web                    Next.js App Router — todo el backend del producto
 │  └─ src
 │     ├─ app/                  SOLO rutas: page/layout/loading/error + route handlers
-│     ├─ features/<dominio>/    porciones de negocio: auth hoy, scans / sites después
+│     ├─ features/<dominio>/    porciones de negocio: auth y scans hoy; sites después
 │     ├─ components/           componentes del shell de la aplicación, compartidos entre rutas
-│     ├─ lib/                  infraestructura de servidor: auth, db, env, audit, password
+│     ├─ lib/                  infraestructura de servidor: auth, db, env, audit, password,
+│     │                        ssrf, celery, rate-limit
 │     ├─ types/                declaraciones de tipos ambientales (.d.ts)
-│     └─ middleware.ts         (planificado, Sprint 2) filtro grueso — nunca autorización
+│     └─ middleware.ts         (planificado) filtro grueso — nunca autorización
 ├─ packages/ui                 sistema de diseño presentacional (ADR 0003): tokens,
 │                              primitivas, utilidades cn/contrast. Sin lógica, sin datos.
 ├─ packages/db                 capa de datos (ADR 0004): esquema Drizzle, cliente
 │                              neutral respecto del proveedor, migraciones. Sin código de la app.
-├─ infra/                      stack de desarrollo con Docker Compose (Redis reservado para el worker del Sprint 2)
+├─ infra/                      stack de desarrollo con Docker Compose: Postgres, Redis y scanner
 ├─ docs/                       roadmap, codebase-map, arquitectura, ADRs, runbooks, changelog
-└─ services/scanner            (Sprint 2) worker Python + Celery — aislado, solo Docker
+└─ services/scanner            worker Python + Celery del Sprint 2 — aislado, solo Docker
 ```
 
 Principio clave: **`apps/web` es dueño de las reglas del producto, `packages/db`
@@ -99,6 +100,47 @@ absorben el crecimiento, en orden:
    cuando la necesidad es real — nunca como un marcador de posición vacío.
 4. **Tablas de escaneo**: `scans`, `scan_events`, `domain_ownership` viven en
    `packages/db/src/schema/` con el mismo cuidado solo-append que `audit_logs`.
+
+## El dominio de escaneo en el código (Sprint 2)
+
+| Capa          | Ruta                                                                          | Responsabilidad                                                                                        |
+| ------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Web — negocio | `apps/web/src/features/scans/actions.ts`                                      | Challenge de propiedad, verificación DNS/`well-known`, `submitScanAction` y auditoría.                 |
+| Web — negocio | `apps/web/src/features/scans/guard.ts`                                        | `requireVerifiedDomain`: la puerta estructural que impide encolar sin propiedad probada.               |
+| Web — negocio | `apps/web/src/features/scans/schema.ts`                                       | Normalización y validación Zod de hostnames y URLs de objetivo.                                        |
+| Web — UI      | `apps/web/src/features/scans/components/`                                     | Formulario, challenge de propiedad, estado del escaneo, stream de progreso y lista de hallazgos.       |
+| Web — infra   | `apps/web/src/lib/celery.ts`                                                  | Codifica el mensaje Celery 5.x y lo publica con `LPUSH` en la cola `celery`.                           |
+| Web — infra   | `apps/web/src/lib/ssrf.ts`                                                    | Guard SSRF y `safeFetch` del lado Node: valida cada respuesta DNS y fija la IP pública.                |
+| Web — infra   | `apps/web/src/lib/rate-limit.ts`                                              | Ventana fija sobre Redis, con clave explícita por dimensión (IP o usuario) y fallo cerrado.            |
+| Web — rutas   | `apps/web/src/app/api/scans/[scanId]/events/route.ts`                         | `POST` de progreso del worker (Bearer) y `GET` SSE/JSON del navegador (sesión + propiedad).            |
+| Web — rutas   | `apps/web/src/app/api/scans/[scanId]/callback/route.ts`                       | Callback terminal del worker (Bearer): hallazgos + estado, idempotente.                                |
+| Web — páginas | `apps/web/src/app/scans/page.tsx`, `apps/web/src/app/scans/[scanId]/page.tsx` | Listado y detalle; el detalle filtra por dueño del dominio.                                            |
+| Worker        | `services/scanner/scanner/tasks.py`                                           | `run_scan`: orquesta los checks, emite progreso y llama al callback; traduce errores a `failed`.       |
+| Worker        | `services/scanner/scanner/{ssrf,egress}.py`                                   | Tabla de reglas SSRF compartida con Node y cliente HTTP endurecido (`follow_redirects=False`).         |
+| Worker        | `services/scanner/scanner/checks/`                                            | `security_headers.py`, `tls.py`, `cookies.py`, `redirects.py`.                                         |
+| Worker        | `services/scanner/scanner/report.py`                                          | Cliente del callback: `send_event` y `send_callback`, ambos con el Bearer secreto.                     |
+| Datos         | `packages/db/src/schema/{domains,scans,findings,scan-events}.ts`              | Tablas, enums y constraints del dominio; migración `drizzle/0003_scan_domain.sql`.                     |
+| Infra         | `infra/docker-compose.dev.yml`                                                | Servicios `postgres`, `redis` y `scanner`; red separada, sin puerto publicado y con `read_only: true`. |
+
+La regla que ordena todo lo anterior: **el worker no importa `packages/db` ni
+recibe `DATABASE_URL`**. Habla con Redis para recibir trabajo y con dos rutas
+HTTP autenticadas para reportar; la web es el único escritor de las tablas de
+escaneo ([TB3]/[TB4]). El detalle del flujo y del contrato está en
+[`architecture.md`](./architecture.md#flujo-de-escaneo--implementado-sprint-2).
+
+### La decisión de la insignia `unknown`
+
+`packages/ui` expone siete variantes de `Badge`: `critical`, `high`, `medium`,
+`low`, `info`, `unknown` y `neutral`. **No existe una variante `unclassified`**,
+aunque el enum `severity` de PostgreSQL sí tenga ese valor y sea el único que el
+Sprint 2 escribe. La lista de hallazgos usa `variant="unknown"` y la etiqueta
+«Sin clasificar» (`findings-list.tsx`), que es el vocabulario que ADR 0003 define
+para una severidad aún no determinada.
+
+Es una brecha de vocabulario, no de datos: cuando el Sprint 3 clasifique
+severidades reales, la insignia no cambiará de color sin mapear
+`critical`/`high`/... a sus variantes. `packages/ui` es de solo lectura en este
+sprint; el mapeo pertenece a la feature de escaneo, no al sistema de diseño.
 
 ## Nunca se versiona
 

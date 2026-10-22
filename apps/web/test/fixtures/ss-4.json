@@ -1,0 +1,15 @@
+{
+  "task": "scanner.tasks.run_scan",
+  "kwargs": {
+    "scan_id": "00000000-0000-0000-0000-000000000000",
+    "domain_id": "00000000-0000-0000-0000-000000000001",
+    "target": {
+      "scheme": "https",
+      "host": "example.com",
+      "port": 443,
+      "base_url": "https://example.com"
+    },
+    "checks": ["security_headers", "tls", "cookies", "redirects"],
+    "callback_base_url": "http://localhost:3000"
+  }
+}

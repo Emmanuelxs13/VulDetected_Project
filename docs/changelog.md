@@ -346,6 +346,84 @@ Sprint 1. Los tres eran invisibles para `tsc` y se habrían publicado.
   ha ejecutado contra una base de datos y de que el flujo de autenticación está
   sin probar hasta que así sea.
 
+### Añadido — Sprint 2: dominio de escaneo
+
+> El Sprint 2 redactó el esquema de escaneo y la migración `0003_scan_domain`
+> quedó **aplicada y verificada** contra la base local `vuldetected` (ver más
+> abajo). Este registro cubre tanto el esquema como el pipeline que lo usa.
+
+- **Base de pruebas para el monorepo.** Vitest 5 configurado en la raíz
+  mediante `test.projects` (`apps/web`, `packages/db`), con config por
+  workspace, stub de `server-only` para los tests web y esqueleto pytest para
+  `services/scanner` (`pyproject.toml`, `tests/test_smoke.py`). Script `test`
+  en la raíz (`vitest run`); 6 tests verdes en Vitest + 1 en pytest.
+- **Esquema del dominio de escaneo en `packages/db`.** Cuatro tablas nuevas
+  (`domains`, `scans`, `findings`, `scan_events`) y dos enums (`scan_status`,
+  `severity`), con el patrón del Sprint 1: `uuid` + `gen_random_uuid()`,
+  `timestamptz`, FKs en cascada, migración aditiva sin backfill.
+- **Desviación deliberada `scan_events.id`:** `bigint GENERATED ALWAYS AS
+IDENTITY` en lugar de `uuid` — el stream append-only necesita un cursor
+  monotónico para el polling SSE (D2, documentado en la tabla).
+- **Unicidad GLOBAL de `normalized_hostname`** — decisión del propietario
+  incorporada a la migración `0003` (D2): la propiedad legal de un dominio es
+  excluyente de hecho; la segunda cuenta recibe "dominio ya verificado por otra
+  cuenta".
+- **Deduplicación de `findings` por clave estable** — `finding_key =
+sha256(domain_id | check_name | affected_url)`, índice único intra-escaneo
+  `(scan_id, finding_key)` con `ON CONFLICT DO NOTHING` y `findings_key_idx` no
+  único para la tendencia entre escaneos (D3).
+- **Migración aditiva `0003_scan_domain` generada y aplicada.** Generada con
+  `db:generate` y verificada con `drizzle-kit check` ("todo en orden");
+  **aplicada a mano en pgAdmin** contra la base local `vuldetected` tras la
+  autorización del propietario, con la propiedad de tablas, tipos y secuencias
+  reasignada al rol `vuldetected`. No se ejecutó `db:migrate` (su journal es
+  ajeno a las migraciones aplicadas a mano).
+
+### Cambiado — Sprint 2: dominio de escaneo
+
+- `docs/database.md` documenta ahora el esquema real del Sprint 2 (las cuatro
+  tablas, los dos enums, los índices y su razón de ser) y corrige el estado de
+  migraciones: las del Sprint 1 (`0000`–`0002`) y la `0003` del Sprint 2 están
+  **ejecutadas y verificadas** contra la base local. Se corrigió además la
+  afirmación errónea de que las migraciones se aplicaban con `drizzle-kit`: la
+  vía real es a mano en pgAdmin, y `db:migrate` está prohibido hasta reconciliar
+  ambos historiales (ver `docs/local-postgres-setup.md` §361).
+- `docs/changelog.md` — este registro.
+
+### Añadido — Sprint 2: pipeline de escaneo
+
+- **Pipeline completo, de la sumisión al progreso en vivo.** `submitScanAction`
+  normaliza la URL, exige propiedad verificada y 5 escaneos por hora y usuario,
+  inserta el escaneo en `queued` y publica un mensaje Celery 5.x real en la cola
+  `celery`; el worker revalida el objetivo, ejecuta `security_headers`, `tls`,
+  `cookies` y `redirects`, y reporta por callback autenticado. El worker sigue sin
+  credenciales de base de datos: la web es el único escritor de `scans`,
+  `findings` y `scan_events` ([TB3]/[TB4]).
+- **Callback y progreso idempotentes.** `POST /api/scans/{id}/events` y
+  `POST /api/scans/{id}/callback` comparten un Bearer comparado en tiempo
+  constante; `UNIQUE (scan_id, seq)` y `UNIQUE (scan_id, finding_key)` absorben
+  los reintentos. Un callback terminal repetido responde
+  `{ok, already_applied: true}` y no reescribe nada.
+- **SSE sobre polling de `scan_events`.** `GET /api/scans/{id}/events` entrega
+  `scan.event` cada segundo, hasta 100 eventos por ciclo, `scan.done` al terminar
+  y un heartbeat cada 15 s; exige sesión y propiedad del dominio. La ruta no usa
+  `LISTEN`/`NOTIFY`, lo que evita el Transaction pooler de Supabase en el **puerto
+  6543** (con ese proveedor, conexión directa o Session pooler 5432). En local,
+  PostgreSQL escucha en el 5432.
+- **Worker aislado.** Contenedor sin puerto publicado, en la red
+  `vuldetected-scanner` compartida solo con Redis, con raíz de solo lectura,
+  `tmpfs` en `/tmp`, `cap_drop: ALL`, `no-new-privileges`, 2 CPU / 1 GB y
+  `timelimit` de 300 s por tarea.
+- **Documentación del flujo real.** `architecture.md` reemplaza el diagrama
+  planificado (Nuclei/ZAP pasan al Sprint 3) y describe el contrato web ↔ worker,
+  el SSE y la frontera de escritura; `security.md` eleva los estados de
+  propiedad, SSRF, aislamiento y callback a `Done (Sprint 2)`, con el pin de
+  socket de Python registrado como hallazgo abierto; `codebase-map.md` indexa el
+  dominio y documenta la elección de `Badge variant="unknown"` ante la ausencia de
+  una variante `unclassified` en `packages/ui` (de solo lectura); `database.md`
+  ancla el esquema a TB3/TB4 y corrige el índice de deduplicación, que es único y
+  no parcial.
+
 ## [Hoja de ruta relevante sin publicar]
 
 El Sprint 2 continúa: entrega de correo (Mailpit), que activa

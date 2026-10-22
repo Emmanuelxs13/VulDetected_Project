@@ -93,6 +93,18 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().int().positive().optional(),
   EMAIL_FROM: z.string().optional(),
 
+  /** Redis URL for Celery broker and rate limiting (Sprint 2). */
+  REDIS_URL: z.string().min(1).optional(),
+
+  /** Shared secret for scanner callback authentication (Sprint 2). */
+  SCANNER_CALLBACK_SECRET: z.string().min(1).optional(),
+
+  /** Base URL for scanner callbacks (Sprint 2). */
+  SCANNER_CALLBACK_BASE_URL: z.string().url().optional(),
+
+  /** Driver for scan events streaming (Sprint 2). */
+  SCAN_EVENTS_DRIVER: z.enum(['poll', 'notify']).optional().default('poll'),
+
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 });
 

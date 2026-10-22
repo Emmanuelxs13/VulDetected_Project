@@ -2,11 +2,13 @@
 
 import { Alert, Button, Field, Input } from '@vuldetected/ui';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 // React 19 moved `useFormStatus` out of `react` and into `react-dom`.
 import { useFormStatus } from 'react-dom';
 
 import { loginAction } from './actions';
+import { MAX_PASSWORD_LENGTH } from './schema';
 
 /**
  * Login form.
@@ -21,9 +23,20 @@ import { loginAction } from './actions';
  * `isPending` is scoped to the `<form>` that owns the action, so reading it in the
  * parent reports the parent's state, not this form's — a mistake that produces a
  * submit button that never shows progress.
+ *
+ * ## WHY THE ACTION RETURNS KEYS
+ *
+ * `actions.ts` and `schema.ts` run on the server, where the request locale is
+ * available but a client component is not. They return `auth.*` message keys and
+ * this form translates them, so validation and auth failures follow the language
+ * switch like every other string on the page.
  */
 export function LoginForm() {
+  const t = useTranslations('auth');
   const [state, formAction] = useActionState(loginAction, null);
+
+  const translate = (key: string) => (t.has(key) ? t(key, { max: MAX_PASSWORD_LENGTH }) : key);
+  const fieldError = (key: string | undefined) => (key ? translate(key) : undefined);
 
   return (
     <form action={formAction} className="flex flex-col gap-4" noValidate>
@@ -34,13 +47,15 @@ export function LoginForm() {
         reader user gets no signal that anything happened at all.
       */}
       <div aria-live="polite" aria-atomic="true">
-        {state && !state.success ? <Alert variant="critical" title={state.error} /> : null}
+        {state && !state.success ? (
+          <Alert variant="critical" title={translate(state.error)} />
+        ) : null}
       </div>
 
       <Field
-        label="Email"
+        label={t('fields.email')}
         required
-        error={state && !state.success ? state.fieldErrors?.email : undefined}
+        error={state && !state.success ? fieldError(state.fieldErrors?.email) : undefined}
       >
         {(control) => (
           <Input
@@ -58,9 +73,9 @@ export function LoginForm() {
       </Field>
 
       <Field
-        label="Password"
+        label={t('fields.password')}
         required
-        error={state && !state.success ? state.fieldErrors?.password : undefined}
+        error={state && !state.success ? fieldError(state.fieldErrors?.password) : undefined}
       >
         {(control) => (
           <Input
@@ -75,12 +90,12 @@ export function LoginForm() {
         )}
       </Field>
 
-      <SubmitButton label="Sign in" />
+      <SubmitButton />
 
       <p className="text-xs text-text-muted">
-        No account yet?{' '}
+        {t('login.noAccount')}{' '}
         <Link href="/register" className="font-medium text-brand underline underline-offset-2">
-          Create one
+          {t('login.createOne')}
         </Link>
       </p>
     </form>
@@ -88,12 +103,13 @@ export function LoginForm() {
 }
 
 /** Isolated so `useFormStatus` binds to this form's pending state. */
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton() {
+  const t = useTranslations('auth');
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" variant="primary" fullWidth loading={pending}>
-      {pending ? 'Working…' : label}
+      {pending ? t('login.submitting') : t('login.submit')}
     </Button>
   );
 }

@@ -10,14 +10,15 @@ estructura del repositorio y las reglas de importación, luego los
 
 ## Los tres desplegables
 
-| Desplegable                     | Tecnología                       | Responsabilidad                                                                                                                                                             |
-| ------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Web** (`apps/web`)            | Next.js App Router sobre Node 22 | Todo el backend del producto: autenticación, validación de sesión, autorización, reglas de negocio, acceso a la base de datos, interfaz, rutas API y el stream de progreso. |
-| **Worker** (`services/scanner`) | Python + Celery                  | Ejecuta escaneos. Orquesta Nuclei y OWASP ZAP contra un dominio ya verificado. No contiene reglas de negocio ni validación de sesión.                                       |
-| **Base de datos**               | PostgreSQL 16                    | Registro de verdad para usuarios, sesiones, dominios, escaneos y hallazgos. Nunca se expone a internet público.                                                             |
+| Desplegable                     | Tecnología                       | Responsabilidad                                                                                                                                                                                                                    |
+| ------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Web** (`apps/web`)            | Next.js App Router sobre Node 22 | Todo el backend del producto: autenticación, validación de sesión, autorización, reglas de negocio, acceso a la base de datos, interfaz, rutas API y el stream de progreso.                                                        |
+| **Worker** (`services/scanner`) | Python + Celery                  | Ejecuta los checks deterministas del Sprint 2 (cabeceras de seguridad, TLS, cookies y redirecciones) contra un dominio ya verificado. Nuclei y ZAP quedan para el Sprint 3. No contiene reglas de negocio ni validación de sesión. |
+| **Base de datos**               | PostgreSQL 16                    | Registro de verdad para usuarios, sesiones, dominios, escaneos y hallazgos. Nunca se expone a internet público.                                                                                                                    |
 
-Infraestructura de apoyo: Redis (broker de Celery y backend de resultados,
-Sprint 2) y un relé SMTP para correo transaccional (Mailpit en local).
+Infraestructura de apoyo: Redis (broker de Celery, Sprint 2; el estado de los
+escaneos vive en PostgreSQL, no en un result backend) y un relé SMTP para correo
+transaccional (Mailpit en local).
 
 El worker es un proceso separado a propósito — ver
 [ADR 0001](./adr/0001-monorepo-and-runtime-split.md). La consecuencia más
@@ -36,15 +37,15 @@ un runtime.**
                                     │                      │
                     ┌───────────────▼──────────┐   ┌───────▼─────────────────┐
                     │  PostgreSQL 16           │   │  Redis 7                │
-                    │  users · sessions ·      │◀──│  Celery broker          │
-                    │  domains · scans ·       │   │  + result backend       │
+                    │  users · sessions ·      │   │  Celery broker          │
+                    │  domains · scans ·       │   │  (sin result backend)   │
                     │  findings · audit_logs   │   └───────▲─────────────────┘
-                    └──────────────────────────┘           │ task / result
+                    └──────────────────────────┘           │ task
                                                            │
                                             ┌──────────────▼─────────────────┐
                                             │  services/scanner             │
                                             │  Python + Celery worker        │
-                                            │  runs Nuclei + ZAP            │
+                                            │  deterministic checks         │
                                             │  filtered egress              │
                                             │  read-only filesystem         │
                                             └──────────────┬─────────────────┘
@@ -108,72 +109,103 @@ consulta:** el token en crudo de la cookie se hashea y el resumen se busca en
 no autenticada — no existe un camino de "confiar solo en la firma". Por eso la
 base de datos puede ser robada sin entregar sesiones activas.
 
-## Flujo de escaneo — planificado, llega en el Sprint 2
+## Flujo de escaneo — implementado (Sprint 2)
+
+El Sprint 2 implementa el pipeline completo con checks deterministas propios
+(`security_headers`, `tls`, `cookies`, `redirects`). Nuclei y OWASP ZAP llegan en
+el Sprint 3, pero la forma del flujo no cambia: el worker seguirá siendo el único
+runtime que habla con el objetivo.
 
 ```
- [TB1] Browser ──▶ [TB2] Next.js
+ [TB1] Navegador ──▶ [TB2] Next.js
                      │
-        ┌────────────▼─────────────────────────────────────┐
-        │ 1. User submits a URL                          │
-        └────────────┬────────────────────────────────────┘
-                     │
-        ┌────────────▼────────────────────────────────────┐
-        │ 2. Reject anything malformed, non-http(s), or  │
-        │    resolving to a private / loopback / link-    │
-        │    local address                                │
-        └────────────┬────────────────────────────────────┘
-                     │  NOT verified → STOP HERE. No job is enqueued.
-                     ▼
-        ┌─────────────────────────────────────────────────┐
-        │ 3. DOMAIN OWNERSHIP PROOF (legal requirement)   │
-        │    • DNS TXT token, and/or                      │
-        │    • /.well-known/ file                         │
-        │    Persist method + record + verified_at         │
-        └────────────┬────────────────────────────────────┘
-                     │
-        ┌────────────▼────────────────────────────────────┐
-        │ 4. Rate limit, then insert `scans` (queued)     │──▶ Postgres
-        └────────────┬────────────────────────────────────┘
-                     │ Celery task
-        ┌────────────▼─────────────┐        ┌──────────────▼────────────┐
-        │ 5. Redis (broker)        │───────▶│ 6. Worker picks up task   │
-        └──────────────────────────┘        └──────────────┬─────────────┘
-                                                        │
-        ┌───────────────────────────────────────────────────▼────────────┐
-        │ 7. SSRF-hardened egress                                         │
-        │    resolve DNS · reject private/link-local/loopback/IPv6 loopback│
-        │    restricted port allowlist                                    │
-        │    RE-VALIDATE after every redirect                             │
-        └───────────────────────────┬────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────▼────────────────────────────────────┐
-        │ 8. Run Nuclei and ZAP against the verified domain              │
-        │    emit progress events                                       │
-        └───────────────────────────┬────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────▼────────────────────────────────────┐
-        │ 9. Normalize tool output → one `findings` shape                 │──▶ Postgres
-        │    (Nuclei and ZAP must both map to the same record)            │
-        └───────────────────────────┬────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────▼────────────────────────────────────┐
-        │ 10. Append `scan_events` for live progress                      │──▶ Postgres
-        └───────────────────────────┬────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────▼────────────────────────────────────┐
-        │ 11. Worker posts result; browser stream updates live           │──▶ Browser
-        └───────────────────────────────────────────────────────────────┘
+        ┌────────────▼──────────────────────────────────────┐
+        │ 1. submitScanAction: normaliza la URL              │
+        │ 2. Gate SSRF + límite de tasa (usuario: 5/hora)    │
+        │ 3. requireVerifiedDomain (propiedad ya probada)    │
+        └────────────┬──────────────────────────────────────┘
+                     │  sin verificación → STOP; no se encola nada
+        ┌────────────▼──────────────────────────────────────┐
+        │ 4. INSERT scans (status = 'queued')                │──▶ Postgres [TB3]
+        └────────────┬──────────────────────────────────────┘
+                     │ mensaje Celery 5.x (LPUSH en `celery`)
+        ┌────────────▼──────────────┐    ┌──────────────────▼────────────────┐
+        │ 5. Redis (broker)         │───▶│ 6. scanner.tasks.run_scan         │
+        │    sin result backend     │    │    revalida el objetivo (SSRF)    │
+        └───────────────────────────┘    └──────────────────┬────────────────┘
+                                                            │
+        ┌───────────────────────────────────────────────────▼────────────────┐
+        │ 7. Egreso endurecido: valida cada salto, puertos 80/443,           │
+        │    máximo 5 redirecciones, timeouts 5/15/5/5 s                    │
+        └───────────────────────────────────────────────────┬────────────────┘
+                                                            │ [TB5] HTTPS
+        ┌───────────────────────────────────────────────────▼────────────────┐
+        │ 8. Checks deterministas; un evento por paso                        │
+        └───────────────────────────────────────────────────┬────────────────┘
+                                                            │ POST /events (Bearer)
+        ┌───────────────────────────────────────────────────▼────────────────┐
+        │ 9. Web inserta scan_events; `ON CONFLICT (scan_id, seq)` absorbe  │──▶ Postgres
+        │    los reintentos                                                   │
+        └───────────────────────────────────────────────────┬────────────────┘
+                                                            │ POST /callback (Bearer)
+        ┌───────────────────────────────────────────────────▼────────────────┐
+        │ 10. Web escribe findings + estado terminal (transacción)          │──▶ Postgres
+        └───────────────────────────────────────────────────┬────────────────┘
+                                                            │ GET /events (SSE)
+        ┌───────────────────────────────────────────────────▼────────────────┐
+        │ 11. El navegador recibe eventos; la web solo lee                  │──▶ Navegador
+        └────────────────────────────────────────────────────────────────────┘
 ```
 
 Dos propiedades de este flujo son determinantes:
 
 - **El paso 3 es un control, no una función.** La verificación de la propiedad
   del dominio existe porque escanear un sistema que no se posee es ilegal en la
-  mayoría de las jurisdicciones. No se puede encolar ningún escaneo sin ella, y
-  esa salvaguarda está cubierta por pruebas — no por convención.
+  mayoría de las jurisdicciones. `submitScanAction` no puede encolar nada sin una
+  fila `domains` verificada, y esa salvaguarda está cubierta por pruebas — no por
+  convención.
 - **El paso 7 se reaplica en cada salto.** Validar la URL inicial no basta: una
   redirección a `169.254.169.254` o `127.0.0.1` derrota una verificación única.
   Cada destino de redirección se resuelve y se revalida.
+
+### Contrato entre la web y el worker
+
+| Dirección    | Mensaje                                                                                                                                                                 | Autenticación                                                                                           | Efecto                                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| web → worker | Tarea Celery `scanner.tasks.run_scan` con kwargs `scan_id`, `domain_id`, `target`, `checks` y `callback_base_url`; se publica con `LPUSH` en la lista `celery` ([TB4]). | Ninguna en el mensaje: el broker es el canal privilegiado. La propiedad se validó **antes** de encolar. | El worker revalida el objetivo por su cuenta y ejecuta los checks.                                                              |
+| worker → web | `POST /api/scans/{id}/events` con `{seq, type, payload}` — un evento por paso.                                                                                          | `Authorization: Bearer <SCANNER_CALLBACK_SECRET>`.                                                      | Inserta en `scan_events`; `scan.started` transiciona el escaneo a `running` y fija `started_at`.                                |
+| worker → web | `POST /api/scans/{id}/callback` con `{scan_id, task_id, status, error, checks_run, events, findings}`.                                                                  | El mismo Bearer.                                                                                        | Escribe los `findings` y el estado terminal en una transacción. Un callback terminal repetido responde `{ok, already_applied}`. |
+
+El secreto del callback **nunca viaja por el broker**: el worker lo lee de su
+entorno y la web del suyo, y ambos deben coincidir. El resto del mensaje Celery
+es el contrato de datos, no una credencial. El pipeline no cruza **[TB6]**: el
+worker no habla con Supabase, SMTP ni Stripe; los proveedores externos solo
+aparecen en la web (base de datos, correo y, más adelante, pagos).
+
+### Progreso en vivo: SSE sobre polling
+
+`GET /api/scans/{id}/events` devuelve `text/event-stream` cuando el cliente lo
+pide —y un snapshot JSON en caso contrario—. La implementación consulta
+`scan_events` cada segundo con `id > cursor`, entrega hasta 100 eventos por
+ciclo, emite un evento `scan.event` por fila, un `scan.done` cuando el escaneo
+es terminal y un heartbeat cada 15 s. El cursor es `scan_events.id`, el `bigint`
+identity que hace monotónico el orden de lectura.
+
+La ruta **no usa `LISTEN`/`NOTIFY`**. Además de mantener el flujo simple, eso
+evita el Transaction pooler de Supabase en el **puerto 6543**, que rompe
+`LISTEN`/`NOTIFY` y las sentencias preparadas: con ese proveedor hay que usar la
+conexión directa o el Session pooler en el 5432. En local no hay pooler y
+PostgreSQL escucha en el 5432.
+
+### El worker no escribe la base de datos
+
+El worker no recibe `DATABASE_URL` ni conoce el esquema: solo consume Redis y
+llama a las dos rutas autenticadas. Por eso la web es el **único** runtime que
+escribe `scans.status`, `scan_events` y `findings` (SP-2), y la idempotencia vive
+en constraints de PostgreSQL —`UNIQUE (scan_id, seq)` y
+`UNIQUE (scan_id, finding_key)`— en lugar de en la memoria del worker. El aislamiento
+de red que respalda esta frontera está en
+[`security.md`](./security.md#3-aislamiento-de-red-y-de-sistema-de-archivos-del-worker).
 
 ## Fronteras de confianza
 
@@ -252,9 +284,10 @@ apps/web
 
 services/scanner (Sprint 2)
   ├─ celery app        consumes CELERY_BROKER_URL
-  ├─ tasks             run_nuclei, run_zap
-  ├─ guard             SSRF validation on the initial URL and every redirect
-  └─ normalizer        tool output → findings shape
+  ├─ tasks             run_scan: orchestration and error handling
+  ├─ ssrf + egress     validation on the initial URL and every redirect
+  ├─ checks            security_headers, tls, cookies, redirects
+  └─ report            progress POST + terminal callback (Bearer secret)
 ```
 
 ## Restricciones de diseño que se derivan de esta arquitectura

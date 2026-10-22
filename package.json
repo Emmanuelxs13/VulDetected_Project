@@ -12,6 +12,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "test": "vitest run",
+    "test:e2e": "pnpm --filter @vuldetected/web exec vitest run --config vitest.e2e.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm lint && pnpm typecheck && pnpm format:check"
@@ -21,6 +23,10 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.27",
     "prettier": "^3.6.2",
-    "turbo": "^2.5.6"
+    "turbo": "^2.5.6",
+    "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "redis": "^6.3.0"
   }
 }

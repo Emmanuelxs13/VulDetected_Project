@@ -1,29 +1,43 @@
 # Base de datos
 
 Referencia del esquema de VulDetected y de las decisiones que lo respaldan.
-Documentación del esquema del Sprint 1 únicamente — el Sprint 2 añade las tablas
-de escaneo, y esos puntos de contacto se enumeran explícitamente en
+Documenta el esquema del Sprint 1 y el del Sprint 2, ambos aplicados y
+verificados. Los puntos de contacto que requieren decisión del propietario se
+enumeran en
 [Puntos de contacto en la DB — se requiere decisión del propietario](#puntos-de-contacto-en-la-db--se-requiere-decisión-del-propietario).
 
-> **Aún no se ha ejecutado ninguna migración.** Nada de lo que aparece en este
-> documento se ha aplicado a ninguna base de datos. El esquema que sigue es el
-> diseño de referencia, no la descripción de una base de datos en funcionamiento.
+> **Las migraciones de los Sprints 1 y 2 están aplicadas y verificadas contra una
+> base de datos real.** Las migraciones `0000`–`0003` se ejecutaron contra la base
+> local `vuldetected` y se verificaron contra `information_schema`, `pg_trigger`
+> y `pg_tables` (registrado en [`docs/changelog.md`](./changelog.md)). La
+> migración del Sprint 2 `0003_scan_domain` fue **generada con `db:generate` y
+> aplicada a mano en pgAdmin** tras la autorización del propietario, con la
+> propiedad de tablas, tipos y secuencias reasignada al rol `vuldetected`.
 
-El acceso siempre se realiza a través de `DATABASE_URL`. Las migraciones se
-aplican con drizzle-kit contra esa URL — ver
-[ADR 0004](./adr/0004-database-provider-neutrality.md).
+El acceso siempre se realiza a través de `DATABASE_URL`.
+
+**Las migraciones se aplican a mano en pgAdmin**, ejecutando el archivo SQL
+generado contra la base `vuldetected` (ver
+[`docs/local-postgres-setup.md`](./local-postgres-setup.md) §3 y §4b). **No se
+ejecuta `db:migrate`**: `drizzle-kit` mantiene su propia tabla de registro y no
+tiene noticia de las migraciones aplicadas a mano, de modo que intentaría aplicar
+`0000` de nuevo y fallaría. Reconciliar ambos historiales es una decisión
+explícita del propietario, nunca algo que se descubre por errores (ver
+[ADR 0004](./adr/0004-database-provider-neutrality.md)).
 
 ## Decisiones DDL ya tomadas
 
 Están resueltas. Cambiar cualquiera de ellas implica un ADR más una decisión del
 propietario.
 
-| Decisión                                   | Valor                                                | Por qué                                                                                                                                                                                                           |
-| ------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Extensión**                              | `citext`                                             | Búsqueda de correo sin distinguir mayúsculas de minúsculas. El inicio de sesión sin distinguir mayúsculas es una propiedad de seguridad, no un adorno. Disponible en todo proveedor gestionado, sin superusuario. |
-| **Valor por defecto de la clave primaria** | `gen_random_uuid()`                                  | Claves primarias UUID sin una extensión; nativo desde Postgres 13. Evita un vector de enumeración por ID secuenciales y evita conceder `CREATE SEQUENCE` por tabla.                                               |
-| **Tipo enum: `account_status`**            | `pending`, `active`, `suspended`, `deleted`          | El dominio de estados de cuenta como tipo de base de datos en lugar de texto libre. Un estado incorrecto lo rechaza la base de datos en lugar de una rama `else` a tres capas de distancia.                       |
-| **Tipo enum: `token_purpose`**             | `verify_email`, `reset_password`, `domain_ownership` | `domain_ownership` está reservado para el desafío DNS/`/.well-known` del Sprint 2, de modo que el vocabulario de propósitos queda fijo antes de que ese código exista.                                            |
+| Decisión                                   | Valor                                                       | Por qué                                                                                                                                                                                                           |
+| ------------------------------------------ | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Extensión**                              | `citext`                                                    | Búsqueda de correo sin distinguir mayúsculas de minúsculas. El inicio de sesión sin distinguir mayúsculas es una propiedad de seguridad, no un adorno. Disponible en todo proveedor gestionado, sin superusuario. |
+| **Valor por defecto de la clave primaria** | `gen_random_uuid()`                                         | Claves primarias UUID sin una extensión; nativo desde Postgres 13. Evita un vector de enumeración por ID secuenciales y evita conceder `CREATE SEQUENCE` por tabla.                                               |
+| **Tipo enum: `account_status`**            | `pending`, `active`, `suspended`, `deleted`                 | El dominio de estados de cuenta como tipo de base de datos en lugar de texto libre. Un estado incorrecto lo rechaza la base de datos en lugar de una rama `else` a tres capas de distancia.                       |
+| **Tipo enum: `token_purpose`**             | `verify_email`, `reset_password`, `domain_ownership`        | `domain_ownership` está reservado para el desafío DNS/`/.well-known` del Sprint 2, de modo que el vocabulario de propósitos queda fijo antes de que ese código exista.                                            |
+| **Tipo enum: `scan_status`**               | `queued`, `running`, `completed`, `failed`, `cancelled`     | El ciclo de vida del escaneo como tipo de base de datos, no texto libre (DM-2). `cancelled` está reservado en el vocabulario para S2 — sin trigger de cancelación todavía (D9).                                   |
+| **Tipo enum: `severity`**                  | `unclassified`, `info`, `low`, `medium`, `high`, `critical` | Vocabulario de ADR 0003 (`Badge unknown` ⇄ `unclassified`). `unclassified` es el primer valor y el **único valor escrito en S2** (DM-3); la clasificación con reglas y proveniencia llega en S3.                  |
 
 Extensiones **no** utilizadas, y por qué: `pg_trgm` (específica del proveedor; la
 búsqueda difusa debe construirse de forma portable), `uuid-ossp` (reemplazada por
@@ -256,6 +270,143 @@ y un índice parcial sobre un enum prácticamente booleano que es el caso común
 indexa casi toda la tabla mientras ayuda a casi ninguna consulta. Reemplazados por
 los dos índices anteriores.
 
+## Esquema actual (Sprint 2)
+
+> **Esta sección documenta el esquema tal como se generó en
+> `packages/db/drizzle/`, verificado leyendo `0003_scan_domain.sql`.**
+> La migración está **aplicada y verificada** contra la base local `vuldetected`
+> (ver la nota al principio de este documento y
+> [Puntos de contacto en la DB](#puntos-de-contacto-en-la-db--se-requiere-decisión-del-propietario)).
+> Donde un borrador anterior discrepaba del SQL generado, ganaba el SQL.
+
+Las cuatro tablas tienen un solo escritor: `apps/web`, la única pieza con
+`DATABASE_URL` ([TB3]). El worker de `services/scanner` no abre conexiones: envía
+progreso y resultados por callback HTTP autenticado, y la web los persiste
+([TB4]). Por eso la idempotencia del pipeline vive en constraints de PostgreSQL y
+no en la memoria del worker; el flujo completo está en
+[`architecture.md`](./architecture.md#flujo-de-escaneo--implementado-sprint-2).
+
+### `domains`
+
+| Columna               | Tipo          | Null | Valor por defecto   | Notas                                                                                                                                                                                                        |
+| --------------------- | ------------- | ---- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                  | `uuid`        | no   | `gen_random_uuid()` | Clave primaria. La aporta la base de datos, no la aplicación.                                                                                                                                                |
+| `user_id`             | `uuid`        | no   | —                   | FK → `users`, `ON DELETE CASCADE`. El dueño del dominio.                                                                                                                                                     |
+| `hostname`            | `text`        | no   | —                   | Tal como lo escribió el usuario, para mostrarlo.                                                                                                                                                             |
+| `normalized_hostname` | `text`        | no   | —                   | Normalizado (minúsculas, IDN→ASCII); es el valor con el que se comparan las pruebas. Restricción de unicidad **global** — la propiedad legal es excluyente de hecho (D2, decisión del propietario resuelta). |
+| `verified`            | `boolean`     | no   | `false`             | Solo lo pone un desafío de propiedad exitoso. `false` en filas creadas a mitad del flujo de verificación.                                                                                                    |
+| `verification_method` | `text`        | sí   | `null`              | `dns_txt` o `well_known`, impuesto por `CHECK` (D2). El alcance fija dos métodos; la restricción da el mismo rechazo a nivel DB sin un tercer tipo enum.                                                     |
+| `verification_record` | `text`        | sí   | `null`              | El valor que demostró la propiedad (registro TXT o ruta `/.well-known`) — la prueba observada, no solo el método.                                                                                            |
+| `verified_at`         | `timestamptz` | sí   | `null`              | Cuándo se verificó. `NULL` = sin verificar.                                                                                                                                                                  |
+| `created_at`          | `timestamptz` | no   | `now()`             | Momento de creación de la fila.                                                                                                                                                                              |
+| `updated_at`          | `timestamptz` | no   | `now()`             | Mantenido por la capa de datos — no debe desviarse.                                                                                                                                                          |
+
+**Por qué existe cada columna sensible**
+
+- `normalized_hostname` — la búsqueda de verificación ("¿este hostname ya está
+  reclamado?") y el destino de las comparaciones deben usar una forma estable; el
+  texto tal como lo escribe el usuario (`hostname`) no lo es. La unicidad GLOBAL
+  es una decisión de producto y de prevención de abuso tomada en D2: dos cuentas
+  verificadas sobre el mismo hostname significan una prueba falsa o coordinación.
+- `verification_record` — el _método_ solo dice cómo se verificó; el _registro_
+  es la prueba concreta que se comparó. Sin él, "verificado" es una afirmación sin
+  evidencia recuperable.
+
+### `scans`
+
+| Columna          | Tipo          | Null | Valor por defecto                                  | Notas                                                                                                                                                                                  |
+| ---------------- | ------------- | ---- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | `uuid`        | no   | `gen_random_uuid()`                                | Clave primaria.                                                                                                                                                                        |
+| `domain_id`      | `uuid`        | no   | —                                                  | FK → `domains`, `ON DELETE CASCADE`. El dominio escaneado.                                                                                                                             |
+| `target_url`     | `text`        | no   | —                                                  | La URL validada y normalizada que se escanea (SS-1 de `docs/security.md`). Es la que el worker recibe como `target.base_url` — se persiste para auditoría.                             |
+| `status`         | `scan_status` | no   | `'queued'`                                         | `queued`/`running`/`completed`/`failed`/`cancelled`. Solo la web transiciona el estado (D9): el worker informa vía `scan_events` y el callback, y nunca escribe `status` directamente. |
+| `checks`         | `jsonb`       | no   | `["security_headers","tls","cookies","redirects"]` | Las comprobaciones solicitadas para esta ejecución. Default en DB para que toda inserción lleve un conjunto coherente.                                                                 |
+| `celery_task_id` | `text`        | sí   | `null`                                             | El id de la tarea Celery. `NULL` si el encolado falló (SS-6: fila antes de encolar — sin tareas huérfanas); la fila pasa a `failed` con `error = 'enqueue_failed'`.                    |
+| `started_at`     | `timestamptz` | sí   | `null`                                             | Inicio real de la ejecución.                                                                                                                                                           |
+| `finished_at`    | `timestamptz` | sí   | `null`                                             | Fin real.                                                                                                                                                                              |
+| `error`          | `text`        | sí   | `null`                                             | Razón legible por máquina (p. ej. `enqueue_failed`), nunca un stack trace.                                                                                                             |
+| `created_at`     | `timestamptz` | no   | `now()`                                            | Momento de creación de la fila.                                                                                                                                                        |
+| `updated_at`     | `timestamptz` | no   | `now()`                                            | Mantenido por la capa de datos — no debe desviarse.                                                                                                                                    |
+
+**Por qué existe cada columna sensible**
+
+- `target_url` — lo que se escanea es la URL derivada del dominio verificado, no
+  un input libre: guardarla permite auditar exactamente qué se envió al worker y
+  reproduce el escaneo sin re-validar.
+- `checks` — el conjunto de comprobaciones es parte del contrato del job (el
+  payload lleva `checks[]`); persistirlo hace que cada fila sea auto-descriptiva
+  y que la política por defecto no dependa del estado de un worker.
+- `celery_task_id` — el puente de correlación con el broker. Que sea anulable y
+  que `error = 'enqueue_failed'` existan juntos es deliberado: un fallo de
+  encolado no debe producir una fila `queued` sin tarea.
+
+### `findings`
+
+| Columna        | Tipo          | Null | Valor por defecto   | Notas                                                                                                                                                                                                                         |
+| -------------- | ------------- | ---- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | `uuid`        | no   | `gen_random_uuid()` | Clave primaria.                                                                                                                                                                                                               |
+| `scan_id`      | `uuid`        | no   | —                   | FK → `scans`, `ON DELETE CASCADE`. El escaneo que produjo el hallazgo.                                                                                                                                                        |
+| `finding_key`  | `text`        | no   | —                   | `sha256(domain_id \| check_name \| affected_url)` — la calcula el worker (D3). Es estable entre re-escaneos y **no** incluye `scan_id`.                                                                                       |
+| `severity`     | `severity`    | no   | `'unclassified'`    | Único valor escrito en S2 (DM-3): `unclassified`. La clasificación con reglas y proveniencia llega en S3.                                                                                                                     |
+| `check_name`   | `text`        | no   | —                   | Qué comprobación determinista produjo el hallazgo (p. ej. `security_headers`).                                                                                                                                                |
+| `title`        | `text`        | no   | —                   | Título legible por humanos.                                                                                                                                                                                                   |
+| `description`  | `text`        | no   | —                   | Descripción legible por humanos.                                                                                                                                                                                              |
+| `affected_url` | `text`        | no   | —                   | La URL concreta afectada — no solo el objetivo del escaneo. Es la mitad derecha de `finding_key`.                                                                                                                             |
+| `evidence`     | `jsonb`       | no   | `'{}'::jsonb`       | Evidencia estructurada normalizada que la remediación de S3 consumirá. No es el payload crudo de la herramienta (eso es `raw`).                                                                                               |
+| `raw`          | `jsonb`       | sí   | `null`              | Salida verbatim de la herramienta (p. ej. un JSON de Nuclei). Se conserva para auditoría y para que un cambio de normalización no destruya la evidencia; la RETENCIÓN está pendiente de decisión del propietario (ver abajo). |
+| `created_at`   | `timestamptz` | no   | `now()`             | Momento de creación de la fila.                                                                                                                                                                                               |
+| `updated_at`   | `timestamptz` | no   | `now()`             | Mantenido por la capa de datos — no debe desviarse.                                                                                                                                                                           |
+
+**Por qué existe cada columna sensible**
+
+- `finding_key` — la deduplicación central (D3): el índice único
+  `(scan_id, finding_key)` descarta el segundo hallazgo igual **dentro** del
+  mismo scan (con `ON CONFLICT DO NOTHING` al insertar), y `findings_key_idx`
+  (no único) agrupa las ocurrencias **entre** escaneos para la tendencia de S3.
+  La clave excluye `scan_id` a propósito: sin eso, un re-escaneo jamás
+  reconocería un hallazgo como el mismo.
+- `evidence` vs `raw` — la separación es deliberada: `evidence` es lo que el
+  producto entiende (estructura normalizada, consumible por S3); `raw` es lo que
+  la herramienta dijo (verbatim, inalterable). Mezclarlos haría que la
+  normalización, la retención o la remediación tuvieran que negociar con bytes
+  de terceros.
+
+### `scan_events`
+
+| Columna      | Tipo          | Null | Valor por defecto | Notas                                                                                                                                                                                                                                     |
+| ------------ | ------------- | ---- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | `bigint`      | no   | identity          | **Desviación deliberada (D2):** `GENERATED ALWAYS AS IDENTITY`, no `uuid`. Es el cursor monotónico del polling SSE; `created_at` sigue siendo el orden autoritativo (SP-1) y `id` es el cursor. Documentado en el comentario de la tabla. |
+| `scan_id`    | `uuid`        | no   | —                 | FK → `scans`, `ON DELETE CASCADE`.                                                                                                                                                                                                        |
+| `seq`        | `integer`     | no   | —                 | Secuencia por escaneo emitida por el worker. Mitad de la clave de idempotencia `UNIQUE (scan_id, seq)`.                                                                                                                                   |
+| `type`       | `text`        | no   | —                 | Tipo de evento, p. ej. `scan.progress`, `check.completed`, `scan.completed`, `scan.failed`. Texto, no enum: el vocabulario crecerá con S3 sin una migración.                                                                              |
+| `payload`    | `jsonb`       | no   | `'{}'::jsonb`     | Datos del evento. `NOT NULL` con default para que un lector nunca maneje `null`.                                                                                                                                                          |
+| `created_at` | `timestamptz` | no   | `now()`           | **El orden autoritativo del evento** (SP-1). El consumo en orden se hace con `(scan_id, id)`, no con esta columna, para no depender de la resolución de reloj.                                                                            |
+
+**Por qué existe cada columna sensible**
+
+- `id` identity en lugar de `uuid` — un stream append-only que se consume por
+  polling necesita un cursor monotónico y barato; `bigint identity` lo aporta sin
+  índice extra (es la PK) y sin colisión. Es la única desviación del patrón uuid
+  del repo, y está documentada en la tabla.
+- `seq` + `UNIQUE (scan_id, seq)` — la idempotencia del callback (D2): un
+  reintento reinserta el mismo `seq` y `ON CONFLICT DO NOTHING` lo absorbe. Sin
+  esto, el retry de un callback produciría eventos duplicados (la fuente clásica
+  de progreso fantasma en un stream).
+
+## Índices del Sprint 2 y por qué existe cada uno
+
+| Índice                            | Tabla         | Tipo                            | Para qué sirve                                                                                                                                                       |
+| --------------------------------- | ------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domains_normalized_hostname_key` | `domains`     | unique (no parcial)             | Unicidad **global** de `normalized_hostname` (D2: la propiedad legal es excluyente de hecho) y la búsqueda "¿este hostname ya está reclamado?" en la verificación.   |
+| `domains_user_id_idx`             | `domains`     | btree                           | "Los dominios de este usuario" — el panel. También es el destino de la FK para los borrados en cascada.                                                              |
+| `scans_domain_created_idx`        | `scans`       | btree, `DESC`                   | "Escaneos de este dominio, más recientes primero" — el patrón de lectura dominante del historial. Descendente porque el acceso es siempre "lo más reciente primero". |
+| `scans_status_idx`                | `scans`       | btree                           | "Todos los escaneos en estado X" — útil para el gatekeeper/consola y para el TTL futuro.                                                                             |
+| `findings_scan_key_unique`        | `findings`    | unique `(scan_id, finding_key)` | Dedup **intra-escaneo** (D3): el segundo hallazgo igual dentro del mismo scan lo descarta la DB (`ON CONFLICT DO NOTHING`), no el código del worker.                 |
+| `findings_key_idx`                | `findings`    | btree (no único)                | Agrupar ocurrencias de un hallazgo **entre** escaneos para la tendencia de S3 (DM-5). No único, a propósito: el historial entre re-escaneos se conserva (SP-5).      |
+| `scan_events_scan_seq_unique`     | `scan_events` | unique `(scan_id, seq)`         | Idempotencia del callback (D2): un reintento reinserta el mismo `seq` → `ON CONFLICT DO NOTHING`.                                                                    |
+| `scan_events_poll_idx`            | `scan_events` | btree `(scan_id, id)`           | El polling SSE 1 s por escaneo: "siguiente evento después del cursor". Sin él, cada poll sería un recorrido secuencial de toda la cola del scan.                     |
+| `scan_events_created_at_idx`      | `scan_events` | btree                           | Retención futura de `scan_events` (decisión del propietario pendiente): barridos por rango de tiempo para el TTL.                                                    |
+
 ---
 
 ## Puntos de contacto en la DB — se requiere decisión del propietario
@@ -264,35 +415,43 @@ los dos índices anteriores.
 > toque los elementos que siguen.** No revisarla después — redactarla. Una
 > migración escrita sin aviso es una decisión tomada por accidente.
 >
-> **Aún no se ha ejecutado ninguna migración.** `users`, `sessions`,
-> `verification_tokens` y `audit_logs` se documentan aquí como el diseño acordado
-> del Sprint 1. Las migraciones del Sprint 1 no se han ejecutado contra ninguna
-> base de datos.
+> **Estado de migraciones hasta hoy:** las del Sprint 1 (`0000`–`0002`) y la del
+> Sprint 2 (`0003_scan_domain`) están **ejecutadas y verificadas** contra la base
+> local `vuldetected` (`docs/changelog.md`). `0003` se aplicó a mano en pgAdmin
+> tras la autorización del propietario, con la propiedad de los objetos nuevos
+> reasignada al rol `vuldetected`.
 
 ### Sprint 2 — dominio de escaneo
 
-Tablas nuevas, sin backfill:
+Tablas nuevas, sin backfill. **La migración `0003_scan_domain` está aplicada y
+verificada** contra la base local `vuldetected`. El esquema completo se documenta
+arriba en [Esquema actual (Sprint 2)](#esquema-actual-sprint-2).
 
-| Tabla         | Propósito                                          | Columnas clave acordar                                                                                                                                                                                                                                            |
-| ------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `domains`     | Un dominio cuya propiedad el usuario ha demostrado | `id`, `user_id`, `hostname`, `normalized_hostname` (**único por usuario** — decide si el mismo hostname puede ser reclamado por dos cuentas), estado de verificación, método de verificación (`dns_txt` / `well_known`), registro de verificación, `verified_at`. |
-| `scans`       | Una ejecución contra un dominio                    | `id`, `domain_id`, estado (`queued`/`running`/`completed`/`failed`/`cancelled`), herramienta(s) usadas, marcas de tiempo de inicio/fin, id de tarea de Celery, estado de error.                                                                                   |
-| `findings`    | Una vulnerabilidad normalizada                     | `id`, `scan_id`, clave estable de hallazgo para deduplicar entre reescaneos, severidad, título, descripción, endpoint afectado, evidencia, payload crudo de la herramienta.                                                                                       |
-| `scan_events` | Flujo de progreso solo-append                      | `id`, `scan_id`, marca de tiempo, tipo de evento, payload — la fuente del progreso en tiempo real.                                                                                                                                                                |
+**Decisiones del propietario RESUELTAS e incorporadas a la migración redactada:**
 
-**Decisiones del propietario necesarias antes de las migraciones del Sprint 2:**
+1. **Unicidad de `normalized_hostname`: GLOBAL** (única en la tabla). La
+   propiedad legal de un dominio es excluyente de hecho; dos cuentas verificadas
+   sobre el mismo hostname significan una prueba falsa o coordinación, y la
+   unicidad elimina el costo doble de escaneo y las carreras de doble
+   verificación. El squatting exigiría prueba real de propiedad, luego no es un
+   vector de abuso. La segunda cuenta recibe "dominio ya verificado por otra
+   cuenta".
+2. **Deduplicación de `findings`: clave estable + unicidad intra-escaneo +
+   retención de ocurrencias entre escaneos.** `finding_key =
+sha256(domain_id | check_name | affected_url)` es estable entre re-escaneos y
+   no incluye `scan_id`; `findings_scan_key_unique (scan_id, finding_key)`
+   descarta en la DB el segundo hallazgo igual del mismo escaneo mediante
+   `ON CONFLICT DO NOTHING`, y `findings_key_idx` (no único) agrupa las
+   ocurrencias entre escaneos para la tendencia que S3 necesita (DM-5).
 
-1. ¿Puede el mismo hostname ser verificado por **dos cuentas distintas**? Esto
-   decide el alcance de unicidad de `domains.normalized_hostname` y es una
-   decisión de producto y de prevención de abuso, no un detalle de esquema.
-2. Retención de `scan_events` — crecen más rápido que todas estas tablas y son el
-   principal candidato a una retención menor que la de `findings`.
-3. Retención de los payloads crudos de las herramientas. Son el campo más voluminoso
-   y el más sensible (los endpoints descubiertos en el objetivo). La truncación o
-   un almacenamiento separado pueden ser lo correcto.
-4. Si `findings` deduplica **dentro** de un escaneo o **entre** reescaneos del
-   mismo dominio. La deduplicación entre escaneos es mucho más útil y mucho más
-   difícil de indexar.
+**Decisiones del propietario PENDIENTES (no bloquean aplicar `0003`):**
+
+1. Retención de `scan_events` — crecen más rápido que todas estas tablas y son el
+   principal candidato a una retención menor que la de `findings`. El índice
+   `scan_events_created_at_idx` ya está creado para un barrido futuro.
+2. Retención de los payloads crudos de las herramientas (`findings.raw`). Son el
+   campo más voluminoso y el más sensible (los endpoints descubiertos en el
+   objetivo). La truncación o un almacenamiento separado pueden ser lo correcto.
 
 ### Sprint 3 — remediación
 

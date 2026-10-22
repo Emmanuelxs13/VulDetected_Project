@@ -19,6 +19,13 @@ coverage/
 *.log
 .DS_Store
 
+# Python — the scanner service (services/scanner) is not a pnpm workspace
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
 # Editor / IDE
 .vscode/
 .idea/
