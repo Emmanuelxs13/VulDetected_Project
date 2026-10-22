@@ -108,7 +108,7 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
                   checkName: f.check,
                   title: f.title,
                   description: f.description ?? '',
-                  affectedUrl: f.affectedUrl ?? body.base_url ?? '',
+                  affectedUrl: f.affected_url ?? f.affectedUrl ?? body.base_url ?? '',
                   evidence: f.evidence ?? {},
                   raw: f.raw ?? {},
                 })

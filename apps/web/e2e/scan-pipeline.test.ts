@@ -83,7 +83,7 @@ vi.mock('@/features/auth/session', () => ({
   getServerSession: vi.fn(async () => ({ user: { id: USER_ID } })),
 }));
 
-import { GET as getScanEvents } from '@/app/api/scans/[scanId]/events/route';
+import { GET as getScanEvents, POST as postScanEvent } from '@/app/api/scans/[scanId]/events/route';
 import { POST as postScanCallback } from '@/app/api/scans/[scanId]/callback/route';
 import { getServerSession } from '@/features/auth/session';
 import { submitScanAction } from '@/features/scans/actions';
@@ -125,6 +125,17 @@ function callbackRequest(scanId: string, body: unknown, token: string | null = S
 function eventRequest(scanId: string, query = '', accept?: string): Request {
   return new Request(`http://localhost:3000/api/scans/${scanId}/events${query}`, {
     headers: accept ? { accept } : undefined,
+  });
+}
+
+function eventPostRequest(scanId: string, body: unknown, token: string | null = SECRET): Request {
+  return new Request(`http://localhost:3000/api/scans/${scanId}/events`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(token === null ? {} : { authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify(body),
   });
 }
 
@@ -412,7 +423,9 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     expect(header?.severity).toBe('unclassified');
     expect(header?.checkName).toBe('security_headers');
     expect(header?.title).toBe('Missing Content-Security-Policy header');
-    expect(header?.affectedUrl).toBe('https://example.com');
+    // The worker's `affected_url` wins over the `base_url` fallback: the fixture
+    // sends them different on purpose so a regression to the fallback fails here.
+    expect(header?.affectedUrl).toBe('https://example.com/');
     expect(header?.evidence).toEqual({ header: 'content-security-policy' });
     expect(header?.raw).toEqual({ observed: { present: false } });
   });
@@ -547,5 +560,105 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     });
     const badBody = await postScanCallback(malformed, params);
     expect(badBody.status).toBe(400);
+  });
+
+  /*
+   * Regression: the worker's `send_event` POSTs to `/events`, but the route
+   * used to export only `GET`, so every live progress event was answered with a
+   * silent 405 and the UI never advanced past `queued` (the final callback was
+   * the only thing that ever worked). These two tests pin the write path and the
+   * `scan.started` status transition it drives.
+   */
+  it('accepts the worker progress POST and reflects `scan.started` as running', async () => {
+    const scanId = await insertQueuedScan();
+    const params = { params: Promise.resolve({ scanId }) };
+
+    const started = await postScanEvent(
+      eventPostRequest(scanId, { seq: 1, type: 'scan.started', payload: {} }),
+      params,
+    );
+    expect(started.status).toBe(200);
+
+    const running = await harness.db.select().from(scans).where(eq(scans.id, scanId)).limit(1);
+    expect(running[0]?.status).toBe('running');
+    expect(running[0]?.startedAt).not.toBeNull();
+
+    const events = await harness.db.select().from(scanEvents).where(eq(scanEvents.scanId, scanId));
+    expect(events.map((event) => event.seq)).toEqual([1]);
+  });
+
+  it('enforces the Bearer contract on the progress POST and deduplicates by (scan_id, seq)', async () => {
+    const scanId = await insertQueuedScan();
+    const params = { params: Promise.resolve({ scanId }) };
+
+    const anonymous = await postScanEvent(
+      eventPostRequest(scanId, { seq: 1, type: 'scan.progress' }, null),
+      params,
+    );
+    expect(anonymous.status).toBe(401);
+
+    const wrongToken = await postScanEvent(
+      eventPostRequest(scanId, { seq: 1, type: 'scan.progress' }, 'not-the-secret'),
+      params,
+    );
+    expect(wrongToken.status).toBe(401);
+
+    const unknown = await postScanEvent(
+      eventPostRequest(randomUUID(), { seq: 1, type: 'scan.progress' }),
+      { params: Promise.resolve({ scanId: randomUUID() }) },
+    );
+    expect(unknown.status).toBe(404);
+
+    const malformed = await postScanEvent(
+      eventPostRequest(scanId, { type: 'scan.progress' }),
+      params,
+    );
+    expect(malformed.status).toBe(400);
+
+    // The same seq twice is the retry shape; the unique constraint absorbs it.
+    const first = await postScanEvent(
+      eventPostRequest(scanId, { seq: 7, type: 'scan.progress', payload: { pct: 50 } }),
+      params,
+    );
+    expect(first.status).toBe(200);
+    const retried = await postScanEvent(
+      eventPostRequest(scanId, { seq: 7, type: 'scan.progress', payload: { pct: 50 } }),
+      params,
+    );
+    expect(retried.status).toBe(200);
+
+    const events = await harness.db.select().from(scanEvents).where(eq(scanEvents.scanId, scanId));
+    expect(events.filter((event) => event.seq === 7)).toHaveLength(1);
+  });
+
+  /*
+   * Regression: the worker sends snake_case findings (`affected_url`), but the
+   * callback read `f.affectedUrl`, so every stored finding silently fell back to
+   * the scan's base URL. This pins the worker's actual wire shape.
+   */
+  it('persists the worker snake_case `affected_url` instead of falling back to base_url', async () => {
+    const scanId = await insertQueuedScan();
+    const params = { params: { scanId } };
+
+    const body = {
+      status: 'completed',
+      base_url: 'https://example.com/',
+      findings: [
+        {
+          key: 'abc123',
+          check: 'security_headers',
+          title: 'Missing CSP',
+          description: 'No Content-Security-Policy header',
+          affected_url: 'https://example.com/admin',
+        },
+      ],
+    };
+
+    const done = await postScanCallback(callbackRequest(scanId, body), params);
+    expect(done.status).toBe(200);
+
+    const rows = await harness.db.select().from(findings).where(eq(findings.scanId, scanId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.affectedUrl).toBe('https://example.com/admin');
   });
 });

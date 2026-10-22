@@ -1,13 +1,104 @@
 import 'server-only';
 
+import { timingSafeEqual } from 'node:crypto';
+
 import { and, eq, gt } from '@vuldetected/db';
 import { domains, scanEvents, scans } from '@vuldetected/db';
 import { NextResponse } from 'next/server';
 
 import { getServerSession } from '@/features/auth/session';
 import { db } from '@/lib/db';
+import { getEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * The worker publishes one progress event per call (SW-5, SP-2).
+ *
+ * The web app is the only writer of `scan_events` (SP-2), so this route is the
+ * worker's single door into the table. Authentication mirrors the callback
+ * route — a shared Bearer secret compared in constant time — because the event
+ * stream and the terminal callback are the same trust boundary: an unauthenticated
+ * caller must never be able to inject progress for someone else's scan.
+ *
+ * The unique `(scan_id, seq)` constraint is the idempotency authority: a retried
+ * POST lands on `ON CONFLICT DO NOTHING` and cannot duplicate an event.
+ */
+function timingSafeEqualBuffer(a: string, b: string) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
+}
+
+function getBearerToken(req: Request) {
+  const auth = req.headers.get('authorization') || req.headers.get('Authorization');
+  if (!auth) return null;
+  if (auth.toLowerCase().startsWith('bearer ')) {
+    return auth.slice(7);
+  }
+  return null;
+}
+
+export async function POST(req: Request, { params }: { params: Promise<{ scanId: string }> }) {
+  try {
+    const env = getEnv();
+    const expected = env.SCANNER_CALLBACK_SECRET;
+    if (!expected) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const token = getBearerToken(req);
+    if (!token || !timingSafeEqualBuffer(token, expected)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { scanId } = await params;
+    const body = await req.json();
+
+    if (typeof body.seq !== 'number' || typeof body.type !== 'string') {
+      return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+    }
+
+    const scanRows = await db()
+      .select({ id: scans.id, status: scans.status, startedAt: scans.startedAt })
+      .from(scans)
+      .where(eq(scans.id, scanId))
+      .limit(1);
+
+    if (scanRows.length === 0) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    await db()
+      .insert(scanEvents)
+      .values({
+        scanId,
+        seq: body.seq,
+        type: body.type,
+        payload: body.payload ?? {},
+      })
+      .onConflictDoNothing();
+
+    // The first event a worker emits is `scan.started`; reflecting it on the
+    // scan row is what makes the UI leave the queued state (SP-1).
+    if (body.type === 'scan.started') {
+      const scan = scanRows[0];
+      if (scan && scan.status === 'queued') {
+        await db()
+          .update(scans)
+          .set({ status: 'running', startedAt: scan.startedAt ?? new Date() })
+          .where(eq(scans.id, scanId));
+      }
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+  }
+}
 
 /**
  * Poll cadence and heartbeat for the live stream (design D7).
