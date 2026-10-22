@@ -16,7 +16,7 @@ async def run(ctx) -> List[Dict[str, Any]]:
         sc_lower = sc.lower()
         affected = ctx.target["base_url"]
         if "secure" not in sc_lower:
-            key = hashlib.sha256(f"{ctx.domain_id}|cookies|{affected}|secure".encode()).hexdigest()
+            key = hashlib.sha256(f"{ctx.domain_id}|cookies|{affected}|{sc}|secure".encode()).hexdigest()
             findings.append(
                 {
                     "key": key,
@@ -29,7 +29,7 @@ async def run(ctx) -> List[Dict[str, Any]]:
                 }
             )
         if "httponly" not in sc_lower:
-            key = hashlib.sha256(f"{ctx.domain_id}|cookies|{affected}|httponly".encode()).hexdigest()
+            key = hashlib.sha256(f"{ctx.domain_id}|cookies|{affected}|{sc}|httponly".encode()).hexdigest()
             findings.append(
                 {
                     "key": key,
@@ -42,7 +42,7 @@ async def run(ctx) -> List[Dict[str, Any]]:
                 }
             )
         if "samesite" not in sc_lower:
-            key = hashlib.sha256(f"{ctx.domain_id}|cookies|{affected}|samesite".encode()).hexdigest()
+            key = hashlib.sha256(f"{ctx.domain_id}|cookies|{affected}|{sc}|samesite".encode()).hexdigest()
             findings.append(
                 {
                     "key": key,

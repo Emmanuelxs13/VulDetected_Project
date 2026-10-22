@@ -26,7 +26,7 @@ async def run(ctx) -> List[Dict[str, Any]]:
     for h in REQUIRED_HEADERS:
         if h not in headers or not headers[h]:
             affected = ctx.target["base_url"]
-            key = hashlib.sha256(f"{ctx.domain_id}|security_headers|{affected}".encode()).hexdigest()
+            key = hashlib.sha256(f"{ctx.domain_id}|security_headers|{affected}|{h}".encode()).hexdigest()
             findings.append(
                 {
                     "key": key,
