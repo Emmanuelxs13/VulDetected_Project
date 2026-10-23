@@ -1,0 +1,64 @@
+schema: spec-driven
+
+context: |
+  Project: VulDetected — web application security scanning with actionable remediation code.
+  Stack: pnpm 10.25 + Turborepo 2.5 monorepo, Node >=22; ESLint 9 (flat config), TypeScript 5.9, Prettier 3.6.
+  Workspaces: apps/web (Next.js 15 App Router, React 19, zod 4, Better Auth, server-only), packages/db (drizzle-orm + postgres, provider-neutral), packages/ui (Tailwind v4 CSS-first tokens + Radix primitives). services/scanner (Python + Celery) is planned for Sprint 2.
+  Architecture: apps/web owns product rules, packages/db owns data, packages/ui owns pixels (docs/codebase-map.md). ADRs 0001-0005 are authoritative.
+  Database: local PostgreSQL 18.3 via pgAdmin, reached only through DATABASE_URL (provider-neutral, ADR 0004).
+  Documents are written in English; docs/ README.md, roadmap.md, codebase-map.md and adr/ are the source of truth.
+  Testing: NO test runner is configured in any workspace (strict_tdd disabled; see testing section).
+
+projects:
+  - path: apps/web
+    stack: Next.js 15 App Router (TypeScript)
+    test_command: null
+    test_layers: none
+  - path: packages/db
+    stack: Drizzle ORM + PostgreSQL (TypeScript)
+    test_command: null
+    test_layers: none
+  - path: packages/ui
+    stack: Tailwind v4 + Radix (TypeScript)
+    test_command: null
+    test_layers: none
+
+strict_tdd: false
+
+testing:
+  strict_tdd: false
+  detected: 2026-10-09
+  runner: none
+  coverage: none
+  linter: "eslint . --max-warnings=0 (apps/web) / pnpm lint (turbo, root)"
+  typechecker: "tsc --noEmit (per workspace) / pnpm typecheck (turbo, root)"
+  formatter: "prettier --check . (pnpm format:check)"
+  check_command: "pnpm check"
+  reason: "No workspace-level test command exists that covers every in-scope project; no test runner/coverage/E2E tooling is installed. strict_tdd fails closed to false until the owner adopts a runner."
+
+rules:
+  proposal:
+    - Reference the relevant ADR (docs/adr/) and roadmap.md sprint before proposing scope.
+    - Include a rollback plan for risky changes.
+  specs:
+    - Use Given/When/Then for scenarios.
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY).
+    - Express security non-negotiables from docs/security.md as requirements with scenarios.
+  design:
+    - Respect the import rules in docs/codebase-map.md and the server-only wall.
+    - Document architecture decisions with rationale; include sequence diagrams for complex flows.
+  tasks:
+    - Group by phase, use hierarchical numbering.
+    - Keep tasks completable in one session.
+  apply:
+    guidelines:
+      - Follow existing code patterns and layer boundaries.
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: "pnpm build"
+    coverage_threshold: 0
+    fallback_gate: "pnpm check"
+  archive:
+    - Warn before merging destructive deltas.

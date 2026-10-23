@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { GeistMono } from 'geist/font/mono';
 import { GeistSans } from 'geist/font/sans';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getTranslations } from 'next-intl/server';
 
 import { SiteNav } from '@/components/site-nav';
 
@@ -28,41 +30,59 @@ import './globals.css';
  * Both `variable` and `className` are attached because Next requires the
  * generated class for the `@font-face` rule to apply at all; the class is an
  * implementation detail, the variable is the interface.
+ *
+ * ## LANGUAGE
+ *
+ * The locale is resolved on the server from the `locale` cookie (see
+ * `src/i18n/request.ts`) and drives `<html lang>`. That is the whole reason the
+ * cookie is read server-side: declaring a language the page is not written in
+ * makes a screen reader mispronounce every word, which is a real accessibility
+ * defect rather than a cosmetic one.
  */
-export const metadata: Metadata = {
-  title: {
-    default: 'VulDetected',
-    template: '%s · VulDetected',
-  },
-  description: 'Vulnerability intelligence for the stacks you actually ship.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('metadata');
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return {
+    title: {
+      default: 'VulDetected',
+      template: '%s · VulDetected',
+    },
+    description: t('description'),
+  };
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+  const t = await getTranslations('common');
+
   return (
     // `lang` is not decoration: it selects the hyphenation and line-breaking
-    // rules, and screen readers use it to pick a pronunciation voice. The app's
-    // default locale is `es` (see `users.locale`), so the document declares it.
-    <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    // rules, and screen readers use it to pick a pronunciation voice. It follows
+    // the resolved locale, so English copy is never announced with Spanish
+    // phonetics.
+    <html lang={locale} className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-dvh bg-bg text-text antialiased">
-        {/*
-          `skip-nav-content` is the standard Tailwind class for the visually-hidden
-          -until-focused skip link. It is the first focusable element in the DOM,
-          which is the whole point: a keyboard user must be able to jump past the
-          nav on every page instead of tabbing through it.
-        */}
-        <a
-          href="#main"
-          className="focus-ring sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-brand focus:px-3 focus:py-2 focus:text-sm focus:text-text-on-brand"
-        >
-          Skip to content
-        </a>
+        <NextIntlClientProvider>
+          {/*
+            `skip-nav-content` is the standard Tailwind class for the visually-hidden
+            -until-focused skip link. It is the first focusable element in the DOM,
+            which is the whole point: a keyboard user must be able to jump past the
+            nav on every page instead of tabbing through it.
+          */}
+          <a
+            href="#main"
+            className="focus-ring sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-brand focus:px-3 focus:py-2 focus:text-sm focus:text-text-on-brand"
+          >
+            {t('skipToContent')}
+          </a>
 
-        <div className="flex min-h-dvh flex-col">
-          <SiteNav />
-          <main id="main" tabIndex={-1} className="flex-1 outline-none">
-            {children}
-          </main>
-        </div>
+          <div className="flex min-h-dvh flex-col">
+            <SiteNav />
+            <main id="main" tabIndex={-1} className="flex-1 outline-none">
+              {children}
+            </main>
+          </div>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

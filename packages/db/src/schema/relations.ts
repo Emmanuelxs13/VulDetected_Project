@@ -2,6 +2,10 @@ import { relations } from 'drizzle-orm';
 
 import { accounts } from './accounts';
 import { auditLogs } from './audit-logs';
+import { domains } from './domains';
+import { findings } from './findings';
+import { scanEvents } from './scan-events';
+import { scans } from './scans';
 import { sessions } from './sessions';
 import { users } from './users';
 
@@ -39,6 +43,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   accounts: many(accounts),
   auditLogs: many(auditLogs),
+  domains: many(domains),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -51,4 +56,32 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   actor: one(users, { fields: [auditLogs.actorUserId], references: [users.id] }),
+}));
+
+/**
+ * Sprint 2 scan graph.
+ *
+ * The tables are imported here and the graph declared in this one module for the
+ * same reason as the Sprint 1 graph (see the header comment): a table module must
+ * never import another table module for relation purposes, or the ES module
+ * cycle returns a partially-initialised module and the graph is built with a
+ * hole in it.
+ */
+export const domainsRelations = relations(domains, ({ one, many }) => ({
+  user: one(users, { fields: [domains.userId], references: [users.id] }),
+  scans: many(scans),
+}));
+
+export const scansRelations = relations(scans, ({ one, many }) => ({
+  domain: one(domains, { fields: [scans.domainId], references: [domains.id] }),
+  findings: many(findings),
+  scanEvents: many(scanEvents),
+}));
+
+export const findingsRelations = relations(findings, ({ one }) => ({
+  scan: one(scans, { fields: [findings.scanId], references: [scans.id] }),
+}));
+
+export const scanEventsRelations = relations(scanEvents, ({ one }) => ({
+  scan: one(scans, { fields: [scanEvents.scanId], references: [scans.id] }),
 }));

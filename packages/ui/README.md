@@ -1,109 +1,89 @@
 # `@vuldetected/ui`
 
-The VulDetected design system: Tailwind CSS v4 CSS-first tokens plus Radix-based
-primitives. Source-export package — there is **no build step**; the consuming app
-transpiles the TypeScript directly.
+Sistema de diseño de VulDetected: tokens CSS-first de Tailwind CSS v4 más primitivos basados en Radix. Paquete de exportación de código fuente — **sin paso de compilación**; la aplicación consumidora transpila el TypeScript directamente.
 
-Binding decision: [`docs/adr/0003`](../../docs/adr/0003-design-tokens-and-color-budget.md).
-If a component and ADR 0003 disagree, ADR 0003 wins.
+Decisión de enlace: [`docs/adr/0003`](../../docs/adr/0003-design-tokens-and-color-budget.md).
+Si un componente y ADR 0003 entran en contradicción, prevalece ADR 0003.
 
 ---
 
-## The token contract
+## Contrato de tokens
 
-Every colour in the product is declared exactly once, in
-[`src/styles/tokens.css`](./src/styles/tokens.css), under a semantic name.
+Todos los colores del producto se declaran exactamente una vez, en
+[`src/styles/tokens.css`](./src/styles/tokens.css), con un nombre semántico.
 
-**Three rules, in order of importance:**
+**Tres reglas, en orden de importancia:**
 
-1. **Components reference semantic names only.** `bg-surface`, `text-text-muted`,
-   `border-border`, `bg-critical`. A raw ramp step (`bg-ink-900`) or a hex literal
-   in a component is a defect, not a style choice.
-2. **No `dark:` variant, anywhere.** Theme is decided at the token layer. There is
-   no `dark:` class in `src/components`, and adding one defeats the whole system:
-   re-theming then costs an audit of every component instead of one edit.
-3. **No component may hardcode a hex value.** Colours live in tokens.css. If a new
-   colour is genuinely needed, add a token there and record why.
+1. **Los componentes solo hacen referencia a nombres semánticos.** `bg-surface`, `text-text-muted`,
+   `border-border`, `bg-critical`. Un paso de rampa en bruto (`bg-ink-900`) o un valor hexadecimal en un componente es un defecto, no una elección de estilo.
+2. **Sin variante `dark:`, en ninguna parte.** El tema se decide a nivel de tokens. No hay clases `dark:` en `src/components`, y añadirlas destruye todo el sistema:
+   cambiar de tema pasaría a costar una auditoría de todos los componentes en lugar de una única edición.
+3. **Ningún componente puede tener codificado un valor hexadecimal.** Los colores residen en `tokens.css`. Si realmente se necesita un nuevo color, se añade un token allí y se registra el motivo.
 
-### How theme switching works
+### Cómo funciona el cambio de tema
 
-`tokens.css` uses CSS `color-scheme` + `light-dark()`. Every semantic token
-carries both themes in one declaration:
+`tokens.css` utiliza `color-scheme` + `light-dark()` de CSS. Cada token semántico contiene ambos temas en una única declaración:
 
 ```css
 --color-surface: light-dark(var(--color-ink-50), var(--color-ink-900));
 ```
 
-`light-dark()` resolves to its second argument when the used `color-scheme` is
-`dark`, and `color-scheme` is driven by exactly one switch:
+`light-dark()` resuelve a su segundo argumento cuando el `color-scheme` utilizado es `dark`, y `color-scheme` se controla mediante un único selector:
 
-| `<html>`             | resolved `color-scheme` |
+| `<html>`             | `color-scheme` resuelto |
 | -------------------- | ----------------------- |
-| `data-theme="dark"`  | `dark` (explicit)       |
-| `data-theme="light"` | `light` (explicit)      |
-| attribute absent     | `prefers-color-scheme`  |
+| `data-theme="dark"`  | `dark` (explícito)      |
+| `data-theme="light"` | `light` (explícito)     |
+| atributo ausente     | `prefers-color-scheme`  |
 
-Because the switch is `color-scheme`, the browser's native form controls,
-scrollbars and `<canvas>` behaviour follow the theme for free.
+Dado que el selector es `color-scheme`, los controles nativos del navegador,
+las barras de desplazamiento y el comportamiento de `<canvas>` siguen el tema automáticamente.
 
-The app toggles the attribute; the design system never branches.
+La aplicación cambia ese atributo; el sistema de diseño nunca hace ramificaciones.
 
-### Semantic tokens available to components
+### Tokens semánticos disponibles para los componentes
 
-| Group      | Tokens                                                                                 |
-| ---------- | -------------------------------------------------------------------------------------- |
-| Surfaces   | `bg`, `surface`, `surface-raised`, `surface-overlay`                                   |
-| Content    | `text`, `text-muted`, `text-subtle`, `text-on-solid`, `text-on-brand`                  |
-| Lines      | `border`, `border-strong`, `border-subtle`                                             |
-| Brand      | `brand` (iris-500), `brand-strong` (iris-600), `brand-subtle` (iris-300), `brand-tint` |
-| Severity   | `critical`, `high`, `medium`, `low`, `info`, `unknown` — each with a `-tint` pair      |
-| Ramps      | `ink-50…950`, `iris-300…700`, and each severity's `-strong` step                       |
-| Typography | `font-sans` / `font-mono` (Geist, supplied by `apps/web` through `next/font`)          |
+| Grupo       | Tokens                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------- |
+| Superficies | `bg`, `surface`, `surface-raised`, `surface-overlay`                                    |
+| Contenido   | `text`, `text-muted`, `text-subtle`, `text-on-solid`, `text-on-brand`                   |
+| Líneas      | `border`, `border-strong`, `border-subtle`                                              |
+| Marca       | `brand` (iris-500), `brand-strong` (iris-600), `brand-subtle` (iris-300), `brand-tint`  |
+| Severidad   | `critical`, `high`, `medium`, `low`, `info`, `unknown` — cada uno con su par `-tint`    |
+| Rampas      | `ink-50…950`, `iris-300…700` y cada `-strong` de severidad                              |
+| Tipografía  | `font-sans` / `font-mono` (Geist, proporcionado por `apps/web` a través de `next/font`) |
 
-Utilities: `.tabular` (tabular figures for numeric columns) and `.focus-ring`
-(2px `outline` at 2px offset, drawn _outside_ the control so it stays visible on
-a same-hue fill). Base layer also sets `border-color` defaults, `::selection`,
-scrollbars, and a `prefers-reduced-motion` block that removes transitions and
-animations.
+Utilidades: `.tabular` (figuras tabulares para columnas numéricas) y `.focus-ring`
+(2px de `outline` con desplazamiento de 2px, dibujado _fuera_ del control para que siga visible sobre un relleno del mismo tono). La capa base también establece los valores por defecto de `border-color`, `::selection`, barras de desplazamiento y un bloque para `prefers-reduced-motion` que elimina transiciones y animaciones.
 
-**Spacing:** the 4px Tailwind step, laid out on the 8px rhythm (8 / 16 / 24 / 32 /
-48). Table rows and button heights are locked to 32 / 36 / 40px.
+**Espaciado:** paso de 4px de Tailwind, organizado en ritmo de 8px (8 / 16 / 24 / 32 / 48). Las filas de tabla y las alturas de los botones se fijan a 32 / 36 / 40px.
 
 ---
 
-## Consuming from `apps/web`
+## Consumo desde `apps/web`
 
-1. Import the stylesheet **once**, from the app's root/global CSS:
+1. Importar la hoja de estilos **una sola vez**, desde el CSS global o raíz de la aplicación:
 
    ```css
    /* apps/web/src/app/globals.css */
    @import '@vuldetected/ui/styles.css';
    ```
 
-   `styles.css` already contains `@import 'tailwindcss'`, so do **not** import
-   `tailwindcss` a second time in the app — duplicate preflight and duplicate
-   theme variables are the result.
+   `styles.css` ya contiene `@import 'tailwindcss'`, por lo que **no** debe importarse
+   `tailwindcss` de nuevo en la aplicación — de lo contrario se producen preflight duplicados y variables de tema duplicadas.
 
-2. Register the package as a source of class names. This package already ships
-   `@source "../components/**/*.{ts,tsx}"` inside `styles.css`, which resolves
-   relative to the stylesheet, so this normally needs **no** extra step. If the
-   app compiles CSS from a different location, register the path explicitly:
+2. Registrar el paquete como fuente de nombres de clases. Este paquete ya incluye
+   `@source "../components/**/*.{ts,tsx}"` dentro de `styles.css`, lo que se resuelve relativo a la hoja de estilos, por lo que normalmente **no** es necesario ningún paso adicional. Si la aplicación compila CSS desde una ubicación distinta, registre la ruta explícitamente:
 
    ```css
    @source '../../../../packages/ui/src';
    ```
 
-   This matters: **Tailwind v4 does not scan `node_modules` by default.** Without
-   a registered source, every class in this package compiles away silently and
-   the app renders unstyled primitives — no error, just missing CSS. Verify by
-   checking that a `bg-surface-raised` rule exists in the built stylesheet.
+   Esto es importante: **Tailwind v4 no analiza `node_modules` por defecto.** Sin una fuente registrada, todas las clases de este paquete se eliminan silenciosamente durante la compilación y la aplicación muestra primitivos sin estilos — no aparece ningún error, solo CSS ausente. Verifique comprobando que existe una regla `bg-surface-raised` en la hoja de estilos compilada.
 
-3. Add `"@vuldetected/ui": "workspace:*"` to the app's dependencies, and make
-   sure Next.js transpiles it (workspaces are symlinked into `node_modules`, so
-   `transpilePackages: ['@vuldetected/ui']` is required for `.tsx` sources under
-   Node's module rules).
+3. Añadir `"@vuldetected/ui": "workspace:*"` a las dependencias de la aplicación y asegurarse de que Next.js transpile el paquete (los workspaces están enlazados por symlink en `node_modules`, por lo que `transpilePackages: ['@vuldetected/ui']` es necesario para las fuentes `.tsx` que siguen las reglas de módulos de Node).
 
-4. Import components by name — no deep imports:
+4. Importar los componentes por nombre — sin importaciones profundas:
 
    ```tsx
    import { Badge, Button, Card, Table } from '@vuldetected/ui';
@@ -111,52 +91,37 @@ animations.
 
 ---
 
-## Severity, and the contrast check that is still pending
+## Severidad y la comprobación de contraste pendiente
 
-`src/lib/contrast.ts` implements WCAG 2.1 `relativeLuminance()` and
-`contrastRatio()`, the `SEVERITY_ON_SURFACE` map, and
-`assertSeverityContrast()` — a report over every severity step against every
-surface it can be rendered on, in both themes.
+`src/lib/contrast.ts` implementa `relativeLuminance()` y `contrastRatio()` de WCAG 2.1,
+el mapa `SEVERITY_ON_SURFACE` y `assertSeverityContrast()` — un informe sobre cada paso de severidad frente a cada superficie en la que puede renderizarse, en ambos temas.
 
-**This is the automated contrast check ADR 0003 §4 requires, and the unit test
-that fails the build on a violation is still pending.** The utility itself only
-reports; it never asserts and never throws.
+**Esto es la comprobación automatizada de contraste que requiere ADR 0003 §4, y la prueba unitaria que debe hacer fallar la compilación ante una violación aún está pendiente.** La utilidad solo informa; nunca afirma ni lanza excepciones.
 
-Measured today, with the pinned palette:
+Valores medidos actualmente, con la paleta fijada:
 
-- severity hue **as text** fails WCAG AA in the light theme for all six
-  severities (worst: `medium` at 1.70:1 on `surface`);
-- the same hues **as icon/border colour** clear the 3:1 non-text bar in the dark
-  theme, but `high` (2.85:1), `low` (2.85:1) and `medium` (1.70:1) do not clear it
-  on the light `surface`.
+- El tono de severidad **como texto** no cumple AA de WCAG en el tema claro para las seis severidades (peor: `medium` con 1,70:1 sobre `surface`);
+- El mismo tono **como color de icono o borde** supera la barra de 3:1 para contenido no textual en el tema oscuro, pero `high` (2,85:1), `low` (2,85:1) y `medium` (1,70:1) no la superan sobre `surface` en el tema claro.
 
-The components therefore keep the **severity word in `--color-text`** (16:1) and
-carry the hue on the icon, the border and a 12% tint. Severity is still encoded
-three times (colour, distinct glyph, word), so the hue is a redundant channel and
-not the one carrying the meaning. Closing the remaining non-text gap needs a
-per-severity adjustment to the pinned palette — an owner decision, tracked in
-`docs/decisions-pending.md`, not something a component can fix.
+Por ello, los componentes mantienen **la palabra de severidad con `--color-text`** (16:1) y aplican el tono al icono, al borde y a un tinte del 12 %. La severidad sigue codificándose de tres formas (color, glifo distinto y palabra), de modo que el tono es un canal redundante y no es el que transmite el significado. Cerrar la brecha restante para contenido no textual requiere un ajuste por severidad de la paleta fijada — decisión del propietario, registrada en `docs/decisions-pending.md`, no algo que pueda corregir un componente.
 
 ---
 
-## Component inventory
+## Inventario de componentes
 
 `Alert` · `Badge` · `Button` · `Card` (+ header/title/description/content/footer) ·
 `Container` · `EmptyState` · `Field` · `Input` · `Label` · `Progress` · `Skeleton` ·
 `Spinner` · `Table` (+ header/body/row/head/cell/caption) · `Textarea` ·
-severity and status icons.
+iconos de severidad y de estado.
 
-Conventions that hold for all of them:
+Convenciones que se aplican a todos ellos:
 
-- React 19: `ref` is an ordinary prop; no `forwardRef`.
-- Every component spreads the remaining props onto its DOM element.
-- `className` is merged with `cn()` (`clsx` + `tailwind-merge`), so a call-site
-  utility wins over a variant.
-- Variant APIs are `class-variance-authority` and are exported
-  (`buttonVariants`, `badgeVariants`, …) for composing new primitives.
-- `Badge` always renders a distinct glyph **and** the severity word — there is no
-  icon-only mode (WCAG 1.4.1, ADR 0003 §5).
-- `Progress` is determinate only; unknown-duration work uses `Spinner`/`Skeleton`.
-  The architecture forbids fake progress.
-- No gradients, no `backdrop-blur`, no drop shadows. Elevation is a border plus a
-  surface step.
+- React 19: `ref` es una propiedad normal; no se utiliza `forwardRef`.
+- Todos los componentes propagan el resto de propiedades al elemento DOM correspondiente.
+- `className` se combina con `cn()` (`clsx` + `tailwind-merge`), de modo que una utilidad indicada en la llamada tiene prioridad sobre una variante.
+- Las APIs de variantes son `class-variance-authority` y se exportan
+  (`buttonVariants`, `badgeVariants`, …) para componer nuevos primitivos.
+- `Badge` siempre muestra un glifo distinto **y** la palabra de severidad — no existe un modo solo con icono (WCAG 1.4.1, ADR 0003 §5).
+- `Progress` es únicamente determinado; el trabajo de duración desconocida utiliza `Spinner`/`Skeleton`.
+  La arquitectura prohíbe el progreso falso.
+- Sin degradados, sin `backdrop-blur`, sin sombras proyectadas. La elevación se representa mediante un borde más un paso de superficie.

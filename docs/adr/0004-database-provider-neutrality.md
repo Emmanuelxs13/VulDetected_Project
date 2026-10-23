@@ -1,141 +1,157 @@
-# ADR 0004: Database provider neutrality
+# ADR 0004: Neutralidad respecto del proveedor de base de datos
 
-- **Status:** Accepted
-- **Date:** Sprint 1
+- **Estado:** Aceptada
+- **Fecha:** Sprint 1
 
-## Context
+## Contexto
 
-The owner has not chosen between a **local Postgres** (Docker, already composed
-in `infra/docker-compose.dev.yml`) and **Supabase**. That decision is not
-blocking Sprint 1, and it must not become blocking later.
+El propietario aún no ha elegido entre un **Postgres local** (Docker, ya
+compuesto en `infra/docker-compose.dev.yml`) y **Supabase**. Esa decisión no
+bloquea el Sprint 1, y no debe volverse bloqueante más adelante.
 
-The failure mode this ADR exists to prevent is specific and common: a codebase
-accumulates provider assumptions until switching providers costs a rewrite.
-Those assumptions are almost always invisible in review because each one is
-individually reasonable:
+El modo de fallo que este ADR existe para prevenir es específico y común: una
+base de código acumula supuestos del proveedor hasta que cambiar de proveedor
+cuesta una reescritura. Esos supuestos casi siempre son invisibles en la
+revisión porque cada uno es individualmente razonable:
 
-- a connection string built in code from `PGHOST`,
-- a `unix_socket` path or a `postgres` service hostname in a DSN,
-- `pg_trgm` for a search feature,
-- an `auth.uid()` call from the Supabase client inside business logic,
-- migrations that only work because Supabase pre-enabled an extension.
+- una cadena de conexión construida en código a partir de `PGHOST`,
+- una ruta `unix_socket` o un nombre de servicio `postgres` en un DSN,
+- `pg_trgm` para una funcionalidad de búsqueda,
+- una llamada a `auth.uid()` desde el cliente de Supabase dentro de la lógica de
+  negocio,
+- migraciones que solo funcionan porque Supabase prehabilitó una extensión.
 
-Each is defensible in isolation. Collectively they are a lock-in nobody chose.
+Cada uno es defendible de forma aislada. Colectivamente son un lock-in que nadie
+eligió.
 
-## Decision
+## Decisión
 
-The data layer is **provider-neutral**. Three hard rules.
+La capa de datos es **neutral respecto del proveedor**. Tres reglas duras.
 
-### 1. No hardcoded hostnames
+### 1. Sin nombres de host fijos en el código
 
-No `postgres`, `db`, `127.0.0.1`, `localhost`, or any service name appears in
-application or migration code. The connection target comes from `DATABASE_URL`,
-full stop. Compose service names are an infra detail and must not leak into the
-data layer.
+No aparece `postgres`, `db`, `127.0.0.1`, `localhost` ni ningún nombre de
+servicio en el código de la aplicación ni en las migraciones. El destino de la
+conexión viene de `DATABASE_URL`, punto. Los nombres de servicio de Compose son
+un detalle de infraestructura y no deben filtrarse en la capa de datos.
 
-### 2. No local unix socket paths
+### 2. Sin rutas locales de unix socket
 
-Connection goes through TCP/TLS to the URL's host. Unix socket paths
-(`/var/run/postgresql`, `/tmp/.s.PGSQL.5432`) are machine-specific and do not
-translate to a managed provider.
+La conexión pasa por TCP/TLS hacia el host de la URL. Las rutas de unix socket
+(`/var/run/postgresql`, `/tmp/.s.PGSQL.5432`) son específicas de la máquina y no
+se traducen a un proveedor gestionado.
 
-### 3. No Postgres extensions beyond `citext` and `gen_random_uuid()`
+### 3. Sin extensiones de Postgres más allá de `citext` y `gen_random_uuid()`
 
-Both are core Postgres or first-party, present on every managed provider
-including Supabase, and available without superuser privileges.
+Ambas son del núcleo de Postgres o de primera parte, presentes en todo proveedor
+gestionado — incluido Supabase — y disponibles sin privilegios de superusuario.
 
-- **`citext`** — case-insensitive text for email addresses. Case-insensitive
-  lookup for login is a security property, not a cosmetic one.
-- **`gen_random_uuid()`** — primary key defaults without an extension. Available
-  natively since Postgres 13.
+- **`citext`** — texto sin distinguir mayúsculas para las direcciones de correo.
+  La búsqueda sin distinguir mayúsculas para el inicio de sesión es una
+  propiedad de seguridad, no un detalle cosmético.
+- **`gen_random_uuid()`** — valores por defecto de clave primaria sin una
+  extensión. Disponible de forma nativa desde Postgres 13.
 
-Explicitly **not** used: `pg_trgm` (fuzzy search — needs `pg_trgm` on the
-provider, and native search would have to be rebuilt differently anyway),
-`uuid-ossp`, PostGIS, `vector`, and anything requiring superuser. If a feature
-truly needs an extension, that becomes an ADR plus an owner decision, not an
-incidental `CREATE EXTENSION` in a migration.
+**No** se usan explícitamente: `pg_trgm` (búsqueda difusa — necesita `pg_trgm`
+en el proveedor, y la búsqueda nativa habría que reconstruirla de otro modo de
+todos modos), `uuid-ossp`, PostGIS, `vector` y cualquier cosa que requiera
+superusuario. Si una funcionalidad necesita de verdad una extensión, eso se
+convierte en un ADR más una decisión del propietario, no en un `CREATE
+EXTENSION` incidental dentro de una migración.
 
-### 4. Everything goes through `DATABASE_URL`
+### 4. Todo pasa por `DATABASE_URL`
 
-Connection pooling, TLS, and credentials are all encoded in the URL. Migrations
-are applied through drizzle-kit against that same URL — never against a separate
-admin URL, socket, or hardcoded target.
+El pool de conexiones, TLS y las credenciales están todos codificados en la URL.
+Las migraciones se aplican con drizzle-kit contra esa misma URL — nunca contra
+una URL de administración aparte, un socket o un destino fijo en el código.
 
-### Consequences of the rules
+### Consecuencias de las reglas
 
-- **Switching between local Postgres and Supabase is a single `DATABASE_URL`
-  edit.** No code change, no compose change, no migration rewrite.
-- **Supabase's connection pooler** works, because it is addressed purely through
-  the URL. Provider features such as Row Level Security are _available_ but not
-  _assumed_ — using them means going through `DATABASE_URL` like anything else.
-- **Migrations are portable**, so a provider swap cannot produce a
-  migration-only outage.
-- **The cost is real:** no fuzzy search without an extension, and search must be
-  implemented with portable SQL (`ILIKE`, trigram-free approaches, or a future
-  external search service). That is a genuine functional cost, accepted
-  deliberately.
-- **Connection lifecycle is our responsibility.** Provider-neutral means we
-  manage pooling explicitly and cannot assume the provider's pooler exists.
-- **A provider swap is untested until it is tested.** Neutrality is a structural
-  guarantee, not proof of compatibility. The cutover plan — including a restore of
-  `pg_dump` output and a verification pass — is an owner decision recorded in
-  [decisions-pending.md](../decisions-pending.md#supabase-vs-local-postgres).
+- **Cambiar entre Postgres local y Supabase es una única edición de
+  `DATABASE_URL`.** Sin cambios de código, sin cambios de compose, sin
+  reescritura de migraciones.
+- **El pool de conexiones de Supabase funciona**, porque se direcciona puramente
+  a través de la URL. Las características del proveedor como Row Level Security
+  están _disponibles_ pero no se _dan por supuestas_ — usarlas significa pasar
+  por `DATABASE_URL` como cualquier otra cosa.
+- **Las migraciones son portables**, de modo que un cambio de proveedor no puede
+  producir un corte de servicio que afecte solo a las migraciones.
+- **El costo es real:** sin búsqueda difusa salvo con una extensión, y la
+  búsqueda debe implementarse con SQL portable (`ILIKE`, enfoques sin trigram, o
+  un servicio de búsqueda externo futuro). Ese es un costo funcional genuino,
+  aceptado deliberadamente.
+- **El ciclo de vida de las conexiones es nuestra responsabilidad.** Neutral
+  respecto del proveedor significa que administramos el pooling explícitamente y
+  no podemos dar por existente el pooler del proveedor.
+- **Un cambio de proveedor no está probado hasta que se prueba.** La neutralidad
+  es una garantía estructural, no una prueba de compatibilidad. El plan de
+  transición — incluida una restauración de la salida de `pg_dump` y una pasada
+  de verificación — es una decisión del propietario registrada en
+  [decisions-pending.md](../decisions-pending.md#1-alojamiento-de-la-base-de-datos--resuelto-dos-veces).
 
-## What still needs an owner decision
+## Lo que todavía necesita una decisión del propietario
 
-Neutrality answers _how the data layer connects_, not _which provider to use_.
-Still open, and deliberately not decided here:
+La neutralidad responde _cómo se conecta la capa de datos_, no _qué proveedor
+usar_. Sigue abierto, y deliberadamente no se decide aquí:
 
-- backup and retention policy,
-- connection pooling topology (Supabase transaction pooler vs direct connection),
-- Row Level Security posture, if RLS is used as a second authorization layer,
-- whether the free tier tolerates Sprint 2's scan volume,
-- cost at production traffic.
+- política de respaldo y retención,
+- topología del pool de conexiones (pooler de transacciones de Supabase vs
+  conexión directa),
+- postura de Row Level Security, si RLS se usa como segunda capa de autorización,
+- si el plan gratuito tolera el volumen de escaneos del Sprint 2,
+- costo con tráfico de producción.
 
-Those need real usage data and pricing knowledge, not architectural speculation.
+Eso necesita datos de uso reales y conocimiento de precios, no especulación
+arquitectónica.
 
-## Consequences
+## Consecuencias
 
-**Accepted benefits**
+**Beneficios aceptados**
 
-- Provider choice is reversible at the cost of one environment variable.
-- The data layer is portable and testable: the same code runs against a throwaway
-  local container in CI and a managed database in production.
-- No hidden privileged-extension dependency that fails on day one with Supabase.
+- La elección del proveedor es reversible al costo de una variable de entorno.
+- La capa de datos es portable y testeable: el mismo código corre contra un
+  contenedor local desechable en CI y contra una base de datos gestionada en
+  producción.
+- Sin dependencia oculta de una extención privilegiada que falle el primer día
+  con Supabase.
 
-**Accepted costs**
+**Costos aceptados**
 
-- Some Postgres-specific functionality is off the table without discussion
-  (fuzzy search, PostGIS, native vector search).
-- Discipline is required at review time: one hardcoded hostname in a DSN undoes
-  this entirely, and it looks like a harmless line.
-- Slightly more abstraction in the connection factory than a single-URL
-  hardcode would need. The factory exists precisely so the rule is enforceable in
-  one place.
+- Alguna funcionalidad propia de Postgres queda fuera de la mesa sin
+  discusión (búsqueda difusa, PostGIS, búsqueda vectorial nativa).
+- Se requiere disciplina en el momento de la revisión: un solo nombre de host
+  fijo en el código dentro de un DSN deshace todo esto por completo, y se ve
+  como una línea inofensiva.
+- Algo más de abstracción en la fábrica de conexiones de la que necesitaría un
+  hardcode con una sola URL. La fábrica existe justamente para que la regla sea
+  aplicable en un solo lugar.
 
-## Alternatives considered
+## Alternativas consideradas
 
-### Choose Supabase now and optimize for it
+### Elegir Supabase ahora y optimizar para él
 
-Rejected. It converts an open decision into a lock-in during Sprint 1, while the
-schema has not yet survived the two schema-heavy sprints ahead. The cost of being
-wrong (rewriting auth storage, migrations, and the connection layer) is far
-higher than the cost of waiting for real data.
+Rechazada. Convierte una decisión abierta en un lock-in durante el Sprint 1,
+mientras el esquema todavía no ha sobrevivido los dos sprints con mucho esquema
+que vienen adelante. El costo de equivocarse (reescribir el almacenamiento de
+autenticación, las migraciones y la capa de conexión) es mucho mayor que el
+costo de esperar datos reales.
 
-### Choose local Postgres only
+### Elegir solo Postgres local
 
-Rejected. Same objection in reverse: it presumes a hosting answer that a
-two-person-stage MVP does not need to make yet, and it would bake in a
-`compose`-only assumption.
+Rechazada. La misma objeción en sentido inverso: presume una respuesta de
+alojamiento que un MVP en etapa de dos personas todavía no necesita dar, y
+quedaría horneado un supuesto de "solo compose".
 
-### Abstract behind an ORM with its own portable dialect
+### Abstraer detrás de un ORM con su propio dialecto portable
 
-Rejected as unnecessary indirection. Drizzle is already SQL-shaped and explicit,
-which is what makes the neutrality rules reviewable. An additional abstraction
-layer would add a place to hide rule violations rather than removing one.
+Rechazada como una indirección innecesaria. Drizzle ya tiene forma de SQL y es
+explícito, y eso es lo que hace revisables las reglas de neutralidad. Una capa
+de abstracción adicional agregaría un lugar donde esconder violaciones de las
+reglas en lugar de quitar uno.
 
-### Use an in-process or embedded database (SQLite, PGlite)
+### Usar una base de datos embebida o en el proceso (SQLite, PGlite)
 
-Rejected. Concurrent scan writes, real constraint enforcement, and a genuine
-"would this work on Postgres" signal all argue against an embedded engine while
-the schema is still moving.
+Rechazada. Las escrituras concurrentes de escaneos, la aplicación real de
+restricciones y la señal genuina de "¿esto funcionaría en Postgres" argumentan
+todas en contra de un motor embebido mientras el esquema todavía se está
+moviendo.

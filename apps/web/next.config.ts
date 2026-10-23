@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import createNextIntlPlugin from 'next-intl/plugin';
 
 const config: NextConfig = {
   /**
@@ -84,4 +85,12 @@ const config: NextConfig = {
   },
 };
 
-export default config;
+/**
+ * `next-intl` resolves the request config (`src/i18n/request.ts`) through this
+ * plugin. Without it the app compiles, but a production build fails while
+ * prerendering with "Couldn't find next-intl config file". The default path is
+ * used, so no argument is passed.
+ */
+const withNextIntl = createNextIntlPlugin();
+
+export default withNextIntl(config);

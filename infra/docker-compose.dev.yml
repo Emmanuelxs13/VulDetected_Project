@@ -68,23 +68,70 @@ services:
       - '127.0.0.1:6379:6379'
     volumes:
       - vuldetected-redisdata:/data
+    healthcheck:
+      # The scanner must not start consuming before Redis accepts connections.
+      test: ['CMD-SHELL', 'redis-cli ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - default
+      - scanner
 
-  # ---------------------------------------------------------------------------
-  # scanner — LANDS IN SPRINT 2, deliberately not defined yet.
-  # ---------------------------------------------------------------------------
-  # In Sprint 2 this file gains a `scanner` service built from services/scanner
-  # (Python + Celery worker). Its constraints are fixed now so the design is not
-  # renegotiated later:
-  #   * image:      built from services/scanner/Dockerfile (not a public image)
-  #   * network:    internal-only network, no host port published by default;
-  #                 jobs are dispatched through Redis, not over HTTP
-  #   * filesystem: read-only root filesystem, tmpfs for /tmp
-  #   * egress:     filtered outbound (see docs/security.md — worker network
-  #                 isolation), because scanning targets user-supplied hosts
-  #   * capabilities: drop ALL, no-new-privileges
-  # It is intentionally absent rather than stubbed: a stubbed scanner would let
-  # the app enqueue jobs that silently go nowhere.
-  # ---------------------------------------------------------------------------
+  scanner:
+    # Python + Celery worker. Consumes scan jobs from Redis and reports progress
+    # and findings back to the web app over the authenticated callback. There is
+    # no published port on purpose: jobs travel through Redis, never over HTTP
+    # into the worker.
+    build:
+      context: ../services/scanner
+      dockerfile: Dockerfile
+    container_name: vuldetected-scanner
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      # Container DNS, not localhost: the broker lives in the `redis` service.
+      CELERY_BROKER_URL: redis://redis:6379/0
+      # Read by scanner/report.py; must match the web's SCANNER_CALLBACK_SECRET.
+      SCANNER_CALLBACK_SECRET: '${SCANNER_CALLBACK_SECRET:-dev-scanner-callback-secret}'
+      # Read by scanner/tasks.py as the fallback callback origin. `pnpm dev` runs
+      # on the host, so the worker reaches it through the host gateway.
+      SCANNER_CALLBACK_BASE_URL: http://host.docker.internal:3000
+      # Read by scanner/egress.py. `test` is reserved for the hermetic E2E run.
+      SCANNER_EGRESS_MODE: '${SCANNER_EGRESS_MODE:-strict}'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    # The image already runs as UID 1000 (`scanner`); pin it here too. The root
+    # filesystem stays read-only and /tmp is the only writable path the worker
+    # needs (Python and Celery both stage temporary files there).
+    user: '1000:1000'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # The worker must reach arbitrary scan targets, so this network cannot be
+    # `internal: true`. It is kept apart from the default network so the worker
+    # cannot reach Postgres or Mailpit (docs/security.md §3).
+    networks:
+      - scanner
+    # One slow target must not monopolise the developer machine.
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1g
+
+networks:
+  scanner:
+    # Shared only by Redis and the worker, so the worker cannot reach the
+    # database services on the default network. See the scanner service above.
+    name: vuldetected-scanner
 
 volumes:
   vuldetected-pgdata:

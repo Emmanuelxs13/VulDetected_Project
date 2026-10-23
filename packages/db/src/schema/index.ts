@@ -14,12 +14,16 @@
 
 import { accounts } from './accounts';
 import { auditLogs } from './audit-logs';
+import { domains } from './domains';
+import { findings } from './findings';
+import { scanEvents } from './scan-events';
+import { scans } from './scans';
 import { sessions } from './sessions';
 import { users } from './users';
 import { verificationTokens } from './verification-tokens';
 
-export { accountStatusEnum, citext, tokenPurposeEnum } from './enums';
-export type { AccountStatus, TokenPurpose } from './enums';
+export { accountStatusEnum, citext, scanStatusEnum, severityEnum, tokenPurposeEnum } from './enums';
+export type { AccountStatus, ScanStatus, Severity, TokenPurpose } from './enums';
 
 export { users } from './users';
 export type { NewUser, User } from './users';
@@ -36,9 +40,25 @@ export type { NewVerificationToken, VerificationToken } from './verification-tok
 export { auditLogs } from './audit-logs';
 export type { AuditLog, NewAuditLog } from './audit-logs';
 
+export { domains } from './domains';
+export type { Domain, NewDomain } from './domains';
+
+export { scans } from './scans';
+export type { NewScan, Scan } from './scans';
+
+export { findings } from './findings';
+export type { Finding, NewFinding } from './findings';
+
+export { scanEvents } from './scan-events';
+export type { NewScanEvent, ScanEvent } from './scan-events';
+
 export {
   accountsRelations,
   auditLogsRelations,
+  domainsRelations,
+  findingsRelations,
+  scanEventsRelations,
+  scansRelations,
   sessionsRelations,
   usersRelations,
 } from './relations';
@@ -58,4 +78,8 @@ export const schema = {
   accounts,
   verificationTokens,
   auditLogs,
+  domains,
+  scans,
+  findings,
+  scanEvents,
 };

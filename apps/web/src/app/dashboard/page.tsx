@@ -10,10 +10,15 @@ import {
   EmptyState,
 } from '@vuldetected/ui';
 import { InboxIcon } from '@vuldetected/ui';
+import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
 
-export const metadata: Metadata = { title: 'Dashboard' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('dashboard');
+
+  return { title: t('title') };
+}
 
 /**
  * Protected page.
@@ -40,12 +45,13 @@ export const metadata: Metadata = { title: 'Dashboard' };
  * See `docs/adr/0002-authentication.md` §4.
  */
 export default async function DashboardPage() {
+  const t = await getTranslations('dashboard');
   const session = await getServerSession();
 
   if (!session?.user) {
     return (
       <Container size="narrow" className="py-12">
-        <EmptyState title="No active session" description="Sign in to see your account." />
+        <EmptyState title={t('noSession.title')} description={t('noSession.description')} />
       </Container>
     );
   }
@@ -56,7 +62,7 @@ export default async function DashboardPage() {
     <Container size="narrow" className="flex flex-col gap-6 py-12">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">
-          {user.name?.trim() ? user.name : 'Your account'}
+          {user.name?.trim() ? user.name : t('fallbackName')}
         </h1>
         <p className="text-sm text-text-muted">{user.email}</p>
       </div>
@@ -70,28 +76,28 @@ export default async function DashboardPage() {
       */}
       <Card>
         <CardHeader>
-          <CardTitle>Account</CardTitle>
-          <CardDescription>Read from the `users` row behind your session.</CardDescription>
+          <CardTitle>{t('account.title')}</CardTitle>
+          <CardDescription>{t('account.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Row label="Email">
+            <Row label={t('account.email')}>
               <span className="text-sm">{user.email}</span>
             </Row>
-            <Row label="Verified">
+            <Row label={t('account.verified')}>
               {user.emailVerified ? (
-                <Badge variant="low">Verified</Badge>
+                <Badge variant="low">{t('account.verified')}</Badge>
               ) : (
-                <Badge variant="unknown">Not verified</Badge>
+                <Badge variant="unknown">{t('account.notVerified')}</Badge>
               )}
             </Row>
-            <Row label="Status">
+            <Row label={t('account.status')}>
               <Badge variant={statusVariant(user.status)}>{user.status ?? 'pending'}</Badge>
             </Row>
-            <Row label="Locale">
+            <Row label={t('account.locale')}>
               <span className="text-sm">{user.locale ?? 'es'}</span>
             </Row>
-            <Row label="User ID">
+            <Row label={t('account.userId')}>
               {/*
                 `tabular` on the badge forces `font-variant-numeric:
                 tabular-nums`, so a hex id does not shift the layout column as it
@@ -99,7 +105,7 @@ export default async function DashboardPage() {
               */}
               <span className="font-mono text-xs text-text-muted">{user.id}</span>
             </Row>
-            <Row label="Member since">
+            <Row label={t('account.memberSince')}>
               <span className="text-sm">
                 {user.createdAt instanceof Date ? user.createdAt.toISOString().slice(0, 10) : '—'}
               </span>
@@ -115,8 +121,8 @@ export default async function DashboardPage() {
       */}
       <EmptyState
         icon={<InboxIcon className="h-4 w-4" />}
-        title="No findings yet"
-        description="Scanning and CVE correlation are later sprints. Nothing is missing — the feature does not exist yet."
+        title={t('findings.title')}
+        description={t('findings.description')}
       />
     </Container>
   );

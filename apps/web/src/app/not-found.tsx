@@ -1,15 +1,18 @@
 import { Button, Container, EmptyState } from '@vuldetected/ui';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getTranslations('notFound');
+
   return (
     <Container size="narrow" className="py-12">
       <EmptyState
-        title="Page not found"
-        description="That route does not exist in this build. Sprint 1 implements only the pages listed in the navigation."
+        title={t('title')}
+        description={t('description')}
         action={
           <Button asChild variant="primary" size="sm">
-            <Link href="/">Back to start</Link>
+            <Link href="/">{t('backToStart')}</Link>
           </Button>
         }
       />

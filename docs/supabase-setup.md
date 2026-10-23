@@ -1,147 +1,157 @@
-# Supabase setup and Sprint 1 smoke test
+# Configuración de Supabase y prueba de humo del Sprint 1
 
-> **SUPERSEDED — not the path in use.** Sprint 1 is being verified against a
-> **local PostgreSQL 18** server through pgAdmin 4 instead. The current runbook is
-> [`local-postgres-setup.md`](./local-postgres-setup.md).
+> **REEMPLAZADO — no es el camino en uso.** El Sprint 1 se está verificando
+> contra un servidor **PostgreSQL 18 local** mediante pgAdmin 4. El runbook
+> actual es [`local-postgres-setup.md`](./local-postgres-setup.md).
 >
-> This file is kept as the documented alternative for when the project moves to a
-> managed provider. Its smoke test (§8), troubleshooting table and the `LISTEN/NOTIFY`
-> pooler reasoning remain valid and were deliberately not duplicated. The steps that
-> differ — project creation, connection-string selection, password encoding,
-> free-tier pausing — only matter once Supabase is adopted.
+> Este archivo se conserva como la alternativa documentada para cuando el
+> proyecto pase a un proveedor gestionado. Su prueba de humo (§8), su tabla de
+> solución de problemas y el razonamiento sobre el pooler con `LISTEN/NOTIFY`
+> siguen siendo válidos y deliberadamente no se duplicaron. Los pasos que
+> difieren — creación del proyecto, selección de la cadena de conexión,
+> codificación de la contraseña, pausa del plan gratuito — solo importan cuando
+> se adopte Supabase.
 
-**Status:** Sprint 1 verification runbook (alternative path, not executed).
+**Estado:** Runbook de verificación del Sprint 1 (camino alternativo, no
+ejecutado).
 
-Until this runbook is completed, every claim about auth in this repository is
-inference from source code. Nothing has ever executed against a database.
+Hasta que este runbook se complete, toda afirmación sobre la autenticación en
+este repositorio es una inferencia a partir del código fuente. Nada se ha
+ejecutado nunca contra una base de datos.
 
-Related: [ADR 0004](./adr/0004-database-provider-neutrality.md) ·
+Relacionado: [ADR 0004](./adr/0004-database-provider-neutrality.md) ·
 [database.md](./database.md) · [security.md](./security.md)
 
 ---
 
-## 0. What you are proving
+## 0. Qué se está verificando
 
-| #   | Claim                                                                | Where it is asserted                    |
-| --- | -------------------------------------------------------------------- | --------------------------------------- |
-| 1   | The 3 authored migrations apply cleanly to a real Postgres           | `packages/db/drizzle/`                  |
-| 2   | `users.email` is genuinely case-insensitive                          | `citext` in migration 0000              |
-| 3   | Passwords are stored as argon2id digests, never plaintext            | `apps/web/src/lib/password.ts`          |
-| 4   | A wrong password and an unknown email produce an **identical** error | `apps/web/src/features/auth/actions.ts` |
-| 5   | Repeated failures lock the account                                   | same file, `recordFailure`              |
-| 6   | `audit_logs` refuses `UPDATE` and `DELETE`                           | migration 0002 trigger                  |
-| 7   | The session cookie is `httpOnly` + `SameSite=Lax`                    | `apps/web/src/lib/auth.ts`              |
-| 8   | Every design token renders in both themes                            | `/dev/sprint-1`                         |
+| #   | Afirmación                                                                       | Dónde se afirma                         |
+| --- | -------------------------------------------------------------------------------- | --------------------------------------- |
+| 1   | Las 3 migraciones redactadas se aplican sin errores a un Postgres real           | `packages/db/drizzle/`                  |
+| 2   | `users.email` es genuinamente sin distinguir mayúsculas                          | `citext` en la migración 0000           |
+| 3   | Las contraseñas se almacenan como resúmenes argon2id, nunca en texto plano       | `apps/web/src/lib/password.ts`          |
+| 4   | Una contraseña incorrecta y un correo desconocido producen un error **idéntico** | `apps/web/src/features/auth/actions.ts` |
+| 5   | Los fallos repetidos bloquean la cuenta                                          | mismo archivo, `recordFailure`          |
+| 6   | `audit_logs` rechaza `UPDATE` y `DELETE`                                         | trigger de la migración 0002            |
+| 7   | La cookie de sesión es `httpOnly` + `SameSite=Lax`                               | `apps/web/src/lib/auth.ts`              |
+| 8   | Cada design token se renderiza en ambos temas                                    | `/dev/sprint-1`                         |
 
-Claims 4 and 5 are the ones worth doing carefully. They are the difference between
-a login form and an authentication system.
+Las afirmaciones 4 y 5 son las que vale la pena hacer con cuidado. Son la
+diferencia entre un formulario de inicio de sesión y un sistema de autenticación.
 
 ---
 
-## 1. Create the project
+## 1. Crear el proyecto
 
-1. Go to <https://supabase.com/dashboard> → **New project**.
-2. **Organization** → create one if prompted.
+1. Vaya a <https://supabase.com/dashboard> → **New project**.
+2. **Organization** → créela si se le solicita.
 3. **Name** → `vuldetected`.
-4. **Database Password** → click _Generate a password_, then **save it somewhere
-   you will not lose**. Supabase does not display it again; there is no recovery,
-   only reset. A password manager is the right home for it.
-5. **Region** → pick the one geographically closest to you. Region cannot be
-   changed later without a restore.
-6. Wait for provisioning to finish.
+4. **Database Password** → pulse _Generate a password_ y luego **guárdela en un
+   lugar donde no la vaya a perder**. Supabase no la muestra de nuevo; no hay
+   recuperación, solo reinicio. Un gestor de contraseñas es el lugar correcto
+   para ella.
+5. **Region** → elija la que geográficamente esté más cerca. La región no se
+   puede cambiar después sin una restauración.
+6. Espere a que termine el aprovisionamiento.
 
-### Two things about the free tier you must know before you build on it
+### Dos cosas del plan gratuito que debe conocer antes de construir sobre él
 
-- **Free projects pause after 7 days of inactivity.** A paused project is not
-  deleted, but it refuses connections, so every request that touches the database
-  starts failing — including your auth flow. For a product you intend to demo,
-  expect this and either touch the project weekly or move to the paid tier
-  ($20/month) when it stops being a demo.
-- **Two projects maximum, 500 MB.** Comfortable for Sprint 1 and 2. Scans will not
-  store raw tool payloads in Postgres (that belongs in object storage), so the
-  ceiling is far away.
+- **Los proyectos gratuitos se pausan tras 7 días de inactividad.** Un proyecto
+  pausado no se elimina, pero rechaza conexiones, de modo que cada solicitud que
+  toca la base de datos empieza a fallar — incluido su flujo de autenticación.
+  Para un producto que piensa demostrar, tenga esto en cuenta y toque el proyecto
+  semanalmente o pase al plan de pago (20 USD/mes) cuando deje de ser una
+  demostración.
+- **Dos proyectos como máximo, 500 MB.** cómodo para los Sprint 1 y 2. Los
+  escaneos no almacenarán payloads crudos de herramientas en Postgres (eso
+  pertenece al almacenamiento de objetos), de modo que el techo está lejos.
 
-### Do not use Supabase Auth
+### No use Supabase Auth
 
-This product has its own auth (see [ADR 0002](./adr/0002-authentication.md)) and
-our tables are not shaped like Supabase's `auth.users`. You are using Supabase for
-**managed Postgres only**. Do not add `supabase-js` to this repository.
+Este producto tiene su propia autenticación (ver
+[ADR 0002](./adr/0002-authentication.md)) y nuestras tablas no tienen la forma
+de `auth.users` de Supabase. Usted está usando Supabase **solo para PostgreSQL
+gestionado**. No agregue `supabase-js` a este repositorio.
 
 ---
 
-## 2. Copy the connection string
+## 2. Copiar la cadena de conexión
 
-**Project Settings → Database → Connection string → the URI tab.**
+**Project Settings → Database → Connection string → la pestaña URI.**
 
-Choose the **Session pooler** card, NOT the Transaction pooler. Copy the URI and
-discard the password placeholder.
+Elija la tarjeta **Session pooler**, no la de Transaction pooler. Copie la URI y
+descarte el marcador de posición de la contraseña.
 
-It looks like:
+Se ve así:
 
 ```
 postgresql://postgres.PROJECTREF:YOUR-PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres
 ```
 
-### Why the Session pooler and not the Transaction pooler
+### Por qué el Session pooler y no el Transaction pooler
 
-Supabase offers three ways in, and the difference is not cosmetic:
+Supabase ofrece tres formas de entrar, y la diferencia no es cosmética:
 
-|                                                              | Direct | Session pooler (5432) | Transaction pooler (6543) |
-| ------------------------------------------------------------ | ------ | --------------------- | ------------------------- |
-| Prepared statements                                          | yes    | yes                   | **no**                    |
-| Cursors spanning statements                                  | yes    | yes                   | **no**                    |
-| Session state (`LISTEN/NOTIFY`, advisory locks, temp tables) | yes    | yes                   | **no**                    |
-| Query pipelining                                             | yes    | yes                   | **no**                    |
-| Counts against your direct-connection quota                  | yes    | no                    | no                        |
+|                                                                              | Direct | Session pooler (5432) | Transaction pooler (6543) |
+| ---------------------------------------------------------------------------- | ------ | --------------------- | ------------------------- |
+| Sentencias preparadas                                                        | sí     | sí                    | **no**                    |
+| Cursores que abarcan sentencias                                              | sí     | sí                    | **no**                    |
+| Estado de sesión (`LISTEN/NOTIFY`, bloqueos asincrónicos, tablas temporales) | sí     | sí                    | **no**                    |
+| Pipelining de consultas                                                      | sí     | sí                    | **no**                    |
+| Cuenta contra su cuota de conexión directa                                   | sí     | no                    | no                        |
 
-The Transaction pooler hands the connection back to the pool after every
-transaction, so anything bound to a session dies. `postgres.js` **pipelines queries
-by default**, and Supabase's own documentation warns that this combination can hang
-or return mismatched rows.
+El Transaction pooler devuelve la conexión a la pool después de cada
+transacción, de modo que todo lo ligado a una sesión muere. `postgres.js`
+**hace pipelining de consultas por defecto**, y la propia documentación de
+Supabase advierte que esta combinación puede colgarse o devolver filas
+desalineadas.
 
-The Session pooler gives you managed Postgres with **none** of those caveats. It
-still does not consume your direct-connection quota, which is the thing you actually
-care about.
+El Session pooler le da PostgreSQL gestionado **sin ninguna** de esas
+advertencias. Tampoco consume su cuota de conexión directa, que es lo que
+realmente le importa.
 
-`packages/db/src/client.ts` already sets `prepare: false`, so even the transaction
-pooler would work — but you would still be running with pipelining disabled. Use the
-Session pooler and the question never arises.
+`packages/db/src/client.ts` ya establece `prepare: false`, de modo que incluso el
+Transaction pooler funcionaría — pero igual estaría ejecutando con el pipelining
+desactivado. Use el Session pooler y la pregunta nunca surge.
 
-**Sprint 2 note:** when scan progress moves to Server-Sent Events on a long-lived
-connection, revisit this. `LISTEN/NOTIFY` needs a session, and it is exactly the
-kind of thing that forces the decision back to a direct connection.
+**Nota del Sprint 2:** cuando el progreso de escaneo pase a Server-Sent Events
+sobre una conexión de larga duración, revise esto. `LISTEN/NOTIFY` necesita una
+sesión, y es exactamente el tipo de cosa que obliga a volver a una conexión
+directa.
 
-### URL-encode the password — this is where it breaks
+### Codificar la contraseña en la URL — ahí es donde falla
 
-If the generated password contains `@ : / ? # [ ] % &`, it must be percent-encoded,
-or the URL parses up to the wrong place and you get a confusing authentication error
-against a password you are sure is correct.
+Si la contraseña generada contiene `@ : / ? # [ ] % &`, debe codificarse con
+porcentajes, o la URL se analiza hasta el lugar equivocado y usted obtiene un
+error de autenticación confuso contra una contraseña de la que está seguro.
 
-| Character | Encode as   |
-| --------- | ----------- |
-| `@`       | `%40`       |
-| `:`       | `%3A`       |
-| `/`       | `%2F`       |
-| `?`       | `%3F`       |
-| `#`       | `%23`       |
-| `[` `]`   | `%5B` `%5D` |
-| `%`       | `%25`       |
+| Carácter | Codificar como |
+| -------- | -------------- |
+| `@`      | `%40`          |
+| `:`      | `%3A`          |
+| `/`      | `%2F`          |
+| `?`      | `%3F`          |
+| `#`      | `%23`          |
+| `[` `]`  | `%5B` `%5D`    |
+| `%`      | `%25`          |
 
-Easiest is to generate your own password with alphanumeric characters only and avoid
-the whole problem.
+Lo más fácil es generar usted mismo una contraseña solo con caracteres
+alfanuméricos y evitar todo el problema.
 
 ---
 
-## 3. Create the local environment file
+## 3. Crear el archivo de entorno local
 
-The root `.env.example` is the source of truth for **names**. Next.js reads
-`.env*` from **its own directory**, so the values file goes in `apps/web/`.
+El `.env.example` de la raíz es la fuente de verdad de los **nombres**. Next.js
+lee `.env*` desde **su propio directorio**, de modo que el archivo de valores va
+en `apps/web/`.
 
 ```powershell
 Copy-Item .env.example apps\web\.env.local
 ```
 
-Then edit `apps/web/.env.local`:
+Luego edite `apps/web/.env.local`:
 
 ```dotenv
 # --- Database ---
@@ -154,49 +164,50 @@ AUTH_URL=http://localhost:3000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### Generate `AUTH_SECRET`
+### Generar `AUTH_SECRET`
 
-Windows has no `openssl` by default. Use Node, which is already installed:
+Windows no tiene `openssl` por defecto. Use Node, que ya está instalado:
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-That prints 44 characters of base64. Paste it in. The app requires a minimum of 32
-characters and will refuse to start without it — this is not a formality: the secret
-signs session cookies, so its length is the entropy an attacker must guess to forge
-one.
+Eso imprime 44 caracteres en base64. Péguelos. La aplicación exige un mínimo de
+32 caracteres y se negará a arrancar sin él — esto no es una formalidad: el
+secreto firma las cookies de sesión, de modo que su longitud es la entropía que
+un atacante debe adivinar para forjar una.
 
-### You do not need SMTP yet
+### Aún no necesita SMTP
 
-Email verification is disabled in Sprint 1, so nothing is sent. Leave the
-`SMTP_*` variables pointing at `localhost:1025` and ignore Mailpit until Sprint 2.
+La verificación de correo está desactivada en el Sprint 1, de modo que no se
+envía nada. Deje las variables `SMTP_*` apuntando a `localhost:1025` e ignore
+Mailpit hasta el Sprint 2.
 
-### `.env.local` is gitignored
+### `.env.local` está en el gitignore
 
-Confirm it never gets committed:
+Confirme que nunca se versiona:
 
 ```powershell
 git check-ignore apps/web/.env.local
 ```
 
-It must print the matching rule. If it prints nothing, stop and fix `.gitignore`
-before doing anything else.
+Debe imprimir la regla que coincide. Si no imprime nada, deténgase y corrija
+`.gitignore` antes de hacer cualquier otra cosa.
 
 ---
 
-## 4. Run the migrations
+## 4. Ejecutar las migraciones
 
-`drizzle-kit migrate` reads `DATABASE_URL` from the environment, and its working
-directory is `packages/db` — so export it for the session rather than creating a
-second config file:
+`drizzle-kit migrate` lee `DATABASE_URL` del entorno, y su directorio de trabajo
+es `packages/db` — así que expórtela para la sesión en lugar de crear un segundo
+archivo de configuración:
 
 ```powershell
 $env:DATABASE_URL = "postgresql://postgres.PROJECTREF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres?sslmode=require"
 pnpm --filter @vuldetected/db run db:migrate
 ```
 
-Expected: three migrations applied in order.
+Esperado: tres migraciones aplicadas en orden.
 
 ```
 0000_enable_citext.sql
@@ -204,15 +215,15 @@ Expected: three migrations applied in order.
 0002_audit_logs_append_only.sql
 ```
 
-`citext` must be its own migration because `users.email` is emitted as `"citext"`
-and Postgres must already know the type at `CREATE TABLE` time. If 0000 ever fails,
-check that the extension is available on your plan.
+`citext` debe ser su propia migración porque `users.email` se emite como
+`"citext"` y Postgres ya debe conocer el tipo en el momento de `CREATE TABLE`. Si
+0000 falla alguna vez, compruebe que la extensión está disponible en su plan.
 
 ---
 
-## 5. Verify the schema landed
+## 5. Verificar que el esquema se aplicó
 
-Paste this into **Supabase → SQL Editor → New query → Run**:
+Pegue esto en **Supabase → SQL Editor → New query → Run**:
 
 ```sql
 -- 1. Every expected table exists
@@ -236,15 +247,16 @@ where table_name = 'users' and column_name = 'email';
 select indexname from pg_indexes where schemaname = 'public' order by indexname;
 ```
 
-Query 1 must list `accounts`, `audit_logs`, `sessions`, `users`,
-`verification_tokens`. Query 3 must report `udt_name = citext` — if it says `text`,
-the extension was not applied and email case-insensitivity is silently absent.
+La consulta 1 debe listar `accounts`, `audit_logs`, `sessions`, `users`,
+`verification_tokens`. La consulta 3 debe informar `udt_name = citext` — si dice
+`text`, la extensión no se aplicó y la insensibilidad a mayúsculas del correo
+ausente en silencio.
 
 ---
 
-## 6. Prove the audit trail is append-only
+## 6. Probar que el registro de auditoría es solo-append
 
-This is a security control, so prove it does something:
+Esto es un control de seguridad, así que demuestre que hace algo:
 
 ```sql
 insert into audit_logs (action, metadata) values ('manual.test', '{}');
@@ -252,78 +264,79 @@ update audit_logs set action = 'tampered' where action = 'manual.test';  -- must
 delete from audit_logs where action = 'manual.test';                     -- must FAIL
 ```
 
-Both mutations must raise an exception. If the update succeeds, the trigger is
-missing and your audit trail is fiction. Clean up with:
+Ambas mutaciones deben lanzar una excepción. Si la actualización funciona, el
+trigger falta y su registro de auditoría es ficción. Limpie con:
 
 ```sql
 truncate audit_logs;
 ```
 
-`TRUNCATE` deliberately bypasses the trigger — it is a DDL statement, not a row
-mutation. That is why it is the documented escape hatch for maintenance.
+`TRUNCATE` elude deliberadamente el trigger — es una sentencia DDL, no una
+mutación de filas. Ésa es la razón por la que es la vía de mantenimiento
+documentada.
 
 ---
 
-## 7. Start the app
+## 7. Iniciar la aplicación
 
 ```powershell
 pnpm dev
 ```
 
-Wait for `ready` and open <http://localhost:3000>.
+Espere `ready` y abra <http://localhost:3000>.
 
 ---
 
-## 8. Sprint 1 smoke test
+## 8. Prueba de humo del Sprint 1
 
-Do these in order. Each one is testing a specific claim.
+Haga estas en orden. Cada una prueba una afirmación concreta.
 
-### Design system
+### Sistema de diseño
 
-| #   | Action                              | Expected                                                                                                                              |
-| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | Open `/dev/sprint-1`                | Every primitive renders: buttons, all 7 severity badges, dense table, 4 alert variants, progress, empty state, full token swatch grid |
-| T2  | Toggle your OS to dark mode, reload | Same page, dark tokens. No `dark:` classes exist in the source, so this works via CSS alone                                           |
-| T3  | Read a severity badge               | It has a **shape** (octagon/triangle/diamond/circle/square) **and** a text label — not color alone                                    |
-| T4  | Home → Register, click through      | Focus ring is visible on keyboard `Tab`. No mouse needed to see where you are                                                         |
+| #   | Acción                                               | Esperado                                                                                                                                                                  |
+| --- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | Abrir `/dev/sprint-1`                                | Cada primitiva se renderiza: botones, las 7 insignias de severidad, tabla densa, 4 variantes de alerta, progreso, estado vacío, cuadrícula completa de muestras de tokens |
+| T2  | Cambiar su sistema operativo a modo oscuro, recargar | Misma página, tokens oscuros. No existen clases `dark:` en el código fuente, de modo que esto funciona solo con CSS                                                       |
+| T3  | Leer una insignia de severidad                       | Tiene una **forma** (octágono/triángulo/diamante/círculo/cuadrado) **y** una etiqueta de texto — no solo color                                                            |
+| T4  | Inicio → Registro, recorrer con clics                | El anillo de foco es visible con el tabulador del teclado. No hace falta ratón para ver dónde está usted                                                                  |
 
-### Registration and storage
+### Registro y almacenamiento
 
-| #   | Action                                                     | Expected                                                              |
-| --- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
-| T5  | Register `owner@vuldetected.test` with a 12+ char password | Redirect to `/dashboard`                                              |
-| T6  | SQL: `select email, status from users;`                    | One row. `email` lowercase, `status = active`                         |
-| T7  | SQL: `select left(password, 10) from accounts;`            | Starts with `$argon2id$`. **If you see the plaintext password, stop** |
-| T8  | SQL: `select action from audit_logs order by created_at;`  | Contains `user.registered`                                            |
-| T9  | Reload `/dashboard`                                        | Still signed in. The session survived a fresh request                 |
+| #   | Acción                                                                  | Esperado                                                                    |
+| --- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| T5  | Registrar `owner@vuldetected.test` con una contraseña de 12+ caracteres | Redirección a `/dashboard`                                                  |
+| T6  | SQL: `select email, status from users;`                                 | Una fila. `email` en minúsculas, `status = active`                          |
+| T7  | SQL: `select left(password, 10) from accounts;`                         | Empieza con `$argon2id$`. **Si ve la contraseña en texto plano, deténgase** |
+| T8  | SQL: `select action from audit_logs order by created_at;`               | Contiene `user.registered`                                                  |
+| T9  | Recargar `/dashboard`                                                   | Sigue con la sesión abierta. La sesión sobrevivió a una petición nueva      |
 
-### The two tests that matter
+### Las dos pruebas que importan
 
-| #   | Action                                                                        | Expected                                                                                                      |
-| --- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| T10 | Sign out. Try to register the **same** email again with a wrong password      | Error is byte-identical to a wrong-password error below. If it differs, you can enumerate registered accounts |
-| T11 | Sign in with `owner@vuldetected.test` + a **wrong** password 6 times in a row | Same generic error every time, and by the 6th the account is locked — the correct password stops working      |
-| T12 | Sign in with a **nonexistent** email + any password                           | **Exactly** the same message as T11. This is the enumeration oracle being closed                              |
+| #   | Acción                                                                                          | Esperado                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| T10 | Cerrar la sesión. Intentar registrar de nuevo el **mismo** correo con una contraseña incorrecta | El error es idéntico byte a byte al error de contraseña incorrecta de más abajo. Si difiere, puede enumerar las cuentas registradas |
+| T11 | Iniciar sesión con `owner@vuldetected.test` + una contraseña **incorrecta** 6 veces seguidas    | El mismo error genérico cada vez, y con el 6.º la cuenta queda bloqueada — la contraseña correcta deja de funcionar                 |
+| T12 | Iniciar sesión con un correo **inexistente** + cualquier contraseña                             | **Exactamente** el mismo mensaje que T11. Éste es el oráculo de enumeración siendo cerrado                                          |
 
-T10–T12 are the acceptance criteria for the auth work. Everything else in Sprint 1
-is scaffolding; these three are the product.
+T10–T12 son los criterios de aceptación del trabajo de autenticación. Todo lo
+demás en el Sprint 1 es andamiaje; estas tres son el producto.
 
-### Session handling
+### Manejo de la sesión
 
-| #   | Action                                                              | Expected                                                                                                                        |
-| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| T13 | Browser devtools → Application → Cookies                            | The session cookie has `HttpOnly` **and** `SameSite=Lax`                                                                        |
-| T14 | Copy the cookie value; SQL: `select left(token, 10) from sessions;` | Cookie and stored value match, and both are digests, not the raw token. See ADR 0002 for why hashing twice is not possible here |
+| #   | Acción                                                                     | Esperado                                                                                                                                                       |
+| --- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T13 | Herramientas de desarrollo del navegador → Application → Cookies           | La cookie de sesión tiene `HttpOnly` **y** `SameSite=Lax`                                                                                                      |
+| T14 | Copiar el valor de la cookie; SQL: `select left(token, 10) from sessions;` | La cookie y el valor almacenado coinciden, y ambos son resúmenes y no el token en crudo. Ver el ADR 0002 para saber por qué aquí no se puede hashear dos veces |
 
-### Logout
+### Cierre de sesión
 
-| #   | Action   | Expected                                                                                 |
-| --- | -------- | ---------------------------------------------------------------------------------------- |
-| T15 | Sign out | Redirect to `/login`; `/dashboard` redirects again; `auth.logged_out` is in `audit_logs` |
+| #   | Acción           | Esperado                                                                                        |
+| --- | ---------------- | ----------------------------------------------------------------------------------------------- |
+| T15 | Cerrar la sesión | Redirección a `/login`; `/dashboard` vuelve a redirigir; `auth.logged_out` está en `audit_logs` |
 
 ---
 
-## 9. Tear down
+## 9. Eliminar los recursos creados
 
 ```sql
 drop table if exists audit_logs cascade;
@@ -333,56 +346,58 @@ drop table if exists accounts cascade;
 drop table if exists users cascade;
 ```
 
-The `__drizzle_migrations` table can stay: it records that migrations ran. Drop it
-too if you want a truly clean slate.
+La tabla `__drizzle_migrations` puede quedarse: registra que las migraciones se
+ejecutaron. Elimínela también si quiere una pizarra realmente limpia.
 
 ---
 
-## Troubleshooting
+## Solución de problemas
 
-| Symptom                                                         | Cause                                      | Fix                                                                                          |
-| --------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `password authentication failed for user "postgres.PROJECTREF"` | Password not URL-encoded, or wrong project | Re-copy the string; percent-encode `@ : / ? # [ ] %`                                         |
-| `ENOTFOUND aws-0-...pooler.supabase.com`                        | Corporate DNS or proxy blocking Supavisor  | Try the direct connection `db.PROJECTREF.supabase.co:5432`                                   |
-| `error: prepared statement "s0" already exists`                 | Transaction pooler (6543)                  | Use the Session pooler (5432)                                                                |
-| `relation "users" does not exist`                               | Migrations never ran                       | Re-run step 4 and confirm it printed three migrations                                        |
-| `extension "citext" is not available`                           | Plan restriction                           | Check the SQL Editor for the extension list; Supabase includes `citext` on all current plans |
-| `AUTH_SECRET is required` at `/dashboard`                       | `.env.local` missing or not in `apps/web/` | Confirm the path; restart `pnpm dev`                                                         |
-| Login 500s, works after a restart                               | Env validated lazily on first request      | See section 11                                                                               |
-| `Can't reach database server`                                   | Free-tier project paused after 7 days idle | Resume it from the dashboard                                                                 |
-
----
-
-## 10. What this runbook does NOT prove
-
-Sprint 1 contains no scanner, so none of the following are tested here. They are
-Sprint 2:
-
-- Domain ownership verification — the legal gate before any scan.
-- SSRF hardening in the worker.
-- Real-time progress streaming.
-- Severity classification.
-
-Do not describe Sprint 1 as "the scanner works". It is account management plus a
-design system.
+| Síntoma                                                         | Causa                                                         | Corrección                                                                                                |
+| --------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `password authentication failed for user "postgres.PROJECTREF"` | Contraseña sin codificar en URL, o proyecto equivocado        | Vuelva a copiar la cadena; codifique con porcentajes `@ : / ? # [ ] %`                                    |
+| `ENOTFOUND aws-0-...pooler.supabase.com`                        | DNS corporativo o proxy que bloquea Supavisor                 | Pruebe la conexión directa `db.PROJECTREF.supabase.co:5432`                                               |
+| `error: prepared statement "s0" already exists`                 | Transaction pooler (6543)                                     | Use el Session pooler (5432)                                                                              |
+| `relation "users" does not exist`                               | Las migraciones nunca se ejecutaron                           | Vuelva a ejecutar el paso 4 y confirme que imprimió tres migraciones                                      |
+| `extension "citext" is not available`                           | Restricción del plan                                          | Revise el SQL Editor para la lista de extensiones; Supabase incluye `citext` en todos los planes actuales |
+| `AUTH_SECRET is required` en `/dashboard`                       | Falta `.env.local` o no está en `apps/web/`                   | Confirme la ruta; reinicie `pnpm dev`                                                                     |
+| Errores 500 en el inicio de sesión, funciona tras un reinicio   | Entorno validado de forma diferida en la primera solicitud    | Ver la sección 11                                                                                         |
+| `Can't reach database server`                                   | Proyecto del plan gratuito pausado tras 7 días de inactividad | Reactívelo desde el panel                                                                                 |
 
 ---
 
-## 11. Known gap: the environment file lives in two places
+## 10. Lo que este runbook NO prueba
 
-The root `.env.example` owns the **names**, but the values file must sit in
-`apps/web/` because that is where Next.js reads from — and `drizzle-kit` reads from
-whatever `process.env` the shell exports. Step 4 works around this with
-`$env:DATABASE_URL`.
+El Sprint 1 no contiene ningún escáner, de modo que nada de lo siguiente se prueba
+aquí. Son del Sprint 2:
 
-A permanent fix is available and cheap on this machine: Node 22 supports
-`--env-file-if-exists`, verified working on v22.14.0, so the dev and migrate scripts
-can load one root `.env.local` regardless of the package that starts them:
+- Verificación de la propiedad del dominio — el control legal antes de cualquier
+  escaneo.
+- Endurecimiento SSRF en el worker.
+- Transmisión de progreso en tiempo real.
+- Clasificación de severidad.
+
+No describa el Sprint 1 como "el escáner funciona". Es gestión de cuentas más un
+sistema de diseño.
+
+---
+
+## 11. Brecha conocida: el archivo de entorno existe en dos lugares
+
+El `.env.example` de la raíz es dueño de los **nombres**, pero el archivo de
+valores debe estar en `apps/web/` porque ahí es donde lee Next.js — y
+`drizzle-kit` lee el `process.env` que exporte el shell. El paso 4 sortea esto
+mediante `$env:DATABASE_URL`.
+
+Existe una corrección permanente y barata en esta máquina: Node 22 admite
+`--env-file-if-exists`, verificado funcionando en v22.14.0, de modo que los
+scripts de desarrollo y de migración pueden cargar un único `.env.local` de la
+raíz sin importar el paquete que los inicie:
 
 ```json
 "dev": "cross-env NODE_OPTIONS=--env-file-if-exists=../../.env.local next dev"
 ```
 
-That is deliberately **not** done yet. It changes how every package resolves
-configuration, and it is better introduced as its own change than folded into a
-verification run.
+Eso deliberadamente **no** se ha hecho todavía. Cambia la forma en que cada
+paquete resuelve la configuración, y es mejor introducirlo como un cambio
+propio que mezclarlo en una ejecución de verificación.
