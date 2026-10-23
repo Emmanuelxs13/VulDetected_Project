@@ -155,6 +155,10 @@
         "created": "Created",
         "detail": "Detail",
         "viewDetails": "View details"
+      },
+      "export": {
+        "csv": "Export CSV",
+        "json": "Export JSON"
       }
     },
     "status": {

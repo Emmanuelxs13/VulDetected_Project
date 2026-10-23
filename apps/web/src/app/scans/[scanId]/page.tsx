@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { and, desc, domains, eq, findings, scanEvents, scans } from '@vuldetected/db';
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -184,8 +185,20 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('detail.findings.title')}</CardTitle>
-          <CardDescription>{t('detail.findings.description')}</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>{t('detail.findings.title')}</CardTitle>
+              <CardDescription>{t('detail.findings.description')}</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button asChild variant="ghost" size="sm">
+                <a href={`/api/scans/${scan.id}/export?format=csv`}>{t('export.csv')}</a>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <a href={`/api/scans/${scan.id}/export?format=json`}>{t('export.json')}</a>
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <FindingsList findings={findingList} />
