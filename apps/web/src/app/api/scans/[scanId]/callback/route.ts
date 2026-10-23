@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
+import { classifyFinding } from '@/lib/severity/classify';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,17 +100,20 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
           for (const f of body.findings) {
             if (!f || !f.key) continue;
             try {
+              const checkName = f.check;
+              const evidence = f.evidence ?? {};
+              const { severity } = classifyFinding(checkName, evidence, f.title ?? '');
               await tx
                 .insert(findings)
                 .values({
                   scanId,
                   findingKey: f.key,
-                  severity: 'unclassified',
-                  checkName: f.check,
+                  severity,
+                  checkName,
                   title: f.title,
                   description: f.description ?? '',
                   affectedUrl: f.affected_url ?? f.affectedUrl ?? body.base_url ?? '',
-                  evidence: f.evidence ?? {},
+                  evidence,
                   raw: f.raw ?? {},
                 })
                 .onConflictDoNothing();
