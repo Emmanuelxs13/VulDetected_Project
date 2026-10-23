@@ -112,7 +112,12 @@
     "findings": {
       "title": "Findings are not aggregated here yet",
       "description": "Open a scan to see its findings. CVE correlation is not built yet."
-    }
+    },
+    "severityBreakdown": "Severity breakdown",
+    "scans": "Scans",
+    "findingsList": "All findings",
+    "filter": "Filter",
+    "trend": "Posture trend"
   },
   "notFound": {
     "title": "Page not found",
@@ -264,8 +269,27 @@
         "affectedUrl": "Affected URL"
       },
       "severity": {
-        "unclassified": "Unclassified"
+        "unclassified": "Unclassified",
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "info": "Info"
+      },
+      "viewDetails": "View details",
+      "detail": {
+        "metadataTitle": "Finding details",
+        "remediation": {
+          "developer": "Developer remediation",
+          "sysadmin": "System administrator remediation",
+          "business": "Business stakeholder remediation",
+          "codeFixes": "Copyable fix code"
+        }
       }
+    },
+    "export": {
+      "csv": "Export CSV",
+      "json": "Export JSON"
     }
   },
   "dev": {

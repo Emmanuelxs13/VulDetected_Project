@@ -112,7 +112,12 @@
     "findings": {
       "title": "Los hallazgos todavía no se agregan aquí",
       "description": "Abre un escaneo para ver sus hallazgos. La correlación de CVE todavía no está implementada."
-    }
+    },
+    "severityBreakdown": "Desglose por severidad",
+    "scans": "Escaneos",
+    "findingsList": "Todos los hallazgos",
+    "filter": "Filtrar",
+    "trend": "Tendencia de postura"
   },
   "notFound": {
     "title": "Página no encontrada",
@@ -264,8 +269,27 @@
         "affectedUrl": "URL afectada"
       },
       "severity": {
-        "unclassified": "Sin clasificar"
+        "unclassified": "Sin clasificar",
+        "critical": "Crítica",
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja",
+        "info": "Informativa"
+      },
+      "viewDetails": "Ver detalles",
+      "detail": {
+        "metadataTitle": "Detalles del hallazgo",
+        "remediation": {
+          "developer": "Remediación para desarrollador",
+          "sysadmin": "Remediación para administrador de sistemas",
+          "business": "Remediación para negocio",
+          "codeFixes": "Código de corrección copiable"
+        }
       }
+    },
+    "export": {
+      "csv": "Exportar CSV",
+      "json": "Exportar JSON"
     }
   },
   "dev": {

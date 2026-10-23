@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -8,11 +9,21 @@ import {
   CardTitle,
   Container,
   EmptyState,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@vuldetected/ui';
 import { InboxIcon } from '@vuldetected/ui';
+import Link from 'next/link';
+import { desc, domains, eq, findings, scans } from '@vuldetected/db';
 import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
+import { db } from '@/lib/db';
+import { getSeverityVariant } from '@/lib/severity/classify';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('dashboard');
@@ -57,6 +68,47 @@ export default async function DashboardPage() {
   }
 
   const { user } = session;
+  const userId = user.id;
+
+  const [scanList, findingList] = await Promise.all([
+    db()
+      .select({
+        id: scans.id,
+        targetUrl: scans.targetUrl,
+        status: scans.status,
+        createdAt: scans.createdAt,
+        hostname: domains.normalizedHostname,
+      })
+      .from(scans)
+      .innerJoin(domains, eq(scans.domainId, domains.id))
+      .where(eq(domains.userId, userId))
+      .orderBy(desc(scans.createdAt))
+      .limit(20),
+    db()
+      .select({
+        id: findings.id,
+        severity: findings.severity,
+        checkName: findings.checkName,
+        title: findings.title,
+        affectedUrl: findings.affectedUrl,
+        scanId: findings.scanId,
+      })
+      .from(findings)
+      .innerJoin(scans, eq(findings.scanId, scans.id))
+      .innerJoin(domains, eq(scans.domainId, domains.id))
+      .where(eq(domains.userId, userId))
+      .orderBy(desc(findings.createdAt))
+      .limit(50),
+  ]);
+
+  const severityCounts = findingList.reduce(
+    (acc, f) => {
+      const key = f.severity === 'unclassified' ? 'unclassified' : f.severity;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 
   return (
     <Container size="narrow" className="flex flex-col gap-6 py-12">
@@ -119,11 +171,128 @@ export default async function DashboardPage() {
         empty state says so instead of rendering a fake-zero dashboard, because a
         fabricated "0 critical findings" would be indistinguishable from a real one.
       */}
-      <EmptyState
-        icon={<InboxIcon className="h-4 w-4" />}
-        title={t('findings.title')}
-        description={t('findings.description')}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('severityBreakdown')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {['critical', 'high', 'medium', 'low', 'info', 'unclassified'].map((sev) => (
+              <Badge key={sev} variant={getSeverityVariant(sev)}>
+                {sev === 'unclassified'
+                  ? t('findings.severity.unclassified')
+                  : t.has(`findings.severity.${sev}` as never)
+                    ? t(`findings.severity.${sev}` as never)
+                    : sev}{' '}
+                {severityCounts[sev] || 0}
+              </Badge>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('scans')}</CardTitle>
+          <CardDescription>{t('list.yourScans.description')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {scanList.length === 0 ? (
+            <EmptyState title={t('findings.title')} description={t('findings.description')} />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('list.table.target')}</TableHead>
+                  <TableHead>{t('list.table.status')}</TableHead>
+                  <TableHead>{t('list.table.created')}</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scanList.map((scan) => (
+                  <TableRow key={scan.id}>
+                    <TableCell>
+                      <span className="font-mono text-xs">{scan.targetUrl}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="neutral">{scan.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <time
+                        className="tabular text-xs text-text-muted"
+                        dateTime={scan.createdAt.toISOString()}
+                      >
+                        {scan.createdAt.toISOString().slice(0, 16).replace('T', ' ')}
+                      </time>
+                    </TableCell>
+                    <TableCell>
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/scans/${scan.id}`}>{t('list.table.viewDetails')}</Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('findingsList')}</CardTitle>
+          <CardDescription>{t('detail.findings.description')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {findingList.length === 0 ? (
+            <EmptyState
+              icon={<InboxIcon className="h-4 w-4" />}
+              title={t('findings.title')}
+              description={t('findings.description')}
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('findings.table.severity')}</TableHead>
+                  <TableHead>{t('findings.table.finding')}</TableHead>
+                  <TableHead>{t('findings.table.affectedUrl')}</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {findingList.map((finding) => (
+                  <TableRow key={finding.id}>
+                    <TableCell>
+                      <Badge variant={getSeverityVariant(finding.severity)}>
+                        {finding.severity === 'unclassified'
+                          ? t('findings.severity.unclassified')
+                          : t.has(`findings.severity.${finding.severity}` as never)
+                            ? t(`findings.severity.${finding.severity}` as never)
+                            : finding.severity}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs">{finding.title}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="break-all font-mono text-xs">{finding.affectedUrl}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/scans/${finding.scanId}/findings/${finding.id}`}>
+                          {t('findings.viewDetails')}
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </Container>
   );
 }
