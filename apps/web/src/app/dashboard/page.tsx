@@ -16,14 +16,20 @@ import {
   TableHeader,
   TableRow,
 } from '@vuldetected/ui';
-import { InboxIcon } from '@vuldetected/ui';
 import Link from 'next/link';
-import { desc, domains, eq, findings, scans } from '@vuldetected/db';
+import { desc, domains, eq, scans } from '@vuldetected/db';
 import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
+import { FindingsList } from '@/features/scans/components/findings-list';
+import { FindingsPagination } from '@/features/scans/components/findings-pagination';
+import {
+  getDomainPostureTrends,
+  getSeverityCounts,
+  listFindingsPage,
+} from '@/features/scans/queries/findings-page';
 import { db } from '@/lib/db';
-import { getSeverityVariant } from '@/lib/severity/classify';
+import { SEVERITY_ORDER, getSeverityVariant } from '@/lib/severity/classify';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('dashboard');
@@ -54,9 +60,22 @@ export async function generateMetadata(): Promise<Metadata> {
  *     already sent.
  *
  * See `docs/adr/0002-authentication.md` §4.
+ *
+ * ## WHY EVERY READ IS BOUNDED
+ *
+ * A domain can hold tens of thousands of findings. The severity breakdown is a
+ * `GROUP BY` that returns at most six rows, the findings table is a keyset page of
+ * 50, and the trend reads the newest 40 completed scans. No query here scales with
+ * the size of the findings table (roadmap exit criterion 4).
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ severity?: string; cursor?: string }>;
+}) {
+  const query = (await searchParams) || {};
   const t = await getTranslations('dashboard');
+  const tScan = await getTranslations('scan');
   const session = await getServerSession();
 
   if (!session?.user) {
@@ -70,7 +89,7 @@ export default async function DashboardPage() {
   const { user } = session;
   const userId = user.id;
 
-  const [scanList, findingList] = await Promise.all([
+  const [scanList, findingsPage, severityTotals, trends] = await Promise.all([
     db()
       .select({
         id: scans.id,
@@ -84,31 +103,10 @@ export default async function DashboardPage() {
       .where(eq(domains.userId, userId))
       .orderBy(desc(scans.createdAt))
       .limit(20),
-    db()
-      .select({
-        id: findings.id,
-        severity: findings.severity,
-        checkName: findings.checkName,
-        title: findings.title,
-        affectedUrl: findings.affectedUrl,
-        scanId: findings.scanId,
-      })
-      .from(findings)
-      .innerJoin(scans, eq(findings.scanId, scans.id))
-      .innerJoin(domains, eq(scans.domainId, domains.id))
-      .where(eq(domains.userId, userId))
-      .orderBy(desc(findings.createdAt))
-      .limit(50),
+    listFindingsPage({ ownerUserId: userId, severity: query.severity, cursor: query.cursor }),
+    getSeverityCounts(userId),
+    getDomainPostureTrends(userId),
   ]);
-
-  const severityCounts = findingList.reduce(
-    (acc, f) => {
-      const key = f.severity === 'unclassified' ? 'unclassified' : f.severity;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
 
   return (
     <Container size="narrow" className="flex flex-col gap-6 py-12">
@@ -166,46 +164,106 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/*
-        Sprint 1 produced no scanner, so there is genuinely nothing to show. The
-        empty state says so instead of rendering a fake-zero dashboard, because a
-        fabricated "0 critical findings" would be indistinguishable from a real one.
-      */}
       <Card>
         <CardHeader>
           <CardTitle>{t('severityBreakdown')}</CardTitle>
+          <CardDescription>{t('filterDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button asChild variant={!query.severity ? 'secondary' : 'ghost'} size="sm">
+            <Link href="/dashboard">
+              {t('filterAll')} ({severityTotals.total})
+            </Link>
+          </Button>
+          {SEVERITY_ORDER.map((severity) => (
+            <Button
+              asChild
+              key={severity}
+              variant={query.severity === severity ? 'secondary' : 'ghost'}
+              size="sm"
+            >
+              <Link href={`/dashboard?severity=${severity}`}>
+                <Badge variant={getSeverityVariant(severity)}>
+                  {tScan(`findings.severity.${severity}`)} ({severityTotals.counts[severity]})
+                </Badge>
+              </Link>
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('trend.title')}</CardTitle>
+          <CardDescription>{t('trend.description')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {['critical', 'high', 'medium', 'low', 'info', 'unclassified'].map((sev) => (
-              <Badge key={sev} variant={getSeverityVariant(sev)}>
-                {sev === 'unclassified'
-                  ? t('findings.severity.unclassified')
-                  : t.has(`findings.severity.${sev}` as never)
-                    ? t(`findings.severity.${sev}` as never)
-                    : sev}{' '}
-                {severityCounts[sev] || 0}
-              </Badge>
-            ))}
-          </div>
+          {trends.length === 0 ? (
+            <p className="text-sm text-text-muted">{t('trend.empty')}</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('trend.table.domain')}</TableHead>
+                  <TableHead>{t('trend.table.latest')}</TableHead>
+                  <TableHead>{t('trend.table.delta')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {trends.map((trend) => (
+                  <TableRow key={trend.latestScanId}>
+                    <TableCell>
+                      <span className="font-mono text-xs">{trend.hostname}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/scans/${trend.latestScanId}`}
+                        className="text-xs hover:underline"
+                      >
+                        {trend.latestRisky} {t('trend.riskyFindings')}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {trend.delta === null ? (
+                        <Badge variant="unknown">{t('trend.firstScan')}</Badge>
+                      ) : trend.delta < 0 ? (
+                        <Badge variant="low">
+                          {t('trend.improved')} ({trend.delta})
+                        </Badge>
+                      ) : trend.delta > 0 ? (
+                        <Badge variant="high">
+                          {t('trend.worsened')} (+{trend.delta})
+                        </Badge>
+                      ) : (
+                        <Badge variant="info">{t('trend.unchanged')}</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>{t('scans')}</CardTitle>
-          <CardDescription>{t('list.yourScans.description')}</CardDescription>
+          <CardDescription>{t('scansDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           {scanList.length === 0 ? (
-            <EmptyState title={t('findings.title')} description={t('findings.description')} />
+            <EmptyState
+              title={tScan('list.empty.title')}
+              description={tScan('list.empty.description')}
+            />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('list.table.target')}</TableHead>
-                  <TableHead>{t('list.table.status')}</TableHead>
-                  <TableHead>{t('list.table.created')}</TableHead>
+                  <TableHead>{tScan('list.table.domain')}</TableHead>
+                  <TableHead>{tScan('list.table.status')}</TableHead>
+                  <TableHead>{tScan('list.table.created')}</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -213,10 +271,14 @@ export default async function DashboardPage() {
                 {scanList.map((scan) => (
                   <TableRow key={scan.id}>
                     <TableCell>
-                      <span className="font-mono text-xs">{scan.targetUrl}</span>
+                      <span className="font-mono text-xs">{scan.hostname}</span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="neutral">{scan.status}</Badge>
+                      <Badge variant="neutral">
+                        {tScan.has(`status.${scan.status}` as never)
+                          ? tScan(`status.${scan.status}` as never)
+                          : scan.status}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <time
@@ -228,7 +290,7 @@ export default async function DashboardPage() {
                     </TableCell>
                     <TableCell>
                       <Button asChild variant="ghost" size="sm">
-                        <Link href={`/scans/${scan.id}`}>{t('list.table.viewDetails')}</Link>
+                        <Link href={`/scans/${scan.id}`}>{tScan('list.table.viewDetails')}</Link>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -242,55 +304,16 @@ export default async function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>{t('findingsList')}</CardTitle>
-          <CardDescription>{t('detail.findings.description')}</CardDescription>
+          <CardDescription>{t('findings.description')}</CardDescription>
         </CardHeader>
-        <CardContent>
-          {findingList.length === 0 ? (
-            <EmptyState
-              icon={<InboxIcon className="h-4 w-4" />}
-              title={t('findings.title')}
-              description={t('findings.description')}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('findings.table.severity')}</TableHead>
-                  <TableHead>{t('findings.table.finding')}</TableHead>
-                  <TableHead>{t('findings.table.affectedUrl')}</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {findingList.map((finding) => (
-                  <TableRow key={finding.id}>
-                    <TableCell>
-                      <Badge variant={getSeverityVariant(finding.severity)}>
-                        {finding.severity === 'unclassified'
-                          ? t('findings.severity.unclassified')
-                          : t.has(`findings.severity.${finding.severity}` as never)
-                            ? t(`findings.severity.${finding.severity}` as never)
-                            : finding.severity}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs">{finding.title}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="break-all font-mono text-xs">{finding.affectedUrl}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/scans/${finding.scanId}/findings/${finding.id}`}>
-                          {t('findings.viewDetails')}
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+        <CardContent className="flex flex-col gap-4">
+          <FindingsList findings={findingsPage.rows} />
+          <FindingsPagination
+            basePath="/dashboard"
+            params={{ severity: query.severity }}
+            nextCursor={findingsPage.nextCursor}
+            isPaged={Boolean(query.cursor)}
+          />
         </CardContent>
       </Card>
     </Container>

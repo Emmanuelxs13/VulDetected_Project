@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyFinding, getSeverityVariant } from './classify';
+import { RULE_SEVERITIES, classifyFinding, getSeverityVariant } from './classify';
 
 describe('classifyFinding', () => {
   it('treats a missing HTTPS endpoint as high', () => {
@@ -72,6 +72,31 @@ describe('classifyFinding', () => {
     const first = classifyFinding('security_headers', { header: 'content-security-policy' });
     const second = classifyFinding('security_headers', { header: 'content-security-policy' });
     expect(first).toEqual(second);
+  });
+
+  it('never produces a severity outside the declared set for its rule', () => {
+    const samples: Array<{ check: string; evidence: Record<string, unknown>; title?: string }> = [
+      { check: 'tls', evidence: {} },
+      { check: 'redirects', evidence: {} },
+      { check: 'security_headers', evidence: { header: 'strict-transport-security' } },
+      { check: 'security_headers', evidence: { header: 'content-security-policy' } },
+      { check: 'security_headers', evidence: { header: 'x-frame-options' } },
+      { check: 'security_headers', evidence: { header: 'x-content-type-options' } },
+      { check: 'security_headers', evidence: { header: 'referrer-policy' } },
+      { check: 'security_headers', evidence: { header: 'permissions-policy' } },
+      { check: 'security_headers', evidence: { header: 'something-new' } },
+      { check: 'cookies', evidence: {}, title: 'Cookie missing Secure flag' },
+      { check: 'cookies', evidence: {}, title: 'Cookie missing HttpOnly flag' },
+      { check: 'cookies', evidence: {}, title: 'Cookie missing SameSite attribute' },
+      { check: 'cookies', evidence: {}, title: 'Cookie without SameSite' },
+    ];
+
+    for (const sample of samples) {
+      const rule = sample.check as keyof typeof RULE_SEVERITIES;
+      const { severity } = classifyFinding(sample.check, sample.evidence, sample.title);
+      expect(RULE_SEVERITIES[rule], `undeclared rule ${sample.check}`).toBeDefined();
+      expect(RULE_SEVERITIES[rule]).toContain(severity);
+    }
   });
 });
 

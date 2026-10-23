@@ -1,7 +1,9 @@
 ﻿import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { CRITICAL_HIGH_RULES, remediationRegistry } from './registry';
+import { CRITICAL_HIGH_RULES, RULE_SEVERITIES } from '@/lib/severity/classify';
+
+import { remediationRegistry } from './registry';
 
 /**
  * Sprint 3 exit criteria enforced by fail-fast assertions:
@@ -54,13 +56,38 @@ describe('remediation registry', () => {
       expect(entry, `missing remediation for ${ruleKey}`).toBeDefined();
       if (!entry) continue;
 
-      expect(entry.severity === 'critical' || entry.severity === 'high').toBe(true);
+      expect(
+        entry.severities.some((severity) => severity === 'critical' || severity === 'high'),
+      ).toBe(true);
       for (const guide of [entry.developerGuide, entry.sysadminGuide, entry.businessGuide]) {
         expect(guide.title.length).toBeGreaterThan(0);
         expect(guide.steps.length).toBeGreaterThan(0);
       }
       expect(entry.codeFixes.length).toBeGreaterThan(0);
       expect(entry.version.length).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * The classifier and the registry must agree on what a rule can produce.
+   *
+   * Without this, a rule could start emitting `high` while the registry still
+   * describes it as `medium` — a High finding with no High-level guidance, which
+   * is exactly what the roadmap makes a build failure.
+   */
+  it('declares the same severities as the classifier for every rule', () => {
+    for (const [ruleKey, severities] of Object.entries(RULE_SEVERITIES)) {
+      const entry = remediationRegistry.find((candidate) => candidate.ruleKey === ruleKey);
+      expect(entry, `missing remediation for ${ruleKey}`).toBeDefined();
+      if (!entry) continue;
+
+      expect([...entry.severities].sort()).toEqual([...severities].sort());
+    }
+  });
+
+  it('has no remediation entry for a rule the classifier does not know', () => {
+    for (const entry of remediationRegistry) {
+      expect(Object.keys(RULE_SEVERITIES)).toContain(entry.ruleKey);
     }
   });
 

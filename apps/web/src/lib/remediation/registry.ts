@@ -1,8 +1,15 @@
+import type { Severity } from '@/lib/severity/classify';
+
 export type AudienceGuide = { title: string; steps: string[]; notes?: string[] };
 
 export interface RemediationEntry {
   ruleKey: string;
-  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  /**
+   * Every severity this rule can produce. Mirrors `RULE_SEVERITIES` in the
+   * classifier; `completeness.test.ts` fails when the two drift apart, which is
+   * what makes "a High finding never lacks guidance" a build-time guarantee.
+   */
+  severities: readonly Severity[];
   version: string;
   developerGuide: AudienceGuide;
   sysadminGuide: AudienceGuide;
@@ -32,7 +39,7 @@ export interface RemediationEntry {
 export const remediationRegistry: RemediationEntry[] = [
   {
     ruleKey: 'security_headers',
-    severity: 'medium',
+    severities: ['high', 'medium', 'low', 'info'],
     version: '1.0',
     developerGuide: {
       title: 'Add the missing security headers',
@@ -72,7 +79,7 @@ export const remediationRegistry: RemediationEntry[] = [
   },
   {
     ruleKey: 'cookies',
-    severity: 'medium',
+    severities: ['medium', 'low'],
     version: '1.0',
     developerGuide: {
       title: 'Harden the cookie flags',
@@ -111,7 +118,7 @@ export const remediationRegistry: RemediationEntry[] = [
   },
   {
     ruleKey: 'tls',
-    severity: 'high',
+    severities: ['high'],
     version: '1.0',
     developerGuide: {
       title: 'Serve the site over HTTPS',
@@ -146,7 +153,7 @@ export const remediationRegistry: RemediationEntry[] = [
   },
   {
     ruleKey: 'redirects',
-    severity: 'high',
+    severities: ['high'],
     version: '1.0',
     developerGuide: {
       title: 'Remove the HTTPS downgrade',
@@ -187,9 +194,3 @@ export function getRemediation(ruleKey: string): RemediationEntry | undefined {
 export function hasRemediation(ruleKey: string): boolean {
   return remediationRegistry.some((entry) => entry.ruleKey === ruleKey);
 }
-
-/**
- * Rules whose severity is Critical or High. The completeness test asserts that
- * every one of them has remediation content and at least one code fix.
- */
-export const CRITICAL_HIGH_RULES = ['tls', 'redirects'] as const;

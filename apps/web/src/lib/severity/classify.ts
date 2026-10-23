@@ -12,6 +12,7 @@ export type SeverityRationale =
   | 'cookieMissingSecure'
   | 'cookieMissingHttpOnly'
   | 'cookieMissingSameSite'
+  | 'cookieOther'
   | 'unknownCheck';
 
 export interface Classification {
@@ -56,7 +57,10 @@ export function classifyFinding(
         return { severity: 'medium', rationale: 'cookieMissingHttpOnly' };
       if (lower.includes('samesite'))
         return { severity: 'low', rationale: 'cookieMissingSameSite' };
-      return { severity: 'low', rationale: 'cookieMissingSameSite' };
+      // A cookie finding whose title names no known flag is still a cookie
+      // finding. Medium is the honest default; claiming SameSite would be a lie
+      // the reader could not verify.
+      return { severity: 'medium', rationale: 'cookieOther' };
     }
 
     case 'security_headers': {
@@ -83,6 +87,41 @@ export function classifyFinding(
       return { severity: 'unclassified', rationale: 'unknownCheck' };
   }
 }
+
+/** Display order, most severe first. */
+export const SEVERITY_ORDER = [
+  'critical',
+  'high',
+  'medium',
+  'low',
+  'info',
+  'unclassified',
+] as const satisfies readonly Severity[];
+
+/**
+ * Every severity each rule can produce.
+ *
+ * This is the single source of truth that ties classification to remediation:
+ * `completeness.test.ts` asserts the registry declares the same set for each
+ * rule, so a rule that starts emitting `high` without High-level guidance fails
+ * the build (roadmap exit criterion 2).
+ */
+export const RULE_SEVERITIES = {
+  tls: ['high'],
+  redirects: ['high'],
+  security_headers: ['high', 'medium', 'low', 'info'],
+  cookies: ['medium', 'low'],
+} as const satisfies Record<string, readonly Severity[]>;
+
+export type RemediatedRule = keyof typeof RULE_SEVERITIES;
+
+/** Rules that can produce a severity the roadmap requires remediation for. */
+export const CRITICAL_HIGH_RULES = (Object.keys(RULE_SEVERITIES) as RemediatedRule[]).filter(
+  (rule) =>
+    RULE_SEVERITIES[rule].some(
+      (severity) => severity === ('high' as Severity) || severity === ('critical' as Severity),
+    ),
+);
 
 /** Maps a stored severity onto the design system's badge variant. */
 export function getSeverityVariant(
