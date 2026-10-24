@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "scan_schedules_domain_unique" ON "scan_schedules" USING btree ("domain_id");

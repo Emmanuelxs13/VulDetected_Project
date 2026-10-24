@@ -20,6 +20,7 @@ import { FindingsList } from '@/features/scans/components/findings-list';
 import type { FindingRow } from '@/features/scans/components/findings-list';
 import { FindingsPagination } from '@/features/scans/components/findings-pagination';
 import { ScanProgressStream } from '@/features/scans/components/scan-progress-stream';
+import { CancelScanButton } from '@/features/scans/components/cancel-scan-button';
 import type { ScanStreamEvent } from '@/features/scans/components/scan-progress-stream';
 import { ScanStatusBadge } from '@/features/scans/components/scan-status';
 import type { ScanStatus } from '@/features/scans/components/scan-status';
@@ -154,6 +155,7 @@ export default async function ScanDetailPage({
         <p className="text-xs text-text-muted">
           {t('detail.verifiedDomainLabel')} <span className="font-mono">{scan.hostname}</span>
         </p>
+        {scan.status === 'queued' ? <CancelScanButton scanId={scan.id} /> : null}
         {checks.length > 0 ? (
           <p className="text-xs text-text-muted">
             {t('detail.checksLabel')} <span className="font-mono">{checks.join(', ')}</span>
@@ -195,6 +197,9 @@ export default async function ScanDetailPage({
               </Button>
               <Button asChild variant="ghost" size="sm">
                 <a href={`/api/scans/${scan.id}/export?format=json`}>{t('export.json')}</a>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <a href={`/api/scans/${scan.id}/export/pdf`}>{t('export.pdf')}</a>
               </Button>
             </div>
           </div>

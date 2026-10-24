@@ -38,6 +38,9 @@ export type AuditAction =
   | 'auth.logged_out'
   | 'scan.enqueued'
   | 'scan.failed'
+  | 'scan_schedule.created'
+  | 'scan_schedule.updated'
+  | 'scan_schedule.deleted'
   | 'domain.ownership.verified'
   | 'domain.ownership.challenge_issued';
 

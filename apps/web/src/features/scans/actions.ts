@@ -2,17 +2,15 @@
 
 import { randomBytes } from 'node:crypto';
 import { resolveTxt } from 'node:dns/promises';
-import { and, desc, domains, eq, gt, scans, verificationTokens } from '@vuldetected/db';
+import { and, desc, domains, eq, gt, or, scans, verificationTokens } from '@vuldetected/db';
 
 import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
-import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
-import { enqueueScanJob } from '@/lib/celery';
-import { getEnv } from '@/lib/env';
 import { consumeRateLimit, RateLimitError } from '@/lib/rate-limit';
 import { safeFetch } from '@/lib/ssrf';
 
+import { enqueueScanForDomain } from './enqueue';
 import { requireVerifiedDomain } from './guard';
 import {
   hostnameSchema,
@@ -350,58 +348,52 @@ export async function submitScanAction(input: {
 
   const domainId = domainRows[0]!.id;
 
-  // Insert scan with status queued BEFORE enqueueing (SS-1..SS-6)
-  const scanRows = await db()
-    .insert(scans)
-    .values({
-      domainId,
-      targetUrl: url,
-      status: 'queued',
-      checks: ['security_headers', 'tls', 'cookies', 'redirects'],
-    })
+  // Row first, then publish (SS-1..SS-6), with the sequence owned by
+  // `enqueueScanForDomain` so the scheduler cannot drift from it.
+  const outcome = await enqueueScanForDomain({
+    domainId,
+    target: { url, scheme, host: normalizedHostname, port, baseUrl },
+    actorUserId: userId,
+    source: 'manual',
+  });
+
+  if (!outcome.ok) {
+    return { success: false, error: 'Service unavailable' };
+  }
+
+  return { success: true, data: { scanId: outcome.scanId } };
+}
+
+export async function cancelScanAction(scanId: string): Promise<ActionResult<null>> {
+  const { userId } = await requireUser();
+  const owned = await db()
+    .select({ id: scans.id })
+    .from(scans)
+    .innerJoin(domains, eq(scans.domainId, domains.id))
+    .where(
+      and(
+        eq(scans.id, scanId),
+        eq(domains.userId, userId),
+        or(eq(scans.status, 'queued'), eq(scans.status, 'running')),
+      ),
+    )
+    .limit(1);
+  if (!owned[0]) return { success: false, error: 'Scan is no longer cancellable.' };
+
+  const updated = await db()
+    .update(scans)
+    .set({ status: 'cancelled', finishedAt: new Date(), error: 'cancelled_by_user' })
+    .where(
+      and(
+        eq(scans.id, scanId),
+        or(eq(scans.status, 'queued'), eq(scans.status, 'running')),
+      ),
+    )
     .returning({ id: scans.id });
 
-  if (scanRows.length === 0) {
-    return { success: false, error: 'Service unavailable' };
+  if (updated.length === 0) {
+    return { success: false, error: 'Scan is no longer cancellable.' };
   }
-  const scanId = scanRows[0]!.id;
 
-  try {
-    const env = getEnv();
-    await enqueueScanJob({
-      scan_id: scanId,
-      domain_id: domainId,
-      target: {
-        scheme: scheme as 'http' | 'https',
-        host: normalizedHostname,
-        port,
-        base_url: baseUrl,
-      },
-      checks: ['security_headers', 'tls', 'cookies', 'redirects'],
-      callback_base_url: env.NEXT_PUBLIC_APP_URL ?? env.AUTH_URL ?? 'http://localhost:3000',
-    });
-
-    await audit({
-      action: 'scan.enqueued' as unknown as import('@/lib/audit').AuditAction,
-      actorUserId: userId,
-      targetType: 'scan',
-      targetId: scanId,
-    });
-    return { success: true, data: { scanId } };
-  } catch {
-    // On enqueue failure: mark as failed with enqueue_failed, audit, return 503
-    await db()
-      .update(scans)
-      .set({ status: 'failed', error: 'enqueue_failed' })
-      .where(eq(scans.id, scanId));
-
-    await audit({
-      action: 'scan.failed' as unknown as import('@/lib/audit').AuditAction,
-      actorUserId: userId,
-      targetType: 'scan',
-      targetId: scanId,
-      metadata: { reason: 'enqueue_failed' },
-    });
-    return { success: false, error: 'Service unavailable' };
-  }
+  return { success: true, data: null };
 }

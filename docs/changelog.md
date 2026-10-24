@@ -10,6 +10,17 @@ a partir de `0.1.0`.
 
 ## [Sin publicar]
 
+### Sprint 4
+
+- Añadida la gestión de escaneos programados: crear, pausar, reanudar y
+  eliminar cadencias diarias o semanales únicamente para dominios verificados.
+- Endurecido el runner: procesa las ejecuciones vencidas en orden y cada
+  dominio admite una sola programación mediante un índice único.
+- Corregida la reanudación de programaciones para conservar la cadencia semanal.
+- Añadidas la exportación PDF ejecutiva y la autenticación social como base de
+  Sprint 4; queda pendiente validar credenciales y pruebas de integración en un
+  entorno configurado.
+
 Base del Sprint 1 — **completa y verificada de extremo a extremo** contra el
 servidor local de PostgreSQL 18.3. El primer commit llega con este hito.
 
@@ -486,3 +497,14 @@ Del Sprint 2 quedaron documentados y sin corregir: el informe del worker trata
 `401/403/404` del callback como éxito, la comprobación `tls` devuelve `[]` para
 todo objetivo HTTPS, `EGRESS_MODE` se lee pero nunca se aplica, y las tareas del
 worker no tienen pruebas unitarias.
+## Sprint 4 follow-up
+
+- Added local Free/Pro/Business plan fixtures, demo-user seeding, and
+  `GUIA_PRUEBAS.md`.
+- Added finding statuses (`open`, `false_positive`, `resolved`) with
+  owner-scoped actions.
+- Added scan cancellation, callback race protection, critical alerts, risk
+  posture, and a lightweight trend visualization.
+- Added a local scheduler clock via `pnpm scheduler:dev`.
+- Fixed the demo seed command by declaring its runtime dependencies at the
+  repository root and documented the Redis prerequisite for fail-closed auth.

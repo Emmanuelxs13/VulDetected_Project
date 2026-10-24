@@ -3,7 +3,7 @@
 El plan autoritativo de VulDetected. Si una afirmación sobre el alcance aparece
 en dos lugares, gana este archivo.
 
-Última actualización: Sprint 1, commit de base.
+Última actualización: Sprint 4, programación de escaneos y exportación ejecutiva.
 
 ## Leyenda de estados
 
@@ -19,10 +19,11 @@ en dos lugares, gana este archivo.
 
 | Sprint    | Enfoque                                                                                    | Estado      |
 | --------- | ------------------------------------------------------------------------------------------ | ----------- |
-| Sprint 1  | Monorepo, sistema de diseño, autenticación con correo y contraseña                         | En curso    |
-| Sprint 2  | Entrada de URL, verificación de propiedad del dominio, worker de escaneo, progreso en vivo | Planificado |
-| Sprint 3  | Clasificación de severidad, panel, remediación por vulnerabilidad                          | Planificado |
-| Sprint 4+ | OAuth, facturación, exportaciones PDF ejecutivas, escaneos programados                     | Aplazado    |
+| Sprint 1  | Monorepo, sistema de diseño, autenticación con correo y contraseña                         | Completado  |
+| Sprint 2  | Entrada de URL, verificación de propiedad del dominio, worker de escaneo, progreso en vivo | Completado  |
+| Sprint 3  | Clasificación de severidad, panel, remediación por vulnerabilidad                          | Completado  |
+| Sprint 4  | OAuth, exportación PDF ejecutiva y escaneos programados                                    | En curso    |
+| Sprint 5+ | Facturación, multitenancy y endurecimiento operativo                                       | Planificado |
 
 ---
 
@@ -165,19 +166,27 @@ audiencia pueda actuar.
 
 ---
 
-## Sprint 4+ — Aplazado
+## Sprint 4 — En curso
 
-**Estado:** Aplazado
+- [x] Demo plans and subscription metadata (Free, Pro, Business)
+- [x] Finding workflow states and owner-scoped status changes
+- [x] Scan cancellation with late-callback protection
+- [x] Critical-finding notifications for eligible plans
+- [x] Local scheduler clock and risk posture dashboard
+- [x] Local demo-user seed and end-to-end test guide — En curso
 
-Explícitamente fuera del MVP. Se registra para que "no construido" sea una
-decisión y no una omisión.
+**Estado:** En curso
 
-| Capacidad                    | Por qué se aplaza                                                                                                                                        | Disparador para revisarlo                                         |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| OAuth con Google / GitHub    | Correo y contraseña demuestran la tubería de autenticación; OAuth añade configuración de proveedor y superficie de redirección antes de que se necesite. | Sprint 4, o en la primera solicitud de incorporación empresarial  |
-| Facturación con Stripe       | Aún no se entrega ningún valor medible — facturar antes de que los escaneos funcionen es prematuro.                                                      | Sprint 4, después de que S3 demuestre patrones de retención y uso |
-| Exportaciones PDF ejecutivas | Requiere que el modelo de severidad sea estable; generar PDFs contra una clasificación en movimiento desperdicia esfuerzo.                               | Después de que pasen los criterios de salida del Sprint 3         |
-| Escaneos programados         | Necesita un planificador con su propia historia de fiabilidad (reintentos, recuperación de atrasos, manejo de zonas horarias).                           | Sprint 4+ con el modelo de facturación y medición                 |
+OAuth, exportación ejecutiva y escaneos programados ya tienen implementación
+inicial. Falta cerrar la configuración operativa, las pruebas específicas y
+las decisiones de producto que no deben quedar implícitas.
+
+| Capacidad                    | Por qué se aplaza                                                                                         | Disparador para revisarlo                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| OAuth con Google / GitHub    | Implementado; pendiente validar credenciales reales y flujo de vinculación.                               | Cerrar configuración en entorno de despliegue |
+| Facturación con Stripe       | Sigue fuera de alcance hasta decidir cuotas, medición y retención.                                        | Sprint 5, después de medir uso real           |
+| Exportaciones PDF ejecutivas | Implementado para el modelo actual de severidad y remediación.                                            | Añadir pruebas de contenido y descarga        |
+| Escaneos programados         | CRUD, runner protegido y UI implementados; falta ejecución operativa periódica y pruebas de concurrencia. | Configurar reloj externo y observabilidad     |
 
 ---
 

@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { boolean, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { accountStatusEnum, citext } from './enums';
+import { accountStatusEnum, citext, subscriptionPlanEnum, subscriptionStatusEnum } from './enums';
 
 /**
  * `users`
@@ -86,6 +86,8 @@ export const users = pgTable(
      * require-verification flow sets.
      */
     status: accountStatusEnum('status').notNull().default('active'),
+    subscriptionPlan: subscriptionPlanEnum('subscription_plan').notNull().default('free'),
+    subscriptionStatus: subscriptionStatusEnum('subscription_status').notNull().default('active'),
 
     /**
      * UI language. Default `es` matches the owner's locale; the repository's

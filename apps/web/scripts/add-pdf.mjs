@@ -1,0 +1,10 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+const en = JSON.parse(readFileSync('messages/en.json', 'utf8'));
+const es = JSON.parse(readFileSync('messages/es.json', 'utf8'));
+en.scan.export = en.scan.export || {};
+es.scan.export = es.scan.export || {};
+en.scan.export.pdf = 'Export PDF (Executive)';
+es.scan.export.pdf = 'Exportar PDF (Ejecutivo)';
+writeFileSync('messages/en.json', JSON.stringify(en, null, 2) + '\n');
+writeFileSync('messages/es.json', JSON.stringify(es, null, 2) + '\n');
+console.log('ok');

@@ -89,6 +89,13 @@
       "passwordRequired": "Password is required.",
       "nameEmpty": "Name cannot be empty.",
       "nameTooLong": "Name is too long."
+    },
+    "social": {
+      "or": "or",
+      "continueGoogle": "Continue with Google",
+      "continueGithub": "Continue with GitHub",
+      "signUpGoogle": "Sign up with Google",
+      "signUpGithub": "Sign up with GitHub"
     }
   },
   "dashboard": {
@@ -229,6 +236,12 @@
         "submitting": "Queuing…",
         "scanAnother": "Scan another domain",
         "invalid": "Enter a valid http(s) URL."
+      },
+      "schedule": {
+        "domain": "Domain",
+        "interval": "Interval",
+        "submit": "Create schedule",
+        "submitting": "Creating..."
       }
     },
     "errors": {
@@ -336,7 +349,31 @@
     },
     "export": {
       "csv": "Export CSV",
-      "json": "Export JSON"
+      "json": "Export JSON",
+      "pdf": "Export PDF (Executive)"
+    },
+    "schedules": {
+      "title": "Scheduled scans",
+      "description": "Automatically scan verified domains on a recurring basis.",
+      "new": "New schedule",
+      "interval": "Interval",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "enabled": "Enabled",
+      "paused": "Paused",
+      "lastRun": "Last run",
+      "nextRun": "Next run",
+      "create": "Create schedule",
+      "pause": "Pause",
+      "resume": "Resume",
+      "delete": "Delete",
+      "domain": "Domain",
+      "empty": "No scheduled scans yet.",
+      "created": "Schedule created",
+      "updated": "Schedule updated",
+      "deleted": "Schedule deleted",
+      "error": "Could not update schedule",
+      "domainNotVerified": "Verify the domain first"
     }
   },
   "dev": {

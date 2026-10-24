@@ -36,6 +36,14 @@ export const accountStatusEnum = pgEnum('account_status', [
   'deleted',
 ]);
 
+export const subscriptionPlanEnum = pgEnum('subscription_plan', ['free', 'pro', 'business']);
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'trialing',
+  'active',
+  'past_due',
+  'cancelled',
+]);
+
 /**
  * What a verification token authorizes.
  *
@@ -89,6 +97,7 @@ export const severityEnum = pgEnum('severity', [
   'high',
   'critical',
 ]);
+export const findingStatusEnum = pgEnum('finding_status', ['open', 'false_positive', 'resolved']);
 
 /**
  * `inet` — a validated IP address, in either family.
@@ -108,6 +117,9 @@ export const inet = customType<{ data: string }>({
 });
 
 export type AccountStatus = (typeof accountStatusEnum.enumValues)[number];
+export type SubscriptionPlan = (typeof subscriptionPlanEnum.enumValues)[number];
+export type SubscriptionStatus = (typeof subscriptionStatusEnum.enumValues)[number];
 export type TokenPurpose = (typeof tokenPurposeEnum.enumValues)[number];
 export type ScanStatus = (typeof scanStatusEnum.enumValues)[number];
 export type Severity = (typeof severityEnum.enumValues)[number];
+export type FindingStatus = (typeof findingStatusEnum.enumValues)[number];

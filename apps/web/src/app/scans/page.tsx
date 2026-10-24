@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { desc, domains, eq, scans } from '@vuldetected/db';
+import { and, desc, domains, eq, scans } from '@vuldetected/db';
 import {
   Button,
   Card,
@@ -21,8 +21,11 @@ import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
 import { NewScanForm } from '@/features/scans/components/new-scan-form';
+import { NewScheduleForm } from '@/features/scans/components/new-schedule-form';
 import { ScanStatusBadge } from '@/features/scans/components/scan-status';
+import { SchedulesList } from '@/features/scans/components/schedules-list';
 import type { ScanStatus } from '@/features/scans/components/scan-status';
+import { listSchedulesAction } from '@/features/scans/schedule-actions';
 import { db } from '@/lib/db';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -65,11 +68,11 @@ export default async function ScansPage() {
 
   const userId = session.user.id;
 
-  const [verifiedDomains, scanRows] = await Promise.all([
+  const [verifiedDomains, scanRows, schedulesResult] = await Promise.all([
     db()
-      .select({ hostname: domains.normalizedHostname })
+      .select({ id: domains.id, hostname: domains.normalizedHostname })
       .from(domains)
-      .where(eq(domains.userId, userId))
+      .where(and(eq(domains.userId, userId), eq(domains.verified, true)))
       .orderBy(desc(domains.createdAt)),
     db()
       .select({
@@ -84,7 +87,12 @@ export default async function ScansPage() {
       .where(eq(domains.userId, userId))
       .orderBy(desc(scans.createdAt))
       .limit(50),
+    listSchedulesAction(),
   ]);
+
+  if (!schedulesResult.success) {
+    throw new Error(schedulesResult.error);
+  }
 
   return (
     <Container size="default" className="flex flex-col gap-6 py-12">
@@ -100,6 +108,17 @@ export default async function ScansPage() {
         </CardHeader>
         <CardContent>
           <NewScanForm verifiedHosts={verifiedDomains.map((domain) => domain.hostname)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('schedules.title')}</CardTitle>
+          <CardDescription>{t('schedules.description')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">
+          <NewScheduleForm verifiedHosts={verifiedDomains} />
+          <SchedulesList schedules={schedulesResult.data} />
         </CardContent>
       </Card>
 
