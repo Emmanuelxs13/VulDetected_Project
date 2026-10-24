@@ -4,8 +4,10 @@ import { Alert, Button, Field, Input } from '@vuldetected/ui';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
-// React 19 moved `useFormStatus` out of `react` and into `react-dom`.
+// React 19 moved `useFormStatus` out of `react` and into `react-dom'.
 import { useFormStatus } from 'react-dom';
+
+import { signIn } from '@/lib/auth-client';
 
 import { registerAction } from './actions';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './schema';
@@ -114,6 +116,8 @@ export function RegisterForm() {
 
       <SubmitButton />
 
+      <SocialButtons mode="register" />
+
       <p className="text-xs text-text-muted">
         {t('register.haveAccount')}{' '}
         <Link href="/login" className="font-medium text-brand underline underline-offset-2">
@@ -121,6 +125,46 @@ export function RegisterForm() {
         </Link>
       </p>
     </form>
+  );
+}
+
+function SocialButtons({ mode }: { mode: 'login' | 'register' }) {
+  const t = useTranslations('auth');
+  const hasGoogle = Boolean(process.env.NEXT_PUBLIC_GOOGLE_ENABLED);
+  const hasGithub = Boolean(process.env.NEXT_PUBLIC_GITHUB_ENABLED);
+  if (!hasGoogle && !hasGithub) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-surface px-2 text-text-muted">{t('social.or')}</span>
+        </div>
+      </div>
+      {hasGoogle ? (
+        <Button
+          type="button"
+          variant="secondary"
+          fullWidth
+          onClick={() => signIn.social({ provider: 'google', callbackURL: '/dashboard' })}
+        >
+          {mode === 'login' ? t('social.continueGoogle') : t('social.signUpGoogle')}
+        </Button>
+      ) : null}
+      {hasGithub ? (
+        <Button
+          type="button"
+          variant="secondary"
+          fullWidth
+          onClick={() => signIn.social({ provider: 'github', callbackURL: '/dashboard' })}
+        >
+          {mode === 'login' ? t('social.continueGithub') : t('social.signUpGithub')}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

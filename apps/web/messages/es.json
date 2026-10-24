@@ -89,6 +89,13 @@
       "passwordRequired": "La contraseña es obligatoria.",
       "nameEmpty": "El nombre no puede estar vacío.",
       "nameTooLong": "El nombre es demasiado largo."
+    },
+    "social": {
+      "or": "o",
+      "continueGoogle": "Continuar con Google",
+      "continueGithub": "Continuar con GitHub",
+      "signUpGoogle": "Registrarse con Google",
+      "signUpGithub": "Registrarse con GitHub"
     }
   },
   "dashboard": {

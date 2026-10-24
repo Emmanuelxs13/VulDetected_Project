@@ -105,6 +105,11 @@ const envSchema = z.object({
   /** Driver for scan events streaming (Sprint 2). */
   SCAN_EVENTS_DRIVER: z.enum(['poll', 'notify']).optional().default('poll'),
 
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  GITHUB_CLIENT_ID: z.string().min(1).optional(),
+  GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 });
 
