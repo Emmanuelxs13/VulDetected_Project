@@ -196,6 +196,9 @@ export default async function ScanDetailPage({
               <Button asChild variant="ghost" size="sm">
                 <a href={`/api/scans/${scan.id}/export?format=json`}>{t('export.json')}</a>
               </Button>
+              <Button asChild variant="ghost" size="sm">
+                <a href={`/api/scans/${scan.id}/export/pdf`}>{t('export.pdf')}</a>
+              </Button>
             </div>
           </div>
         </CardHeader>

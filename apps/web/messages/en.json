@@ -336,7 +336,8 @@
     },
     "export": {
       "csv": "Export CSV",
-      "json": "Export JSON"
+      "json": "Export JSON",
+      "pdf": "Export PDF (Executive)"
     }
   },
   "dev": {
