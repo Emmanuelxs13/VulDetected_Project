@@ -192,6 +192,16 @@ export async function updateScheduleAction(input: {
     return { success: false, error: 'Invalid schedule.' };
   }
 
+  const currentRows = await db()
+    .select({ id: scanSchedules.id, interval: scanSchedules.interval })
+    .from(scanSchedules)
+    .where(and(eq(scanSchedules.id, parsed.data.scheduleId), eq(scanSchedules.userId, userId)))
+    .limit(1);
+  const current = currentRows[0];
+  if (current === undefined) {
+    return { success: false, error: 'Schedule not found' };
+  }
+
   const now = new Date();
   const patch: {
     interval?: string;
@@ -210,7 +220,7 @@ export async function updateScheduleAction(input: {
     if (parsed.data.enabled && parsed.data.interval === undefined) {
       // Resuming a paused schedule re-arms it rather than firing immediately for
       // every tick it was paused.
-      patch.nextRunAt = computeNextRunAt(now, 'daily');
+      patch.nextRunAt = computeNextRunAt(now, current.interval);
     }
   }
 

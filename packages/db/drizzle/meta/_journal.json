@@ -36,6 +36,13 @@
       "when": 1792815664706,
       "tag": "0004_warm_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792819346155,
+      "tag": "0005_third_goblin_queen",
+      "breakpoints": true
     }
   ]
 }

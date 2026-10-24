@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { domains } from './domains';
 import { users } from './users';
@@ -25,6 +25,7 @@ export const scanSchedules = pgTable(
   },
   (table) => ({
     domainIdx: index('scan_schedules_domain_idx').on(table.domainId),
+    domainUnique: uniqueIndex('scan_schedules_domain_unique').on(table.domainId),
     userIdx: index('scan_schedules_user_idx').on(table.userId),
     nextRunIdx: index('scan_schedules_next_run_idx').on(table.nextRunAt),
   }),

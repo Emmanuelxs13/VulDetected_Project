@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, domains, eq, lte, or, isNull, scanSchedules } from '@vuldetected/db';
+import { and, asc, domains, eq, isNull, lte, or, scanSchedules } from '@vuldetected/db';
 
 import { enqueueScanForDomain, scheduleTarget } from '@/features/scans/enqueue';
 import { computeNextRunAt, isDue } from '@/features/scans/schedule-schema';
@@ -69,6 +69,7 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedu
         or(isNull(scanSchedules.nextRunAt), lte(scanSchedules.nextRunAt, now)),
       ),
     )
+    .orderBy(asc(scanSchedules.nextRunAt))
     .limit(RUN_BATCH_SIZE);
 
   const result: RunSchedulesResult = { due: dueRows.length, enqueued: 0, failed: 0, skipped: 0 };

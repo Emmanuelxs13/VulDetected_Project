@@ -10,6 +10,17 @@ a partir de `0.1.0`.
 
 ## [Sin publicar]
 
+### Sprint 4
+
+- Añadida la gestión de escaneos programados: crear, pausar, reanudar y
+  eliminar cadencias diarias o semanales únicamente para dominios verificados.
+- Endurecido el runner: procesa las ejecuciones vencidas en orden y cada
+  dominio admite una sola programación mediante un índice único.
+- Corregida la reanudación de programaciones para conservar la cadencia semanal.
+- Añadidas la exportación PDF ejecutiva y la autenticación social como base de
+  Sprint 4; queda pendiente validar credenciales y pruebas de integración en un
+  entorno configurado.
+
 Base del Sprint 1 — **completa y verificada de extremo a extremo** contra el
 servidor local de PostgreSQL 18.3. El primer commit llega con este hito.
 
