@@ -17,6 +17,7 @@ import { auditLogs } from './audit-logs';
 import { domains } from './domains';
 import { findings } from './findings';
 import { scanEvents } from './scan-events';
+import { scanSchedules } from './scan-schedules';
 import { scans } from './scans';
 import { sessions } from './sessions';
 import { users } from './users';
@@ -52,12 +53,16 @@ export type { Finding, NewFinding } from './findings';
 export { scanEvents } from './scan-events';
 export type { NewScanEvent, ScanEvent } from './scan-events';
 
+export { scanSchedules } from './scan-schedules';
+export type { NewScanSchedule, ScanSchedule } from './scan-schedules';
+
 export {
   accountsRelations,
   auditLogsRelations,
   domainsRelations,
   findingsRelations,
   scanEventsRelations,
+  scanSchedulesRelations,
   scansRelations,
   sessionsRelations,
   usersRelations,
@@ -82,4 +87,5 @@ export const schema = {
   scans,
   findings,
   scanEvents,
+  scanSchedules,
 };

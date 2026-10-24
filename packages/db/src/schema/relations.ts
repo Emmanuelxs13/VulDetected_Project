@@ -5,6 +5,7 @@ import { auditLogs } from './audit-logs';
 import { domains } from './domains';
 import { findings } from './findings';
 import { scanEvents } from './scan-events';
+import { scanSchedules } from './scan-schedules';
 import { scans } from './scans';
 import { sessions } from './sessions';
 import { users } from './users';
@@ -39,11 +40,17 @@ import { users } from './users';
  * FK would invite resolving tokens by user id instead of by the value that was
  * actually emailed. The full argument is in `verification-tokens.ts`.
  */
+export const scanSchedulesRelations = relations(scanSchedules, ({ one }) => ({
+  domain: one(domains, { fields: [scanSchedules.domainId], references: [domains.id] }),
+  user: one(users, { fields: [scanSchedules.userId], references: [users.id] }),
+}));
+
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   accounts: many(accounts),
   auditLogs: many(auditLogs),
   domains: many(domains),
+  scanSchedules: many(scanSchedules),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
