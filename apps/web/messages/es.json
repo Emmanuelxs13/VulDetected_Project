@@ -236,6 +236,12 @@
         "submitting": "Encolando…",
         "scanAnother": "Escanear otro dominio",
         "invalid": "Introduce una URL http(s) válida."
+      },
+      "schedule": {
+        "domain": "Dominio",
+        "interval": "Frecuencia",
+        "submit": "Crear programación",
+        "submitting": "Creando..."
       }
     },
     "errors": {
@@ -345,6 +351,29 @@
       "csv": "Exportar CSV",
       "json": "Exportar JSON",
       "pdf": "Exportar PDF (Ejecutivo)"
+    },
+    "schedules": {
+      "title": "Escaneos programados",
+      "description": "Escanea dominios verificados de forma automática y recurrente.",
+      "new": "Nuevo programado",
+      "interval": "Frecuencia",
+      "daily": "Diario",
+      "weekly": "Semanal",
+      "enabled": "Activo",
+      "paused": "Pausado",
+      "lastRun": "Última ejecución",
+      "nextRun": "Próxima ejecución",
+      "create": "Crear programación",
+      "pause": "Pausar",
+      "resume": "Reanudar",
+      "delete": "Eliminar",
+      "domain": "Dominio",
+      "empty": "Aún no hay escaneos programados.",
+      "created": "Programación creada",
+      "updated": "Programación actualizada",
+      "deleted": "Programación eliminada",
+      "error": "No se pudo actualizar la programación",
+      "domainNotVerified": "Verifica el dominio primero"
     }
   },
   "dev": {
