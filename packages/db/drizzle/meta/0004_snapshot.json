@@ -133,12 +133,8 @@
           "name": "accounts_user_id_users_id_fk",
           "tableFrom": "accounts",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -268,12 +264,8 @@
           "name": "audit_logs_actor_user_id_users_id_fk",
           "tableFrom": "audit_logs",
           "tableTo": "users",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -375,12 +367,8 @@
           "name": "domains_user_id_users_id_fk",
           "tableFrom": "domains",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -390,9 +378,7 @@
         "domains_normalized_hostname_key": {
           "name": "domains_normalized_hostname_key",
           "nullsNotDistinct": false,
-          "columns": [
-            "normalized_hostname"
-          ]
+          "columns": ["normalized_hostname"]
         }
       },
       "policies": {},
@@ -530,12 +516,8 @@
           "name": "findings_scan_id_scans_id_fk",
           "tableFrom": "findings",
           "tableTo": "scans",
-          "columnsFrom": [
-            "scan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["scan_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -643,12 +625,8 @@
           "name": "scan_events_scan_id_scans_id_fk",
           "tableFrom": "scan_events",
           "tableTo": "scans",
-          "columnsFrom": [
-            "scan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["scan_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -658,10 +636,7 @@
         "scan_events_scan_seq_unique": {
           "name": "scan_events_scan_seq_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "scan_id",
-            "seq"
-          ]
+          "columns": ["scan_id", "seq"]
         }
       },
       "policies": {},
@@ -784,12 +759,8 @@
           "name": "scan_schedules_domain_id_domains_id_fk",
           "tableFrom": "scan_schedules",
           "tableTo": "domains",
-          "columnsFrom": [
-            "domain_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["domain_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -797,12 +768,8 @@
           "name": "scan_schedules_user_id_users_id_fk",
           "tableFrom": "scan_schedules",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -933,12 +900,8 @@
           "name": "scans_domain_id_domains_id_fk",
           "tableFrom": "scans",
           "tableTo": "domains",
-          "columnsFrom": [
-            "domain_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["domain_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1042,12 +1005,8 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1057,9 +1016,7 @@
         "sessions_token_unique": {
           "name": "sessions_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -1190,9 +1147,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -1315,44 +1270,22 @@
     "public.account_status": {
       "name": "account_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "active",
-        "suspended",
-        "deleted"
-      ]
+      "values": ["pending", "active", "suspended", "deleted"]
     },
     "public.scan_status": {
       "name": "scan_status",
       "schema": "public",
-      "values": [
-        "queued",
-        "running",
-        "completed",
-        "failed",
-        "cancelled"
-      ]
+      "values": ["queued", "running", "completed", "failed", "cancelled"]
     },
     "public.severity": {
       "name": "severity",
       "schema": "public",
-      "values": [
-        "unclassified",
-        "info",
-        "low",
-        "medium",
-        "high",
-        "critical"
-      ]
+      "values": ["unclassified", "info", "low", "medium", "high", "critical"]
     },
     "public.token_purpose": {
       "name": "token_purpose",
       "schema": "public",
-      "values": [
-        "verify_email",
-        "reset_password",
-        "domain_ownership"
-      ]
+      "values": ["verify_email", "reset_password", "domain_ownership"]
     }
   },
   "schemas": {},
