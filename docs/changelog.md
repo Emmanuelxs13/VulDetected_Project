@@ -424,9 +424,65 @@ sha256(domain_id | check_name | affected_url)`, índice único intra-escaneo
   ancla el esquema a TB3/TB4 y corrige el índice de deduplicación, que es único y
   no parcial.
 
+### Añadido - Sprint 3: severidad, panel y remediación
+
+- **Clasificación determinista de severidad.** `apps/web/src/lib/severity/classify.ts`
+  es una tabla pura, no una puntuación: `(checkName, evidence, title) → {severity,
+rationale}`. `tls` y `redirects` son altos; `security_headers` gradúa según la
+  cabecera (HSTS y CSP altos, X-Frame-Options medio, X-Content-Type-Options y
+  Referrer-Policy bajos, Permissions-Policy informativo); `cookies` gradúa Secure
+  y HttpOnly como medios y SameSite como bajo. `critical` queda reservado: ninguna
+  de las cuatro comprobaciones puede justificar ejecución remota de código.
+  - **La regla es visible, no solo el número.** La vista de detalle recalcula la
+    clasificación (es pura) y muestra la regla aplicada junto a la evidencia.
+  - `RULE_SEVERITIES` declara qué severidades puede producir cada regla y es la
+    única fuente que comparten clasificador y remediación.
+- **Contenido de remediación versionado.** `apps/web/src/lib/remediation/registry.ts`
+  cubre `security_headers`, `cookies`, `tls` y `redirects` con guía para
+  desarrollador, administrador de sistemas y responsable de negocio, más código de
+  corrección (nginx, Express/TypeScript, server action de Next.js). Se descartó
+  una tabla en base de datos: las dos garantías que pide la hoja de ruta —fallar la
+  compilación cuando un registro Crítico/Alto no tiene contenido, y verificar la
+  sintaxis de los ejemplos— son garantías de compilación y de test, no de fila.
+  `version` permite corregir la guía sin reescribir hallazgos históricos.
+- **Garantías ejecutadas en `pnpm test`.** `completeness.test.ts` verifica claves
+  únicas, cobertura de las tres audiencias para toda regla que pueda producir
+  Alto/Crítico, concordancia exacta entre `RULE_SEVERITIES` y el registro, ausencia
+  de entradas para reglas desconocidas y sintaxis de cada ejemplo (compilador de
+  TypeScript para TS/JS, comprobación estructural balanceada para nginx).
+- **Clasificación en el momento de escritura.** El callback del worker clasifica
+  cada hallazgo en la misma inserción; la web sigue siendo el único escritor y el
+  worker no conoce la severidad.
+- **Panel con lectura acotada.** Recuentos por severidad con `GROUP BY` (máximo
+  seis filas), lista de hallazgos paginada por cursor `(created_at, id)` de 50 en
+  50, filtro por severidad y tendencia de postura por dominio —los hallazgos
+  altos y críticos del último escaneo completado frente al anterior— calculada
+  sobre los 40 escaneos completados más recientes. Ninguna consulta crece con el
+  tamaño de la tabla de hallazgos.
+- **Vista de detalle del hallazgo.** Evidencia en bruto, regla de clasificación,
+  las tres guías de remediación y el código de corrección copiable; todo el acceso
+  está acotado por la cadena `findings → scans → domains → userId`.
+- **Exportación CSV/JSON por escaneo.** `GET /api/scans/{id}/export?format=csv|json`
+  exige sesión, comprueba propiedad y escapa comas, comillas y saltos de línea.
+- **Prueba de integridad de i18n.** Un test recorre `src`, resuelve cada
+  `t('clave')` estático contra los diccionarios y exige paridad exacta de claves
+  entre `es` y `en`. Encontró y corrigió claves del panel que no existían.
+
+### Pendiente de Sprint 3
+
+- El criterio «el panel carga un dominio con 10 000 hallazgos sin degradarse» está
+  implementado (paginación por cursor, sin consultas sin límite) pero **no medido**:
+  la base local no tiene dominios ni escaneos con ese volumen, y generar datos de
+  prueba en la base del propietario requiere su decisión.
+
 ## [Hoja de ruta relevante sin publicar]
 
 El Sprint 2 continúa: entrega de correo (Mailpit), que activa
 `verification_tokens` y obliga a resolver primero su columna `value` en crudo;
 limitación de tasa por IP; y el flujo de verificación `domain_ownership`, que es
 una precondición legal y no una función.
+
+Del Sprint 2 quedaron documentados y sin corregir: el informe del worker trata
+`401/403/404` del callback como éxito, la comprobación `tls` devuelve `[]` para
+todo objetivo HTTPS, `EGRESS_MODE` se lee pero nunca se aplica, y las tareas del
+worker no tienen pruebas unitarias.

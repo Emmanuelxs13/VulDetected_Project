@@ -112,6 +112,28 @@
     "findings": {
       "title": "Findings are not aggregated here yet",
       "description": "Open a scan to see its findings. CVE correlation is not built yet."
+    },
+    "severityBreakdown": "Severity breakdown",
+    "scans": "Scans",
+    "findingsList": "All findings",
+    "filter": "Filter",
+    "filterAll": "All",
+    "filterDescription": "Filter by severity. Counts cover every finding you own.",
+    "scansDescription": "The 20 most recent scans of the domains you verified.",
+    "trend": {
+      "title": "Posture trend",
+      "description": "High and critical findings in the newest completed scan of each domain, compared with the scan before it.",
+      "empty": "No completed scans yet, so there is no trend to show.",
+      "riskyFindings": "high/critical",
+      "improved": "Improved",
+      "worsened": "Worsened",
+      "unchanged": "Unchanged",
+      "firstScan": "First scan",
+      "table": {
+        "domain": "Domain",
+        "latest": "Latest scan",
+        "delta": "Change"
+      }
     }
   },
   "notFound": {
@@ -150,6 +172,10 @@
         "created": "Created",
         "detail": "Detail",
         "viewDetails": "View details"
+      },
+      "export": {
+        "csv": "Export CSV",
+        "json": "Export JSON"
       }
     },
     "status": {
@@ -231,7 +257,7 @@
       },
       "findings": {
         "title": "Findings",
-        "description": "In Sprint 2 every finding is recorded as “Unclassified”; classification arrives in Sprint 3."
+        "description": "Every finding carries a severity computed by a documented rule. Open a finding to see the evidence and how to fix it."
       }
     },
     "progress": {
@@ -264,8 +290,53 @@
         "affectedUrl": "Affected URL"
       },
       "severity": {
-        "unclassified": "Unclassified"
+        "unclassified": "Unclassified",
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "info": "Info"
+      },
+      "viewDetails": "View details",
+      "detail": {
+        "metadataTitle": "Finding details",
+        "remediation": {
+          "developer": "Developer remediation",
+          "sysadmin": "System administrator remediation",
+          "business": "Business stakeholder remediation",
+          "codeFixes": "Copyable fix code"
+        },
+        "evidence": "Evidence",
+        "evidenceDescription": "What the check observed, exactly as the worker recorded it."
+      },
+      "rationale": {
+        "rule": "Classification rule",
+        "noHttps": "Missing HTTPS",
+        "httpsDowngrade": "HTTPS downgraded to HTTP",
+        "missingHsts": "Missing Strict-Transport-Security",
+        "missingCsp": "Missing Content-Security-Policy",
+        "missingFrameOptions": "Missing X-Frame-Options",
+        "missingContentTypeOptions": "Missing X-Content-Type-Options",
+        "missingReferrerPolicy": "Missing Referrer-Policy",
+        "missingPermissionsPolicy": "Missing Permissions-Policy",
+        "cookieMissingSecure": "Cookie missing Secure flag",
+        "cookieMissingHttpOnly": "Cookie missing HttpOnly flag",
+        "cookieMissingSameSite": "Cookie missing SameSite attribute",
+        "unknownCheck": "Unknown check",
+        "cookieOther": "Cookie attribute issue outside the specific rules"
+      },
+      "filter": {
+        "all": "All"
+      },
+      "pagination": {
+        "label": "Findings pagination",
+        "next": "Next page",
+        "first": "First page"
       }
+    },
+    "export": {
+      "csv": "Export CSV",
+      "json": "Export JSON"
     }
   },
   "dev": {

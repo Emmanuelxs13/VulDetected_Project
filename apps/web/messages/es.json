@@ -112,6 +112,28 @@
     "findings": {
       "title": "Los hallazgos todavía no se agregan aquí",
       "description": "Abre un escaneo para ver sus hallazgos. La correlación de CVE todavía no está implementada."
+    },
+    "severityBreakdown": "Desglose por severidad",
+    "scans": "Escaneos",
+    "findingsList": "Todos los hallazgos",
+    "filter": "Filtrar",
+    "filterAll": "Todos",
+    "filterDescription": "Filtre por severidad. Los conteos incluyen todos sus hallazgos.",
+    "scansDescription": "Los 20 escaneos más recientes de los dominios que verificó.",
+    "trend": {
+      "title": "Tendencia de postura",
+      "description": "Hallazgos altos y críticos del último escaneo completado de cada dominio, frente al anterior.",
+      "empty": "Todavía no hay escaneos completados, así que no hay tendencia que mostrar.",
+      "riskyFindings": "altos/críticos",
+      "improved": "Mejoró",
+      "worsened": "Empeoró",
+      "unchanged": "Sin cambios",
+      "firstScan": "Primer escaneo",
+      "table": {
+        "domain": "Dominio",
+        "latest": "Último escaneo",
+        "delta": "Cambio"
+      }
     }
   },
   "notFound": {
@@ -150,6 +172,10 @@
         "created": "Creado",
         "detail": "Detalle",
         "viewDetails": "Ver detalle"
+      },
+      "export": {
+        "csv": "Exportar CSV",
+        "json": "Exportar JSON"
       }
     },
     "status": {
@@ -231,7 +257,7 @@
       },
       "findings": {
         "title": "Hallazgos",
-        "description": "En el Sprint 2 todo hallazgo se registra como «Sin clasificar»; la clasificación llega en el Sprint 3."
+        "description": "Cada hallazgo tiene una severidad calculada con una regla documentada. Abra un hallazgo para ver la evidencia y cómo corregirlo."
       }
     },
     "progress": {
@@ -264,8 +290,53 @@
         "affectedUrl": "URL afectada"
       },
       "severity": {
-        "unclassified": "Sin clasificar"
+        "unclassified": "Sin clasificar",
+        "critical": "Crítica",
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja",
+        "info": "Informativa"
+      },
+      "viewDetails": "Ver detalles",
+      "detail": {
+        "metadataTitle": "Detalles del hallazgo",
+        "remediation": {
+          "developer": "Remediación para desarrollador",
+          "sysadmin": "Remediación para administrador de sistemas",
+          "business": "Remediación para negocio",
+          "codeFixes": "Código de corrección copiable"
+        },
+        "evidence": "Evidencia",
+        "evidenceDescription": "Lo que observó la comprobación, tal como lo registró el worker."
+      },
+      "rationale": {
+        "rule": "Regla de clasificación",
+        "noHttps": "Falta HTTPS",
+        "httpsDowngrade": "HTTPS degradado a HTTP",
+        "missingHsts": "Falta Strict-Transport-Security",
+        "missingCsp": "Falta Content-Security-Policy",
+        "missingFrameOptions": "Falta X-Frame-Options",
+        "missingContentTypeOptions": "Falta X-Content-Type-Options",
+        "missingReferrerPolicy": "Falta Referrer-Policy",
+        "missingPermissionsPolicy": "Falta Permissions-Policy",
+        "cookieMissingSecure": "Cookie sin flag Secure",
+        "cookieMissingHttpOnly": "Cookie sin flag HttpOnly",
+        "cookieMissingSameSite": "Cookie sin atributo SameSite",
+        "unknownCheck": "Comprobación desconocida",
+        "cookieOther": "Problema de atributo de cookie fuera de las reglas específicas"
+      },
+      "filter": {
+        "all": "Todos"
+      },
+      "pagination": {
+        "label": "Paginación de hallazgos",
+        "next": "Página siguiente",
+        "first": "Primera página"
       }
+    },
+    "export": {
+      "csv": "Exportar CSV",
+      "json": "Exportar JSON"
     }
   },
   "dev": {

@@ -9,6 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from '@vuldetected/ui';
+import Link from 'next/link';
+
+import { getSeverityVariant as getSeverityBadgeVariant } from '@/lib/severity/classify';
 
 /** One finding, flattened for the table. */
 export interface FindingRow {
@@ -18,19 +21,9 @@ export interface FindingRow {
   title: string;
   description: string;
   affectedUrl: string;
+  scanId?: string;
 }
 
-/**
- * Findings of one scan.
- *
- * ## WHY EVERY SEVERITY READS "SIN CLASIFICAR"
- *
- * Sprint 2 writes exactly one severity value: `unclassified` (DM-3). The
- * classification rules land in Sprint 3, so the badge shows the honest label
- * instead of a colour that would imply a triage decision nobody made. The
- * `unknown` variant of the badge is the design system's vocabulary for that
- * (ADR 0003).
- */
 export async function FindingsList({ findings }: { findings: FindingRow[] }) {
   const t = await getTranslations('scan');
 
@@ -48,14 +41,19 @@ export async function FindingsList({ findings }: { findings: FindingRow[] }) {
           <TableHead>{t('findings.table.check')}</TableHead>
           <TableHead>{t('findings.table.finding')}</TableHead>
           <TableHead>{t('findings.table.affectedUrl')}</TableHead>
+          <TableHead></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {findings.map((finding) => (
           <TableRow key={finding.id}>
             <TableCell>
-              <Badge variant="unknown">
-                {severityLabel(finding.severity, t('findings.severity.unclassified'))}
+              <Badge variant={getSeverityBadgeVariant(finding.severity)}>
+                {finding.severity === 'unclassified'
+                  ? t('findings.severity.unclassified')
+                  : t.has(`findings.severity.${finding.severity}` as never)
+                    ? t(`findings.severity.${finding.severity}` as never)
+                    : finding.severity}
               </Badge>
             </TableCell>
             <TableCell>
@@ -67,19 +65,19 @@ export async function FindingsList({ findings }: { findings: FindingRow[] }) {
             <TableCell>
               <span className="break-all font-mono text-xs">{finding.affectedUrl}</span>
             </TableCell>
+            <TableCell>
+              {finding.scanId ? (
+                <Link
+                  href={`/scans/${finding.scanId}/findings/${finding.id}`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  {t('findings.viewDetails')}
+                </Link>
+              ) : null}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
   );
-}
-
-/**
- * Severity label.
- *
- * Only `unclassified` is written in Sprint 2. Any other value is a future
- * Sprint 3 severity and is shown verbatim rather than guessed at.
- */
-function severityLabel(severity: string, unclassifiedLabel: string): string {
-  return severity === 'unclassified' ? unclassifiedLabel : severity;
 }

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
-import { and, desc, domains, eq, findings, scanEvents, scans } from '@vuldetected/db';
+import { and, domains, eq, scanEvents, scans } from '@vuldetected/db';
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -12,15 +13,19 @@ import {
 } from '@vuldetected/ui';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 
 import { getServerSession } from '@/features/auth/session';
 import { FindingsList } from '@/features/scans/components/findings-list';
 import type { FindingRow } from '@/features/scans/components/findings-list';
+import { FindingsPagination } from '@/features/scans/components/findings-pagination';
 import { ScanProgressStream } from '@/features/scans/components/scan-progress-stream';
 import type { ScanStreamEvent } from '@/features/scans/components/scan-progress-stream';
 import { ScanStatusBadge } from '@/features/scans/components/scan-status';
 import type { ScanStatus } from '@/features/scans/components/scan-status';
+import { getSeverityCounts, listFindingsPage } from '@/features/scans/queries/findings-page';
 import { db } from '@/lib/db';
+import { SEVERITY_ORDER, getSeverityVariant } from '@/lib/severity/classify';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('scan');
@@ -45,8 +50,15 @@ export async function generateMetadata(): Promise<Metadata> {
  * starting point, so a reload shows the full history instead of an empty
  * feed, and the stream resumes from the last event it has already seen.
  */
-export default async function ScanDetailPage({ params }: { params: Promise<{ scanId: string }> }) {
+export default async function ScanDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ scanId: string }>;
+  searchParams?: Promise<{ severity?: string; cursor?: string }>;
+}) {
   const { scanId } = await params;
+  const query = (await searchParams) || {};
   const t = await getTranslations('scan');
 
   const session = await getServerSession();
@@ -86,7 +98,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
     notFound();
   }
 
-  const [eventRows, findingRows] = await Promise.all([
+  const [eventRows, findingsPage, severityTotals] = await Promise.all([
     db()
       .select({
         id: scanEvents.id,
@@ -99,18 +111,13 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
       .where(eq(scanEvents.scanId, scanId))
       .orderBy(scanEvents.id)
       .limit(100),
-    db()
-      .select({
-        id: findings.id,
-        severity: findings.severity,
-        checkName: findings.checkName,
-        title: findings.title,
-        description: findings.description,
-        affectedUrl: findings.affectedUrl,
-      })
-      .from(findings)
-      .where(eq(findings.scanId, scanId))
-      .orderBy(desc(findings.createdAt)),
+    listFindingsPage({
+      ownerUserId: userId,
+      scanId,
+      severity: query.severity,
+      cursor: query.cursor,
+    }),
+    getSeverityCounts(userId, scanId),
   ]);
 
   const initialEvents: ScanStreamEvent[] = eventRows.map((event) => ({
@@ -121,14 +128,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
     createdAt: event.createdAt.toISOString(),
   }));
 
-  const findingList: FindingRow[] = findingRows.map((finding) => ({
-    id: finding.id,
-    severity: finding.severity,
-    checkName: finding.checkName,
-    title: finding.title,
-    description: finding.description,
-    affectedUrl: finding.affectedUrl,
-  }));
+  const findingList: FindingRow[] = findingsPage.rows;
 
   const checks = Array.isArray(scan.checks) ? (scan.checks as string[]) : [];
 
@@ -184,11 +184,50 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('detail.findings.title')}</CardTitle>
-          <CardDescription>{t('detail.findings.description')}</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>{t('detail.findings.title')}</CardTitle>
+              <CardDescription>{t('detail.findings.description')}</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button asChild variant="ghost" size="sm">
+                <a href={`/api/scans/${scan.id}/export?format=csv`}>{t('export.csv')}</a>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <a href={`/api/scans/${scan.id}/export?format=json`}>{t('export.json')}</a>
+              </Button>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant={!query.severity ? 'secondary' : 'ghost'} size="sm">
+              <Link href={`/scans/${scan.id}`}>
+                {t('findings.filter.all')} ({severityTotals.total})
+              </Link>
+            </Button>
+            {SEVERITY_ORDER.map((severity) => (
+              <Button
+                asChild
+                key={severity}
+                variant={query.severity === severity ? 'secondary' : 'ghost'}
+                size="sm"
+              >
+                <Link href={`/scans/${scan.id}?severity=${severity}`}>
+                  <Badge variant={getSeverityVariant(severity)}>
+                    {t(`findings.severity.${severity}`)} ({severityTotals.counts[severity]})
+                  </Badge>
+                </Link>
+              </Button>
+            ))}
+          </div>
           <FindingsList findings={findingList} />
+          <FindingsPagination
+            basePath={`/scans/${scan.id}`}
+            params={{ severity: query.severity }}
+            nextCursor={findingsPage.nextCursor}
+            isPaged={Boolean(query.cursor)}
+          />
         </CardContent>
       </Card>
     </Container>
