@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
-import { severityEnum } from './enums';
+import { findingStatusEnum, severityEnum } from './enums';
 import { scans } from './scans';
 
 /**
@@ -40,6 +40,7 @@ export const findings = pgTable(
 
     /** Always `unclassified` in Sprint 2; classification rules land in S3 (DM-3). */
     severity: severityEnum('severity').notNull().default('unclassified'),
+    status: findingStatusEnum('status').notNull().default('open'),
 
     /** Which deterministic check produced the finding (e.g. `security_headers`). */
     checkName: text('check_name').notNull(),

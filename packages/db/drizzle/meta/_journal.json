@@ -43,6 +43,27 @@
       "when": 1792819346155,
       "tag": "0005_third_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792858783124,
+      "tag": "0006_grey_sleeper",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792858846615,
+      "tag": "0007_real_tombstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792859129342,
+      "tag": "0008_amazing_wonder_man",
+      "breakpoints": true
     }
   ]
 }

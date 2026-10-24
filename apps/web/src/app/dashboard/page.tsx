@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@vuldetected/ui';
 import Link from 'next/link';
-import { desc, domains, eq, scans } from '@vuldetected/db';
+import { desc, domains, eq, notifications, scans, users } from '@vuldetected/db';
 import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
@@ -30,6 +30,7 @@ import {
 } from '@/features/scans/queries/findings-page';
 import { db } from '@/lib/db';
 import { SEVERITY_ORDER, getSeverityVariant } from '@/lib/severity/classify';
+import { getPlanDefinition } from '@/lib/plans';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('dashboard');
@@ -89,7 +90,7 @@ export default async function DashboardPage({
   const { user } = session;
   const userId = user.id;
 
-  const [scanList, findingsPage, severityTotals, trends] = await Promise.all([
+  const [scanList, findingsPage, severityTotals, trends, accountRows, alertRows] = await Promise.all([
     db()
       .select({
         id: scans.id,
@@ -106,7 +107,23 @@ export default async function DashboardPage({
     listFindingsPage({ ownerUserId: userId, severity: query.severity, cursor: query.cursor }),
     getSeverityCounts(userId),
     getDomainPostureTrends(userId),
+    db()
+      .select({ subscriptionPlan: users.subscriptionPlan, subscriptionStatus: users.subscriptionStatus })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+    db()
+      .select({ id: notifications.id, message: notifications.message, createdAt: notifications.createdAt })
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(5),
   ]);
+  const account = accountRows[0];
+  const plan = getPlanDefinition(account?.subscriptionPlan ?? 'free');
+  const criticalCount = severityTotals.counts.critical;
+  const highCount = severityTotals.counts.high;
+  const riskLabel = criticalCount > 0 || highCount > 0 ? 'High risk' : 'Secure';
 
   return (
     <Container size="narrow" className="flex flex-col gap-6 py-12">
@@ -164,6 +181,65 @@ export default async function DashboardPage({
         </CardContent>
       </Card>
 
+      <Card className={criticalCount > 0 ? 'border-critical' : 'border-low'}>
+        <CardHeader>
+          <CardTitle>Current security posture</CardTitle>
+          <CardDescription>Open findings from the latest account data.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          <Badge variant={criticalCount > 0 ? 'critical' : highCount > 0 ? 'high' : 'low'}>
+            {riskLabel}
+          </Badge>
+          <p className="text-sm text-text-muted">
+            {criticalCount} critical · {highCount} high · {severityTotals.total} open findings
+          </p>
+        </CardContent>
+      </Card>
+
+      {alertRows.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Notifications</CardTitle>
+            <CardDescription>Recent plan-enabled security alerts.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {alertRows.map((alert) => (
+              <div key={alert.id} className="flex justify-between gap-4 text-sm">
+                <span>{alert.message}</span>
+                <time className="text-text-muted" dateTime={alert.createdAt.toISOString()}>
+                  {alert.createdAt.toISOString().slice(0, 16).replace('T', ' ')}
+                </time>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscription</CardTitle>
+          <CardDescription>{plan.description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-lg font-semibold">{plan.name}</p>
+              <p className="text-sm text-text-muted">
+                Status: {account?.subscriptionStatus ?? 'active'}
+              </p>
+            </div>
+            <ul className="grid gap-1 text-sm text-text-muted sm:grid-cols-2">
+              <li>Monthly scans: {plan.monthlyScans ?? 'Unlimited'}</li>
+              <li>Concurrent scans: {plan.concurrentScans}</li>
+              <li>Scheduled scans: {plan.scheduledScans}</li>
+              <li>Private targets: {plan.privateTargets ? 'Included' : 'Not included'}</li>
+              <li>Executive PDF: {plan.pdfExport ? 'Included' : 'Not included'}</li>
+              <li>Critical alerts: {plan.criticalAlerts ? 'Included' : 'Not included'}</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>{t('severityBreakdown')}</CardTitle>
@@ -201,7 +277,27 @@ export default async function DashboardPage({
           {trends.length === 0 ? (
             <p className="text-sm text-text-muted">{t('trend.empty')}</p>
           ) : (
-            <Table>
+            <div className="flex flex-col gap-5">
+              <div className="grid gap-3" aria-label="Risk trend chart">
+                {trends.map((trend) => {
+                  const max = Math.max(trend.latestRisky, trend.previousRisky ?? 0, 1);
+                  return (
+                    <div key={`chart-${trend.latestScanId}`} className="grid gap-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-mono">{trend.hostname}</span>
+                        <span>{trend.latestRisky}</span>
+                      </div>
+                      <div className="h-2 rounded bg-surface-muted">
+                        <div
+                          className="h-2 rounded bg-primary transition-[width]"
+                          style={{ width: `${Math.round((trend.latestRisky / max) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('trend.table.domain')}</TableHead>
@@ -241,7 +337,8 @@ export default async function DashboardPage({
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

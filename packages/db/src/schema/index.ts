@@ -22,9 +22,27 @@ import { scans } from './scans';
 import { sessions } from './sessions';
 import { users } from './users';
 import { verificationTokens } from './verification-tokens';
+import { notifications } from './notifications';
 
-export { accountStatusEnum, citext, scanStatusEnum, severityEnum, tokenPurposeEnum } from './enums';
-export type { AccountStatus, ScanStatus, Severity, TokenPurpose } from './enums';
+export {
+  accountStatusEnum,
+  citext,
+  findingStatusEnum,
+  scanStatusEnum,
+  severityEnum,
+  subscriptionPlanEnum,
+  subscriptionStatusEnum,
+  tokenPurposeEnum,
+} from './enums';
+export type {
+  AccountStatus,
+  FindingStatus,
+  ScanStatus,
+  Severity,
+  SubscriptionPlan,
+  SubscriptionStatus,
+  TokenPurpose,
+} from './enums';
 
 export { users } from './users';
 export type { NewUser, User } from './users';
@@ -55,6 +73,8 @@ export type { NewScanEvent, ScanEvent } from './scan-events';
 
 export { scanSchedules } from './scan-schedules';
 export type { NewScanSchedule, ScanSchedule } from './scan-schedules';
+export { notifications } from './notifications';
+export type { NewNotification, Notification } from './notifications';
 
 export {
   accountsRelations,
@@ -88,4 +108,5 @@ export const schema = {
   findings,
   scanEvents,
   scanSchedules,
+  notifications,
 };

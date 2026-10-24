@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@node-rs/argon2':
+        specifier: ^2.2.1
+        version: 2.2.1
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       redis:
         specifier: ^6.3.0
         version: 6.3.0

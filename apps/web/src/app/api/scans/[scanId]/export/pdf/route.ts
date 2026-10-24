@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, domains, eq, findings, scans } from '@vuldetected/db';
+import { and, domains, eq, findings, scans, users } from '@vuldetected/db';
 import { NextResponse } from 'next/server';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
@@ -25,9 +25,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
     .select({
       scan: scans,
       hostname: domains.normalizedHostname,
+      subscriptionPlan: users.subscriptionPlan,
     })
     .from(scans)
     .innerJoin(domains, eq(scans.domainId, domains.id))
+    .innerJoin(users, eq(domains.userId, users.id))
     .where(and(eq(scans.id, scanId), eq(domains.userId, session.user.id)))
     .limit(1);
 
@@ -37,8 +39,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
 
   const scan = scanRows[0]?.scan;
   const hostname = scanRows[0]?.hostname;
+  const subscriptionPlan = scanRows[0]?.subscriptionPlan;
   if (!scan || !hostname) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (subscriptionPlan === 'free') {
+    return NextResponse.json({ error: 'PDF export requires Pro or Business.' }, { status: 403 });
   }
 
   const findingRows = await db()

@@ -12,11 +12,13 @@ import {
 import Link from 'next/link';
 
 import { getSeverityVariant as getSeverityBadgeVariant } from '@/lib/severity/classify';
+import { FindingStatusControl } from './finding-status-control';
 
 /** One finding, flattened for the table. */
 export interface FindingRow {
   id: string;
   severity: string;
+  status: 'open' | 'false_positive' | 'resolved';
   checkName: string;
   title: string;
   description: string;
@@ -61,6 +63,9 @@ export async function FindingsList({ findings }: { findings: FindingRow[] }) {
             </TableCell>
             <TableCell title={finding.description}>
               <span className="text-xs">{finding.title}</span>
+            </TableCell>
+            <TableCell>
+              <FindingStatusControl findingId={finding.id} status={finding.status} />
             </TableCell>
             <TableCell>
               <span className="break-all font-mono text-xs">{finding.affectedUrl}</span>

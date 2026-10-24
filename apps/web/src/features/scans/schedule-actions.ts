@@ -1,11 +1,12 @@
 'use server';
 
-import { and, desc, domains, eq, scanSchedules } from '@vuldetected/db';
+import { and, desc, domains, eq, scanSchedules, users } from '@vuldetected/db';
 
 import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
 import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
+import { getPlanDefinition } from '@/lib/plans';
 
 import { computeNextRunAt, createScheduleSchema, updateScheduleSchema } from './schedule-schema';
 /** What the schedule list renders. */
@@ -106,6 +107,16 @@ export async function createScheduleAction(input: {
 
   if (domainRows.length === 0) {
     return { success: false, error: 'Domain not verified' };
+  }
+
+  const account = await db()
+    .select({ subscriptionPlan: users.subscriptionPlan })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const plan = getPlanDefinition(account[0]?.subscriptionPlan ?? 'free');
+  if (plan.scheduledScans === 0) {
+    return { success: false, error: 'Your plan does not include scheduled scans.' };
   }
 
   const now = new Date();

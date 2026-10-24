@@ -2,7 +2,18 @@ import 'server-only';
 
 import { timingSafeEqual } from 'node:crypto';
 
-import { eq, findings, scans, scanEvents } from '@vuldetected/db';
+import {
+  and,
+  domains,
+  eq,
+  findings,
+  inArray,
+  notifications,
+  ne,
+  scans,
+  users,
+  scanEvents,
+} from '@vuldetected/db';
 import { NextResponse } from 'next/server';
 
 import { audit } from '@/lib/audit';
@@ -96,6 +107,12 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
     const status = body.status;
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
       await db().transaction(async (tx) => {
+        const current = await tx
+          .select({ status: scans.status })
+          .from(scans)
+          .where(eq(scans.id, scanId))
+          .limit(1);
+        if (current[0]?.status === 'cancelled') return;
         if (Array.isArray(body.findings)) {
           for (const f of body.findings) {
             if (!f || !f.key) continue;
@@ -136,8 +153,37 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
         await tx
           .update(scans)
           .set(update as unknown as Record<string, Date | string>)
-          .where(eq(scans.id, scanId));
+          .where(and(eq(scans.id, scanId), ne(scans.status, 'cancelled')));
       });
+
+      if (status === 'completed') {
+        const criticalRows = await db()
+          .select({ userId: domains.userId })
+          .from(findings)
+          .innerJoin(scans, eq(findings.scanId, scans.id))
+          .innerJoin(domains, eq(scans.domainId, domains.id))
+          .innerJoin(users, eq(domains.userId, users.id))
+          .where(
+            and(
+              eq(findings.scanId, scanId),
+              eq(findings.severity, 'critical'),
+              eq(users.subscriptionStatus, 'active'),
+              inArray(users.subscriptionPlan, ['pro', 'business']),
+            ),
+          )
+          .limit(1);
+        if (criticalRows[0]) {
+          await db()
+            .insert(notifications)
+            .values({
+              userId: criticalRows[0].userId,
+              scanId,
+              type: 'critical_finding',
+              message: 'A completed scan contains a critical finding.',
+            })
+            .onConflictDoNothing();
+        }
+      }
 
       try {
         if (status === 'completed') {

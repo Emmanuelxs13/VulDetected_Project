@@ -168,6 +168,13 @@ audiencia pueda actuar.
 
 ## Sprint 4 — En curso
 
+- [x] Demo plans and subscription metadata (Free, Pro, Business)
+- [x] Finding workflow states and owner-scoped status changes
+- [x] Scan cancellation with late-callback protection
+- [x] Critical-finding notifications for eligible plans
+- [x] Local scheduler clock and risk posture dashboard
+- [x] Local demo-user seed and end-to-end test guide — En curso
+
 **Estado:** En curso
 
 OAuth, exportación ejecutiva y escaneos programados ya tienen implementación

@@ -2,7 +2,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { resolveTxt } from 'node:dns/promises';
-import { and, desc, domains, eq, gt, verificationTokens } from '@vuldetected/db';
+import { and, desc, domains, eq, gt, or, scans, verificationTokens } from '@vuldetected/db';
 
 import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
@@ -362,4 +362,38 @@ export async function submitScanAction(input: {
   }
 
   return { success: true, data: { scanId: outcome.scanId } };
+}
+
+export async function cancelScanAction(scanId: string): Promise<ActionResult<null>> {
+  const { userId } = await requireUser();
+  const owned = await db()
+    .select({ id: scans.id })
+    .from(scans)
+    .innerJoin(domains, eq(scans.domainId, domains.id))
+    .where(
+      and(
+        eq(scans.id, scanId),
+        eq(domains.userId, userId),
+        or(eq(scans.status, 'queued'), eq(scans.status, 'running')),
+      ),
+    )
+    .limit(1);
+  if (!owned[0]) return { success: false, error: 'Scan is no longer cancellable.' };
+
+  const updated = await db()
+    .update(scans)
+    .set({ status: 'cancelled', finishedAt: new Date(), error: 'cancelled_by_user' })
+    .where(
+      and(
+        eq(scans.id, scanId),
+        or(eq(scans.status, 'queued'), eq(scans.status, 'running')),
+      ),
+    )
+    .returning({ id: scans.id });
+
+  if (updated.length === 0) {
+    return { success: false, error: 'Scan is no longer cancellable.' };
+  }
+
+  return { success: true, data: null };
 }

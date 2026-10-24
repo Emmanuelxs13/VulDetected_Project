@@ -103,6 +103,7 @@ export async function listFindingsPage(query: FindingsPageQuery): Promise<Findin
     .select({
       id: findings.id,
       severity: findings.severity,
+      status: findings.status,
       checkName: findings.checkName,
       title: findings.title,
       description: findings.description,
@@ -125,6 +126,7 @@ export async function listFindingsPage(query: FindingsPageQuery): Promise<Findin
     rows: page.map((row) => ({
       id: row.id,
       severity: row.severity,
+      status: row.status,
       checkName: row.checkName,
       title: row.title,
       description: row.description,
@@ -142,7 +144,7 @@ export async function getSeverityCounts(
   ownerUserId: string,
   scanId?: string,
 ): Promise<{ counts: SeverityCounts; total: number }> {
-  const conditions = [eq(domains.userId, ownerUserId)];
+  const conditions = [eq(domains.userId, ownerUserId), eq(findings.status, 'open')];
   if (scanId) {
     conditions.push(eq(findings.scanId, scanId));
   }
