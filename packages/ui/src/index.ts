@@ -30,6 +30,26 @@ export type { BadgeProps } from './components/Badge';
 export { Button, buttonVariants } from './components/Button';
 export type { ButtonProps } from './components/Button';
 
+export { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from './components/Dialog';
+export { Sheet, SheetPortal, SheetOverlay, SheetTrigger, SheetClose, SheetContent, SheetHeader, SheetFooter, SheetTitle, SheetDescription } from './components/Sheet';
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './components/Accordion';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './components/Tabs';
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './components/Tooltip';
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+} from './components/DropdownMenu';
+
 export {
   Card,
   CardContent,

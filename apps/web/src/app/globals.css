@@ -22,11 +22,6 @@
  * which resolves relative to that stylesheet and is therefore enough for the
  * primitives on their own.
  *
- * (Do not paste a recursive glob literally into a comment here. A CSS comment
- * ends at the first star-slash sequence, and a recursive glob's doubled star
- * contains one — so the comment silently terminates early and the remainder is
- * parsed as CSS, failing with `Unknown word` on a line that looks fine.)
- *
  * The app's own class names still need registering, because they live in
  * `apps/web/src` — not a `components/` directory, and not under a registered
  * path. Without this line, every utility used in a page below silently compiles
@@ -63,4 +58,23 @@
 @utility dev-banner {
   border: 1px dashed var(--color-medium);
   background-color: var(--color-medium-tint);
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
 }
