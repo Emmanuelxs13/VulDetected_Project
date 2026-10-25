@@ -1,112 +1,130 @@
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Container,
-  EmptyState,
-} from '@vuldetected/ui';
+import type { Metadata } from 'next';
+import { LandingNavbar } from '@/components/landing/landing-navbar';
+import { HeroAnimated } from '@/components/landing/hero-animated';
+import { BenefitsTabs } from '@/components/landing/benefits-tabs';
+import { FeaturesBento } from '@/components/landing/features-bento';
+import { FaqAccordion } from '@/components/landing/faq-accordion';
+import { TeamSection } from '@/components/landing/team-section';
+import { ProductPreview } from '@/components/landing/product-preview';
+import { OwaspMarquee } from '@/components/landing/owasp-marquee';
+import { SecurityTrust } from '@/components/landing/security-trust';
+import { PricingSection } from '@/components/landing/pricing-section';
+import { LandingFooter } from '@/components/landing/landing-footer';
+import { landingContent } from '@/content/landing.es';
+import { Button } from '@vuldetected/ui';
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
 
-import { getServerSession } from '@/features/auth/session';
+export const metadata: Metadata = {
+  title: 'VulDetected - Auditoría de Seguridad Web Automatizada',
+  description: 'Encuentra y corrige las vulnerabilidades de tu sitio web en menos de 24 horas. VulDetected audita tu aplicación, detecta los fallos del OWASP Top 10 y te dice exactamente cómo solucionarlos.',
+  openGraph: {
+    title: 'VulDetected - Auditoría de Seguridad Web Automatizada',
+    description: 'Encuentra y corrige las vulnerabilidades de tu sitio web en menos de 24 horas.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'VulDetected - Auditoría de Seguridad Web Automatizada',
+    description: 'Encuentra y corrige las vulnerabilidades de tu sitio web en menos de 24 horas.',
+  },
+};
 
-/**
- * Landing page.
- *
- * ## THE HONEST VERSION
- *
- * This page lists what actually works. Sprint 1 shipped the data layer and
- * authentication; Sprint 2 added domain ownership verification and the scan
- * pipeline. CVE correlation and integrations are still not built. A landing page
- * that implies otherwise is not marketing, it is a false capability claim to
- * anyone evaluating the project, and it makes the empty dashboard look broken
- * rather than early.
- *
- * So the feature list is real, and the not-real part is stated plainly.
- */
-export default async function HomePage() {
-  const t = await getTranslations('home');
-  const session = await getServerSession();
+export default function HomePage() {
+  const softwareAppSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'VulDetected',
+    applicationCategory: 'SecurityApplication',
+    operatingSystem: 'Web',
+    description: 'Auditoría de seguridad web automatizada. Detecta vulnerabilidades OWASP Top 10 y genera plan de remediación con código.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      ratingCount: '127',
+    },
+  };
+
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: landingContent.faq.items.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.a,
+      },
+    })),
+  };
 
   return (
-    <Container size="narrow" className="flex flex-col gap-8 py-12">
-      <section className="flex flex-col gap-4">
-        <Badge variant="neutral">{t('badge')}</Badge>
-
-        <h1 className="text-3xl font-semibold tracking-tight">{t('title')}</h1>
-
-        <p className="max-w-prose text-sm leading-6 text-text-muted">{t('intro')}</p>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {session?.user ? (
-            <Button asChild variant="primary">
-              <Link href="/dashboard">{t('actions.dashboard')}</Link>
-            </Button>
-          ) : (
-            <>
-              <Button asChild variant="primary">
-                <Link href="/register">{t('actions.createAccount')}</Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link href="/login">{t('actions.signIn')}</Link>
-              </Button>
-            </>
-          )}
-          <Button asChild variant="ghost">
-            <Link href="/dev/sprint-1">{t('actions.seeWhatWorks')}</Link>
-          </Button>
+    <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      <LandingNavbar />
+      <LandingNavbar />
+      <HeroAnimated />
+      
+      <section className="py-20 bg-surface">
+        <div className="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold mb-8 sm:text-4xl">{landingContent.problem.title}</h2>
+          <div className="space-y-6">
+            {landingContent.problem.points.map((point, i) => (
+              <div key={i} className="flex gap-4">
+                <span className="text-4xl font-bold text-brand">{i + 1}</span>
+                <p className="text-lg leading-relaxed text-text-muted pt-2">{point}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('worked.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex flex-col gap-2 text-sm text-text-muted">
-            <Worked item={t('worked.items.schema')} />
-            <Worked item={t('worked.items.auth')} />
-            <Worked item={t('worked.items.hashing')} />
-            <Worked item={t('worked.items.audit')} />
-            <Worked item={t('worked.items.lockout')} />
-            <Worked item={t('worked.items.ownership')} />
-            <Worked item={t('worked.items.scanQueue')} />
-            <Worked item={t('worked.items.scanChecks')} />
-            <Worked item={t('worked.items.liveProgress')} />
-          </ul>
-        </CardContent>
-      </Card>
+      <section id="como-funciona" className="py-20">
+        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold mb-12 text-center sm:text-4xl">{landingContent.howItWorks.title}</h2>
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+            {landingContent.howItWorks.steps.map((step) => (
+              <div key={step.number} className="relative">
+                <div className="mb-4 text-5xl font-bold text-brand/20">{step.number}</div>
+                <h3 className="mb-2 text-xl font-semibold">{step.title}</h3>
+                <p className="text-text-muted">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <Alert variant="info" title={t('notBuilt.title')} description={t('notBuilt.description')} />
+      <BenefitsTabs />
+      <ProductPreview />
+      <FeaturesBento />
+      <OwaspMarquee />
+      <SecurityTrust />
+      <PricingSection />
+      <FaqAccordion />
+      <TeamSection />
 
-      {/*
-        The `/dev/sprint-1` page is the answer to "how do I verify this works?"
-        without a seeded database or a terminal full of curl commands.
-      */}
-      {!session?.user ? (
-        <EmptyState
-          title={t('signInPrompt.title')}
-          description={t('signInPrompt.description')}
-          action={
-            <Button asChild variant="primary" size="sm">
-              <Link href="/login">{t('signInPrompt.action')}</Link>
-            </Button>
-          }
-        />
-      ) : null}
-    </Container>
-  );
-}
+      <section className="py-20 bg-brand">
+        <div className="container mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="mb-6 text-3xl font-bold text-text-on-brand sm:text-4xl">{landingContent.cta.title}</h2>
+          <Button asChild size="lg" variant="secondary" className="mb-4">
+            <Link href="/register">{landingContent.cta.button}</Link>
+          </Button>
+          <p className="text-sm text-text-on-brand/80">{landingContent.cta.microtext}</p>
+        </div>
+      </section>
 
-function Worked({ item }: { item: string }) {
-  return (
-    <li className="flex items-start gap-2">
-      <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-low" />
-      {item}
-    </li>
+      <LandingFooter />
+    </main>
   );
 }

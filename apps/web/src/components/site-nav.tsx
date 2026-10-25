@@ -52,8 +52,12 @@ export async function SiteNav() {
             </Link>
 
             <nav aria-label={t('mainLabel')} className="hidden items-center gap-1 sm:flex">
-              <NavLink href="/dashboard">{t('dashboard')}</NavLink>
-              <NavLink href="/scans">{t('scans')}</NavLink>
+              {session?.user ? (
+                <>
+                  <NavLink href="/dashboard">{t('dashboard')}</NavLink>
+                  <NavLink href="/scans">{t('scans')}</NavLink>
+                </>
+              ) : null}
             </nav>
           </div>
 

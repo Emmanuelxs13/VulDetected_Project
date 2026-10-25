@@ -4,7 +4,7 @@ import { GeistSans } from 'geist/font/sans';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getTranslations } from 'next-intl/server';
 
-import { SiteNav } from '@/components/site-nav';
+import { Toaster } from '@/components/ui/sonner';
 
 import './globals.css';
 
@@ -77,11 +77,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </a>
 
           <div className="flex min-h-dvh flex-col">
-            <SiteNav />
             <main id="main" tabIndex={-1} className="flex-1 outline-none">
               {children}
             </main>
           </div>
+          <Toaster />
         </NextIntlClientProvider>
       </body>
     </html>
