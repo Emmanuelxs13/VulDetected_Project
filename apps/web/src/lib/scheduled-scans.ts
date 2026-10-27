@@ -1,5 +1,3 @@
-import 'server-only';
-
 import { and, asc, domains, eq, isNull, lte, or, scanSchedules } from '@vuldetected/db';
 
 import { enqueueScanForDomain, scheduleTarget } from '@/features/scans/enqueue';
@@ -48,6 +46,12 @@ export interface RunSchedulesResult {
  * domain stops its traffic on the next tick rather than at the next user visit.
  * The unverified row is still claimed (its clock advances) so it cannot sit at
  * the head of every batch and starve verified schedules behind it.
+ *
+ * ## WHY THE CLOCK IS INJECTABLE
+ *
+ * `now` is a parameter so a test can assert the exact instant written to
+ * `last_run_at`/`next_run_at` without freezing the process clock. The production
+ * caller passes nothing and gets the real time.
  */
 export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedulesResult> {
   const dueRows = await db()
