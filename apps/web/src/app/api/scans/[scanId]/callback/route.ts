@@ -5,14 +5,10 @@ import { timingSafeEqual } from 'node:crypto';
 import {
   and,
   desc,
-  domains,
   eq,
   findings,
-  inArray,
-  notifications,
   ne,
   scans,
-  users,
   scanEvents,
 } from '@vuldetected/db';
 import { NextResponse } from 'next/server';
@@ -21,6 +17,7 @@ import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { computeFindingKey } from '@/lib/findings/newness';
+import { notifyScanCompleted } from '@/lib/mail/notify';
 import { classifyFinding } from '@/lib/severity/classify';
 import { owaspCategoryCodeFor } from '@/lib/severity/owasp';
 
@@ -221,44 +218,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
       });
 
       if (status === 'completed') {
-        const criticalRows = await db()
-          .select({ userId: domains.userId })
-          .from(findings)
-          .innerJoin(scans, eq(findings.scanId, scans.id))
-          .innerJoin(domains, eq(scans.domainId, domains.id))
-          .innerJoin(users, eq(domains.userId, users.id))
-          .where(
-            and(
-              eq(findings.scanId, scanId),
-              eq(findings.severity, 'critical'),
-              eq(users.subscriptionStatus, 'active'),
-              inArray(users.subscriptionPlan, ['pro', 'business']),
-            ),
-          )
-          .limit(1);
-        if (criticalRows[0]) {
-          await db()
-            .insert(notifications)
-            .values({
-              userId: criticalRows[0].userId,
-              scanId,
-              type: 'critical_finding',
-              message: 'A completed scan contains a critical finding.',
-            })
-            .onConflictDoNothing();
+        /**
+         * Notifications and mail for a finished scan.
+         *
+         * Wrapped so a mail problem cannot turn a successful scan into a failed
+         * callback: the worker would retry the whole terminal report, the scan
+         * would flip to `failed` for a reason that has nothing to do with the
+         * scan, and the findings would already be written. The outbox row is
+         * what makes delivery retryable on its own schedule.
+         */
+        try {
+          await notifyScanCompleted(scanId);
+        } catch (error) {
+          console.error('[mail] could not queue the scan notifications', error);
         }
       }
 
       try {
         if (status === 'completed') {
           await audit({
-            action: 'scan.completed' as unknown as import('@/lib/audit').AuditAction,
+            action: 'scan.completed',
             targetType: 'scan',
             targetId: scanId,
           });
         } else {
           await audit({
-            action: 'scan.failed' as unknown as import('@/lib/audit').AuditAction,
+            action: 'scan.failed',
             targetType: 'scan',
             targetId: scanId,
           });

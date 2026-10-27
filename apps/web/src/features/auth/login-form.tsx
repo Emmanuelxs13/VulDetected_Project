@@ -60,6 +60,15 @@ export function LoginForm() {
         )}
       </Field>
 
+      <p className="-mt-2 text-xs">
+        <Link
+          href="/forgot-password"
+          className="font-medium text-brand underline underline-offset-2"
+        >
+          {t('login.forgotPassword')}
+        </Link>
+      </p>
+
       <SubmitButton />
 
       <SocialButtons mode="login" />

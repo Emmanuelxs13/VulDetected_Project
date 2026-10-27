@@ -61,11 +61,12 @@
       "submit": "Sign in",
       "submitting": "Working…",
       "noAccount": "No account yet?",
-      "createOne": "Create one"
+      "createOne": "Create one",
+      "forgotPassword": "Forgot your password?"
     },
     "register": {
       "title": "Create an account",
-      "description": "Email verification is disabled for now, so you can sign in straight away.",
+      "description": "We will email you a link to confirm your address. You can start using the account right away.",
       "nameDescription": "Optional. Used to address you in the dashboard.",
       "passwordHint": "At least {min} characters. Length is what matters: capital letters, symbols and digits are not required.",
       "submit": "Create account",
@@ -73,11 +74,33 @@
       "haveAccount": "Already registered?",
       "signIn": "Sign in"
     },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "description": "Enter your account email and we will send you a link to choose a new password.",
+      "submit": "Send link",
+      "submitting": "Sending…",
+      "sent": "Check your email",
+      "sentDetail": "If that address has an account, the link is on its way. It expires in one hour and can be used once.",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Choose a new password",
+      "description": "Enter the password you want to use from now on.",
+      "submit": "Save password",
+      "submitting": "Saving…",
+      "confirmLabel": "Repeat the password",
+      "passwordHint": "At least {min} characters.",
+      "missingToken": "Incomplete link",
+      "missingTokenDetail": "This link carries no reset token. Request a new one.",
+      "requestNew": "Request a new link"
+    },
     "errors": {
       "checkFields": "Check the highlighted fields.",
       "genericLogin": "We could not sign you in with those details. Check the email and password and try again.",
       "genericRegister": "We could not create that account. If the address is already registered, try signing in instead.",
-      "createFailed": "We could not create that account. Try again in a moment."
+      "createFailed": "We could not create that account. Try again in a moment.",
+      "tooManyRequests": "Too many requests in a row. Wait a few minutes and try again.",
+      "resetTokenInvalid": "The link is not valid or has expired. Request a new one."
     },
     "validation": {
       "emailRequired": "Email is required.",
@@ -87,6 +110,8 @@
       "passwordMax": "Use at most {max} characters.",
       "passwordOnlySpaces": "Password cannot be only spaces.",
       "passwordRequired": "Password is required.",
+      "passwordMismatch": "The two passwords do not match.",
+      "resetTokenRequired": "The link is missing its token.",
       "nameEmpty": "Name cannot be empty.",
       "nameTooLong": "Name is too long."
     },

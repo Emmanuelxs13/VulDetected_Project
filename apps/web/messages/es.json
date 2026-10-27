@@ -61,11 +61,12 @@
       "submit": "Iniciar sesión",
       "submitting": "Procesando…",
       "noAccount": "¿Todavía no tienes cuenta?",
-      "createOne": "Crea una"
+      "createOne": "Crea una",
+      "forgotPassword": "¿Olvidaste tu contraseña?"
     },
     "register": {
       "title": "Crear una cuenta",
-      "description": "La verificación por correo está desactivada por ahora, así que puedes iniciar sesión de inmediato.",
+      "description": "Te enviaremos un correo para confirmar tu dirección. Puedes empezar a usar la cuenta de inmediato.",
       "nameDescription": "Opcional. Se usa para dirigirse a ti en el panel.",
       "passwordHint": "Al menos {min} caracteres. La longitud es lo que importa: no se exigen mayúsculas, símbolos ni dígitos.",
       "submit": "Crear cuenta",
@@ -73,11 +74,33 @@
       "haveAccount": "¿Ya tienes una cuenta?",
       "signIn": "Inicia sesión"
     },
+    "forgotPassword": {
+      "title": "Restablecer contraseña",
+      "description": "Escribe el correo de tu cuenta y te enviaremos un enlace para elegir una contraseña nueva.",
+      "submit": "Enviar enlace",
+      "submitting": "Enviando…",
+      "sent": "Revisa tu correo",
+      "sentDetail": "Si esa dirección tiene una cuenta, el enlace ya va en camino. Caduca en una hora y solo se puede usar una vez.",
+      "backToLogin": "Volver a iniciar sesión"
+    },
+    "resetPassword": {
+      "title": "Elige una contraseña nueva",
+      "description": "Escribe la contraseña que quieres usar desde ahora.",
+      "submit": "Guardar contraseña",
+      "submitting": "Guardando…",
+      "confirmLabel": "Repite la contraseña",
+      "passwordHint": "Al menos {min} caracteres.",
+      "missingToken": "Enlace incompleto",
+      "missingTokenDetail": "Este enlace no trae un token de restablecimiento. Solicita uno nuevo.",
+      "requestNew": "Solicitar un enlace nuevo"
+    },
     "errors": {
       "checkFields": "Revisa los campos marcados.",
       "genericLogin": "No pudimos iniciar sesión con esos datos. Revisa el correo y la contraseña e inténtalo de nuevo.",
       "genericRegister": "No pudimos crear esa cuenta. Si la dirección ya está registrada, inicia sesión.",
-      "createFailed": "No pudimos crear esa cuenta. Inténtalo de nuevo en un momento."
+      "createFailed": "No pudimos crear esa cuenta. Inténtalo de nuevo en un momento.",
+      "tooManyRequests": "Demasiadas solicitudes seguidas. Espera unos minutos y vuelve a intentarlo.",
+      "resetTokenInvalid": "El enlace no es válido o ya caducó. Solicita uno nuevo."
     },
     "validation": {
       "emailRequired": "El correo electrónico es obligatorio.",
@@ -87,6 +110,8 @@
       "passwordMax": "Usa como máximo {max} caracteres.",
       "passwordOnlySpaces": "La contraseña no puede contener solo espacios.",
       "passwordRequired": "La contraseña es obligatoria.",
+      "passwordMismatch": "Las dos contraseñas no coinciden.",
+      "resetTokenRequired": "Falta el token del enlace.",
       "nameEmpty": "El nombre no puede estar vacío.",
       "nameTooLong": "El nombre es demasiado largo."
     },
