@@ -1,171 +1,186 @@
-'use client';
+import type { Metadata } from 'next';
+import { and, domains, eq, findings, scans, sql } from '@vuldetected/db';
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Container,
+  EmptyState,
+} from '@vuldetected/ui';
+import { getTranslations } from 'next-intl/server';
 
-import { useState } from 'react';
-import { Button, Card, CardContent, Container } from '@vuldetected/ui';
-import { toast } from 'sonner';
+import { getServerSession } from '@/features/auth/session';
+import { db } from '@/lib/db';
+import { getRemediation, type RemediationEntry } from '@/lib/remediation/registry';
+import { SEVERITY_ORDER } from '@/lib/severity/classify';
 
-const guides = [
-  {
-    id: 'xss',
-    title: 'Cross-Site Scripting (XSS)',
-    category: 'Injection',
-    description: 'XSS permite a atacantes inyectar scripts maliciosos en páginas web vistas por otros usuarios.',
-    prevention: [
-      'Escapar siempre la salida de datos del usuario',
-      'Usar Content-Security-Policy (CSP)',
-      'Validar y sanitizar entradas',
-      'Usar frameworks con protección XSS integrada',
-    ],
-    codeExamples: {
-      javascript: `// Mal - vulnerable
-element.innerHTML = userInput;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('remediation');
 
-// Bien - seguro
-element.textContent = userInput;
-// o usar DOMPurify
-element.innerHTML = DOMPurify.sanitize(userInput);`,
-      php: `// Mal - vulnerable
-echo $_GET['search'];
+  return { title: t('title') };
+}
 
-// Bien - seguro
-echo htmlspecialchars($_GET['search'], ENT_QUOTES, 'UTF-8');`,
-      python: `# Mal - vulnerable
-return f"<div>{user_input}</div>"
+/** Most severe severity a rule can produce, used to order the guides worst-first. */
+function ruleWeight(entry: RemediationEntry): number {
+  return Math.min(
+    ...entry.severities.map((severity) =>
+      SEVERITY_ORDER.indexOf(severity as (typeof SEVERITY_ORDER)[number]),
+    ),
+  );
+}
 
-# Bien - seguro
-from markupsafe import escape
-return f"<div>{escape(user_input)}</div>"`,
-    },
-  },
-  {
-    id: 'sql-injection',
-    title: 'Inyección SQL',
-    category: 'Injection',
-    description: 'Los atacantes pueden manipular consultas SQL para acceder, modificar o eliminar datos.',
-    prevention: [
-      'Usar consultas parametrizadas (prepared statements)',
-      'Usar ORM con protección integrada',
-      'Validar y sanitizar entradas',
-      'Aplicar principio de menor privilegio',
-    ],
-    codeExamples: {
-      javascript: `// Mal - vulnerable
-db.query(\`SELECT * FROM users WHERE id = \${userId}\`);
+/**
+ * Remediation guides, driven by the findings the caller actually has open.
+ *
+ * ## WHY THIS IS NOT A STATIC LIBRARY PAGE
+ *
+ * A catalogue of every guide we wrote is a documentation site; it does not tell
+ * the reader where to start. The page lists only the rules behind their own open
+ * findings, worst first, with the number of open findings for each — so the
+ * first card is the next thing to fix, not an alphabetical entry.
+ *
+ * ## WHY A RULE WITH NO GUIDE IS STILL LISTED
+ *
+ * Silently dropping it would make a gap in our own registry look like a clean
+ * result. The entry is shown as "no guide yet" instead, which is the honest
+ * state and the one that gets us a bug report.
+ */
+export default async function RemediationPage() {
+  const t = await getTranslations('remediation');
+  const tScan = await getTranslations('scan');
+  const session = await getServerSession();
 
-// Bien - seguro con prepared statements
-db.query('SELECT * FROM users WHERE id = ?', [userId]);`,
-      php: `// Mal - vulnerable
-mysqli_query($conn, "SELECT * FROM users WHERE id = $id");
+  if (!session?.user) {
+    return (
+      <Container size="narrow" className="py-12">
+        <EmptyState
+          title={t('sessionRequired.title')}
+          description={t('sessionRequired.description')}
+        />
+      </Container>
+    );
+  }
 
-// Bien - seguro
-$stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
-$stmt->bind_param("i", $id);
-$stmt->execute();`,
-      python: `# Mal - vulnerable
-cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
+  const userId = session.user.id;
 
-# Bien - seguro
-cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))`,
-    },
-  },
-];
+  const openByCheck = await db()
+    .select({ checkName: findings.checkName, total: sql<number>`count(*)::int` })
+    .from(findings)
+    .innerJoin(scans, eq(findings.scanId, scans.id))
+    .innerJoin(domains, eq(scans.domainId, domains.id))
+    .where(and(eq(domains.userId, userId), eq(findings.status, 'open')))
+    .groupBy(findings.checkName);
 
-export default function RemediationPage() {
-  const [activeGuide, setActiveGuide] = useState(guides[0]);
-  const [framework, setFramework] = useState('javascript');
+  const withGuide = openByCheck
+    .map((row) => ({ ...row, entry: getRemediation(row.checkName) }))
+    .filter((row): row is typeof row & { entry: RemediationEntry } => row.entry !== undefined)
+    .sort((a, b) => ruleWeight(a.entry) - ruleWeight(b.entry) || b.total - a.total);
 
-  const copyCode = () => {
-    const examples = activeGuide?.codeExamples as Record<string, string> | undefined;
-    const code = examples?.[framework] || '';
-    navigator.clipboard.writeText(code);
-    toast.success('Código copiado al portapapeles');
-  };
+  const withoutGuide = openByCheck.filter((row) => getRemediation(row.checkName) === undefined);
 
   return (
     <Container className="flex flex-col gap-6 py-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Guías de Remediación</h1>
-        <p className="text-text-muted">Documentación técnica con código de corrección listo para copiar</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-text-muted">{t('description')}</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      {withGuide.length === 0 && withoutGuide.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
-            <nav className="space-y-2">
-              <div className="text-sm font-medium mb-3">Categorías</div>
-              {guides.map((guide) => (
-                <button
-                  key={guide.id}
-                  onClick={() => setActiveGuide(guide)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    activeGuide?.id === guide.id 
-                      ? 'bg-brand/10 text-brand font-medium' 
-                      : 'text-text-muted hover:text-text hover:bg-surface'
-                  }`}
-                >
-                  {guide.title}
-                </button>
-              ))}
-            </nav>
+            <EmptyState title={t('empty.title')} description={t('empty.description')} />
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardContent className="pt-6 space-y-6">
-            <div>
-              <h2 className="text-2xl font-semibold mb-2">{activeGuide?.title || ''}</h2>
-              <p className="text-text-muted">{activeGuide?.description || ''}</p>
+      ) : null}
+
+      {withGuide.map(({ checkName, total, entry }) => (
+        <Card key={checkName}>
+          <CardHeader>
+            <div className="flex flex-wrap items-center gap-3">
+              <CardTitle>{entry.developerGuide.title}</CardTitle>
+              <Badge variant="neutral">{t('openFindings', { count: total })}</Badge>
+              <span className="font-mono text-xs text-text-muted">{checkName}</span>
             </div>
-
-            <section>
-              <h3 className="font-medium mb-3 text-lg">¿Qué es?</h3>
-              <p className="text-text-muted">{activeGuide?.description || ''}</p>
-            </section>
-
-            <section>
-              <h3 className="font-medium mb-3 text-lg">Medidas de Prevención</h3>
-              <ul className="space-y-2">
-                {(activeGuide?.prevention || []).map((item: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-text-muted">
-                    <span className="text-brand mt-1">✓</span>
-                    <span>{item}</span>
-                  </li>
+            <CardDescription>{entry.businessGuide.title}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6">
+            <section className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold">
+                {tScan('findings.detail.remediation.developer')}
+              </h3>
+              <ol className="list-decimal space-y-1 pl-5 text-sm">
+                {entry.developerGuide.steps.map((step) => (
+                  <li key={step}>{step}</li>
                 ))}
-              </ul>
+              </ol>
+              {entry.developerGuide.notes?.map((note) => (
+                <p key={note} className="text-xs text-text-muted">
+                  {note}
+                </p>
+              ))}
             </section>
 
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-lg">Cómo corregirlo</h3>
-                <select 
-                  value={framework} 
-                  onChange={(e) => setFramework(e.target.value)}
-                  className="w-[150px] px-3 py-2 bg-surface border border-border rounded-md text-sm"
-                >
-                  <option value="javascript">JavaScript</option>
-                  <option value="php">PHP</option>
-                  <option value="python">Python</option>
-                </select>
-              </div>
-              <div className="rounded-lg bg-surface p-4 relative">
-                <pre className="overflow-x-auto text-sm">
-                  <code className="text-text">
-                    {((activeGuide?.codeExamples as Record<string, string>)?.[framework]) || ''}
-                  </code>
-                </pre>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="absolute top-2 right-2"
-                  onClick={copyCode}
-                >
-                  Copiar
-                </Button>
-              </div>
+            <section className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold">
+                {tScan('findings.detail.remediation.sysadmin')}
+              </h3>
+              <ol className="list-decimal space-y-1 pl-5 text-sm">
+                {entry.sysadminGuide.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold">
+                {tScan('findings.detail.remediation.business')}
+              </h3>
+              <ol className="list-decimal space-y-1 pl-5 text-sm">
+                {entry.businessGuide.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold">
+                {tScan('findings.detail.remediation.codeFixes')}
+              </h3>
+              {entry.codeFixes.map((fix) => (
+                <div key={`${fix.language}-${fix.label}`} className="flex flex-col gap-1">
+                  <div className="text-xs font-medium">
+                    {fix.label} · {fix.language}
+                  </div>
+                  <pre className="overflow-x-auto rounded-md bg-surface-raised p-3 text-xs">
+                    <code>{fix.code}</code>
+                  </pre>
+                </div>
+              ))}
             </section>
           </CardContent>
         </Card>
-      </div>
+      ))}
+
+      {withoutGuide.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('noGuide.title')}</CardTitle>
+            <CardDescription>{t('noGuide.description')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-wrap gap-2 text-xs">
+              {withoutGuide.map((row) => (
+                <li key={row.checkName} className="font-mono">
+                  {row.checkName} ({row.total})
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
     </Container>
   );
 }
