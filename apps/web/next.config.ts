@@ -29,7 +29,36 @@ const config: NextConfig = {
    * rather than an experimental flag whose only effect would be to silence a
    * build-time module read that should never happen.
    */
-  serverExternalPackages: ['@node-rs/argon2', 'postgres'],
+  serverExternalPackages: ['@node-rs/argon2', 'postgres', 'pino'],
+
+  /**
+   * `standalone` is what the production image ships: Next traces the modules the
+   * server actually imports and emits a self-contained `server.js` with its own
+   * `node_modules`. Without it the image would have to carry the whole workspace
+   * `node_modules` (hundreds of MB of dev dependencies) or reinstall at boot.
+   *
+   * The traced tree is exercised locally by starting the emitted server and
+   * calling `/api/health` and `/api/ready`; that is the same artifact the
+   * Dockerfile copies, so a missing file shows up here and not in production.
+   */
+  output: 'standalone',
+
+  /**
+   * `messages/*.json` are loaded through a template literal
+   * (`import(`../../messages/${locale}.json`)` in `src/i18n/request.ts`), which
+   * the bundler cannot follow statically. Without this entry the standalone
+   * trace leaves both catalogues behind and the image starts fine but renders
+   * every page without translations — a failure that only shows up on the first
+   * request, in the language fallback, with no stack trace.
+   *
+   * The pattern is asserted by starting the emitted server and reading a
+   * translated page; see `docs/deployment.md`.
+   */
+  outputFileTracingIncludes: {
+    '/**': ['./messages/**/*.json'],
+  },
+
+
 
   reactStrictMode: true,
 
