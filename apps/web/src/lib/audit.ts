@@ -47,6 +47,8 @@ export type AuditAction =
   | 'scan_schedule.created'
   | 'scan_schedule.updated'
   | 'scan_schedule.deleted'
+  | 'scan_credential.created'
+  | 'scan_credential.revoked'
   | 'domain.ownership.verified'
   | 'domain.ownership.challenge_issued';
 

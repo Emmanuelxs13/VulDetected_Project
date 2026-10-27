@@ -287,7 +287,8 @@
         "concurrent_scan_limit": "Your plan already has the maximum number of scans running at once. Wait for one to finish.",
         "schedule_limit": "Your plan reached its maximum number of active schedules.",
         "scan_not_cancellable": "This scan can no longer be cancelled.",
-        "scan_not_retryable": "Only failed or cancelled scans can be retried."
+        "scan_not_retryable": "Only failed or cancelled scans can be retried.",
+        "credential_unavailable": "This domain has a scan credential that could not be used. Save it again in Settings."
       }
     },
     "queued": {
@@ -493,5 +494,42 @@
         "description": "Per-account lockout exists, but there is no IP-level limiter in front of the auth route. Server-side throttling is a Sprint 2 item and is required before this is exposed publicly."
       }
     }
+  },
+  "credentials": {
+    "title": "Scan credentials",
+    "description": "Let the scanner reach pages that require a session. They are stored encrypted and never shown again.",
+    "empty": "You have not stored any credentials yet.",
+    "domain": "Domain",
+    "label": "Label",
+    "labelPlaceholder": "Production, staging…",
+    "kind": "Authentication type",
+    "username": "Username",
+    "password": "Password",
+    "token": "Token",
+    "headerName": "Header name",
+    "headerValue": "Header value",
+    "save": "Save credential",
+    "saving": "Saving…",
+    "saved": "Credential saved. It will be used on the next scan.",
+    "revoke": "Revoke",
+    "revoking": "Revoking…",
+    "revoked": "Credential revoked. New scans will no longer use it.",
+    "lastUsed": "Last used",
+    "neverUsed": "Never used",
+    "noVerified": "Verify a domain before storing a credential.",
+    "kinds": {
+      "basic": "Username and password",
+      "bearer": "Bearer token",
+      "header": "Custom header"
+    },
+    "errors": {
+      "codes": {
+        "invalid_credential": "Check the credential fields.",
+        "domain_not_verified": "That domain is not verified on your account.",
+        "storage_unavailable": "The credential could not be stored. Encryption is not configured in this deployment.",
+        "credential_not_found": "That credential no longer exists or was revoked."
+      }
+    },
+    "pageTitle": "Settings"
   }
 }

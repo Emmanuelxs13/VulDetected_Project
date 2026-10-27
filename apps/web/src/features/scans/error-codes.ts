@@ -20,6 +20,7 @@ export const SCAN_ERROR_CODES = [
   'schedule_limit',
   'scan_not_cancellable',
   'scan_not_retryable',
+  'credential_unavailable',
 ] as const;
 
 export type ScanErrorCode = (typeof SCAN_ERROR_CODES)[number];
@@ -42,4 +43,5 @@ export const SCAN_ERROR_KEYS: Record<ScanErrorCode, string> = {
   schedule_limit: 'errors.codes.schedule_limit',
   scan_not_cancellable: 'errors.codes.scan_not_cancellable',
   scan_not_retryable: 'errors.codes.scan_not_retryable',
+  credential_unavailable: 'errors.codes.credential_unavailable',
 };

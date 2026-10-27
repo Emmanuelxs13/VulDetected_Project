@@ -125,6 +125,25 @@ const envSchema = z.object({
    */
   MAIL_DISPATCH_SECRET: z.string().min(16).optional(),
 
+  /**
+   * Key that seals scan credentials (AES-256-GCM).
+   *
+   * Base64 of exactly 32 raw bytes — `openssl rand -base64 32`. A passphrase is
+   * rejected rather than stretched: `lib/credentials/keyring.ts` explains why.
+   * Optional in development so the app boots without the credentials feature in
+   * use; required in production, where the UI offers it.
+   */
+  CREDENTIALS_ENCRYPTION_KEY: z.string().min(1).optional(),
+
+  /**
+   * The previous key, still readable during a rotation. Off by one version from
+   * the current key by definition; nothing else is accepted.
+   */
+  CREDENTIALS_ENCRYPTION_KEY_PREVIOUS: z.string().min(1).optional(),
+
+  /** Version stamped on newly sealed credentials. Defaults to 1. */
+  CREDENTIALS_ENCRYPTION_KEY_VERSION: z.coerce.number().int().positive().optional(),
+
   /** Redis URL for Celery broker and rate limiting (Sprint 2). */
   REDIS_URL: z.string().min(1).optional(),
 
@@ -152,8 +171,13 @@ const envSchema = z.object({
  * accepts messages, the sender still resolves, and every message is delivered
  * to `localhost:1025` where nothing is listening. Failing at boot with the
  * variable named is the only version of this that gets fixed.
+ *
+ * The credential key follows the same rule for the opposite reason: without it
+ * the settings page can render the form, the user can submit it, and every save
+ * fails at the last step. A feature that is offered and always broken is worse
+ * than a boot error that names the variable.
  */
-const productionMailRefinement = (value: z.infer<typeof envSchema>, ctx: z.RefinementCtx): void => {
+const productionRefinement = (value: z.infer<typeof envSchema>, ctx: z.RefinementCtx): void => {
   if (value.NODE_ENV !== 'production') {
     return;
   }
@@ -171,9 +195,18 @@ const productionMailRefinement = (value: z.infer<typeof envSchema>, ctx: z.Refin
       message: 'EMAIL_FROM is required in production: transactional mail needs a sender identity.',
     });
   }
+  if (!value.CREDENTIALS_ENCRYPTION_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['CREDENTIALS_ENCRYPTION_KEY'],
+      message:
+        'CREDENTIALS_ENCRYPTION_KEY is required in production: it seals the scan credentials ' +
+        'the settings page offers. Generate one with: openssl rand -base64 32',
+    });
+  }
 };
 
-const validatedEnvSchema = envSchema.superRefine(productionMailRefinement);
+const validatedEnvSchema = envSchema.superRefine(productionRefinement);
 
 export type Env = z.infer<typeof envSchema>;
 

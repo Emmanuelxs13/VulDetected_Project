@@ -287,7 +287,8 @@
         "concurrent_scan_limit": "Ya tienes el máximo de escaneos simultáneos de tu plan. Espera a que termine uno.",
         "schedule_limit": "Tu plan alcanzó el máximo de programaciones activas.",
         "scan_not_cancellable": "Este escaneo ya no se puede cancelar.",
-        "scan_not_retryable": "Solo se pueden reintentar escaneos fallidos o cancelados."
+        "scan_not_retryable": "Solo se pueden reintentar escaneos fallidos o cancelados.",
+        "credential_unavailable": "El dominio tiene una credencial de escaneo que no se pudo usar. Vuelve a guardarla en Configuración."
       }
     },
     "queued": {
@@ -493,5 +494,42 @@
         "description": "Existe bloqueo por cuenta, pero no hay un limitador por IP delante de la ruta de autenticación. La limitación del lado del servidor es una tarea del Sprint 2 y es obligatoria antes de exponer esto públicamente."
       }
     }
+  },
+  "credentials": {
+    "title": "Credenciales de escaneo",
+    "description": "Permiten al escáner entrar en las páginas que requieren sesión. Se guardan cifradas y nunca se muestran de nuevo.",
+    "empty": "Todavía no has guardado credenciales.",
+    "domain": "Dominio",
+    "label": "Etiqueta",
+    "labelPlaceholder": "Producción, staging…",
+    "kind": "Tipo de autenticación",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "token": "Token",
+    "headerName": "Nombre de la cabecera",
+    "headerValue": "Valor de la cabecera",
+    "save": "Guardar credencial",
+    "saving": "Guardando…",
+    "saved": "Credencial guardada. Se usará en el próximo escaneo.",
+    "revoke": "Revocar",
+    "revoking": "Revocando…",
+    "revoked": "Credencial revocada. Los escaneos nuevos ya no la usarán.",
+    "lastUsed": "Último uso",
+    "neverUsed": "Nunca usada",
+    "noVerified": "Verifica un dominio antes de guardar una credencial.",
+    "kinds": {
+      "basic": "Usuario y contraseña",
+      "bearer": "Token Bearer",
+      "header": "Cabecera personalizada"
+    },
+    "errors": {
+      "codes": {
+        "invalid_credential": "Revisa los datos de la credencial.",
+        "domain_not_verified": "Ese dominio no está verificado en tu cuenta.",
+        "storage_unavailable": "No se pudo guardar la credencial. El cifrado no está configurado en este despliegue.",
+        "credential_not_found": "Esa credencial ya no existe o fue revocada."
+      }
+    },
+    "pageTitle": "Configuración"
   }
 }

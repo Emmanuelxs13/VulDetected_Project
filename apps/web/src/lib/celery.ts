@@ -2,6 +2,7 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 
+import type { WorkerCredentialPayload } from './credentials/secret';
 import { withRedis } from './redis';
 
 export interface ScanJobKwargs {
@@ -15,6 +16,13 @@ export interface ScanJobKwargs {
   };
   checks: string[];
   callback_base_url: string;
+  /**
+   * Decrypted credential for authenticated scanning.
+   *
+   * Omitted entirely when the domain has none, so the worker's default of "no
+   * auth headers" is reached by absence rather than by an empty object.
+   */
+  credentials?: WorkerCredentialPayload;
 }
 
 function buildCeleryMessage(kwargs: ScanJobKwargs) {
