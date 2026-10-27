@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { getLogger } from './logger';
 import { withRedis } from './redis';
 
 /**
@@ -112,10 +113,10 @@ export async function consumeRateLimit(config: RateLimitConfig): Promise<void> {
   } catch (error) {
     if (!warnedAboutFallback) {
       warnedAboutFallback = true;
-      console.warn(
-        '[rate-limit] Redis is unavailable; using the process-local window. ' +
+      getLogger('rate-limit').warn(
+        { err: error },
+        'Redis is unavailable; using the process-local window. ' +
           'Limits are per replica until Redis returns.',
-        error instanceof Error ? error.message : error,
       );
     }
     count = memoryHit(bucket, windowSec, Date.now());

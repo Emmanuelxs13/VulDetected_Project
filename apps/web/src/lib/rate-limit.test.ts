@@ -11,6 +11,11 @@ import { consumeRateLimit, RateLimitError, resetRateLimitMemoryForTesting } from
 
 const incr = vi.fn<(key: string) => Promise<number>>(async () => 1);
 const expire = vi.fn<(key: string, seconds: number) => Promise<boolean>>(async () => true);
+const log = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() }));
+
+vi.mock('@/lib/logger', () => ({
+  getLogger: () => log,
+}));
 
 vi.mock('@/lib/redis', () => ({
   withRedis: (fn: (client: unknown) => Promise<unknown>) =>
@@ -20,7 +25,6 @@ vi.mock('@/lib/redis', () => ({
 beforeEach(() => {
   resetRateLimitMemoryForTesting();
   vi.clearAllMocks();
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 });
 
 describe('consumeRateLimit (Redis backend)', () => {
@@ -74,11 +78,9 @@ describe('consumeRateLimit (Redis unavailable)', () => {
   });
 
   it('warns once, not once per request', async () => {
-    const warn = vi.mocked(console.warn);
-
     await consumeRateLimit({ key: 'warn', limit: 10, windowSec: 3600 });
     await consumeRateLimit({ key: 'warn', limit: 10, windowSec: 3600 });
 
-    expect(warn).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledTimes(1);
   });
 });

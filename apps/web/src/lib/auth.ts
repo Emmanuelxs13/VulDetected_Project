@@ -7,6 +7,7 @@ import { nextCookies } from 'better-auth/next-js';
 
 import { db } from './db';
 import { getEnv } from './env';
+import { getLogger } from './logger';
 import { queuePasswordResetEmail, queueVerificationEmail } from './mail/notify';
 import { hashPassword, verifyPassword } from './password';
 
@@ -223,7 +224,7 @@ function buildAuth() {
            * problem into "the form is broken" while leaking whether the address
            * exists. The dispatcher's `failed` rows are the operational signal.
            */
-          console.error('[mail] could not queue the password reset email', error);
+          getLogger('mail').error({ err: error }, 'could not queue the password reset email');
         }
       },
     },
@@ -452,7 +453,7 @@ function buildAuth() {
             url,
           });
         } catch (error) {
-          console.error('[mail] could not queue the verification email', error);
+          getLogger('mail').error({ err: error }, 'could not queue the verification email');
         }
       },
 
