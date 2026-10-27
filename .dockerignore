@@ -1,0 +1,42 @@
+# Build context for the production image (repository root).
+#
+# The context is the whole workspace because `next build` needs `packages/db`
+# and `packages/ui` as source. Everything that cannot influence the build is
+# excluded here so the daemon transfers kilobytes instead of gigabytes — most
+# importantly `node_modules` from the host, which is platform-specific and would
+# otherwise shadow the container's own install.
+
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/coverage
+**/*.tsbuildinfo
+
+# Python artifacts from a local scanner run
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.venv
+
+# Version control and editor state
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.idea
+.codegraph
+.atl
+
+# Documentation, specs and local infrastructure: none of it is imported by the
+# build, and every megabyte here is one the daemon has to send.
+docs
+openspec
+infra
+**/*.md
+
+# Secrets. Only the example file is allowed through.
+**/.env
+**/.env.*
+!**/.env.example

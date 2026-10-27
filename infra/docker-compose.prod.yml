@@ -1,0 +1,216 @@
+# =============================================================================
+# VulDetected — production-shaped stack
+# =============================================================================
+# This file describes the full deployment on ONE host with Docker Compose:
+# Postgres, Redis, a one-shot migration, the web app, the scheduler, and the
+# Python scan worker.
+#
+# It is a reference deployment, not a managed platform. Everything that a
+# platform would give you — TLS termination, backups, log shipping, secret
+# rotation — is deliberately out of scope and called out in docs/deployment.md.
+#
+# Usage (from the repository root):
+#   cp infra/.env.prod.example infra/.env.prod      # fill it in, never commit it
+#   docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yml up -d --build
+#   docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yml ps
+#
+# REQUIRED VALUES use `${VAR:?message}`: Compose refuses to start instead of
+# silently substituting a development default. That is the whole point — a
+# production stack that boots with `AUTH_SECRET` unset is worse than one that
+# does not boot at all.
+# =============================================================================
+
+name: vuldetected-prod
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
+x-web-env: &web-env
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in infra/.env.prod}
+  AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET (openssl rand -base64 32)}
+  AUTH_URL: ${AUTH_URL:?set AUTH_URL to the public origin}
+  NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/0
+  SCANNER_CALLBACK_SECRET: ${SCANNER_CALLBACK_SECRET:?set SCANNER_CALLBACK_SECRET}
+  SCANNER_CALLBACK_BASE_URL: http://web:3000
+  SCANNER_EGRESS_MODE: ${SCANNER_EGRESS_MODE:-strict}
+  SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST — production requires a real mail server}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  EMAIL_FROM: ${EMAIL_FROM:?set EMAIL_FROM}
+  MAIL_DISPATCH_SECRET: ${MAIL_DISPATCH_SECRET:?set MAIL_DISPATCH_SECRET}
+  CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY:?set CREDENTIALS_ENCRYPTION_KEY}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+  GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The migration must not start before the database accepts connections.
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    <<: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--save', '60', '1']
+    volumes:
+      - redisdata:/data
+    networks:
+      - default
+      # The scan worker consumes from this broker; see `scanner`.
+      - scanner
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    <<: *logging
+
+  # Applies pending migrations and exits. `depends_on: condition:
+  # service_completed_successfully` keeps the app from starting against a schema
+  # that has not been migrated yet — the failure mode that turns a deploy into a
+  # wave of 500s instead of one clear error.
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: migrator
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in infra/.env.prod}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    <<: *logging
+
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment: *web-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      # Bind to the loopback interface when a reverse proxy on the same host
+      # terminates TLS. Exposing this port directly to the internet exposes
+      # plain HTTP; change to '0.0.0.0:3000:3000' only behind one.
+      - '${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3000}:3000'
+    networks:
+      - default
+      # The scan worker posts findings back to this service; see `scanner`.
+      - scanner
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/ready').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    <<: *logging
+
+  # Drives `POST /api/internal/schedules/run` on a fixed cadence. The endpoint
+  # claims due rows with a compare-and-set, so a second runner or a restart is
+  # harmless; that is why this is a plain container and not a platform cron.
+  scheduler:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    command: ['node', 'scripts/run-scheduler.mjs']
+    environment:
+      SCHEDULER_BASE_URL: http://web:3000
+      SCHEDULER_INTERVAL_MS: ${SCHEDULER_INTERVAL_MS:-60000}
+      SCANNER_CALLBACK_SECRET: ${SCANNER_CALLBACK_SECRET:?set SCANNER_CALLBACK_SECRET}
+    depends_on:
+      web:
+        condition: service_healthy
+    <<: *logging
+
+  scanner:
+    build:
+      context: ../services/scanner
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      SCANNER_CALLBACK_SECRET: ${SCANNER_CALLBACK_SECRET:?set SCANNER_CALLBACK_SECRET}
+      SCANNER_CALLBACK_BASE_URL: http://web:3000
+      SCANNER_EGRESS_MODE: ${SCANNER_EGRESS_MODE:-strict}
+    user: '1000:1000'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # The worker must reach arbitrary scan targets on the internet, so it cannot
+    # live on an `internal` network. It is instead kept OFF the default bridge:
+    # `scanner` is a network only it, `web` and `redis` join, which is exactly
+    # what a scan needs (a broker to consume from and a callback to post to).
+    # Postgres is on `default` alone, so a compromised worker cannot reach the
+    # database at all.
+    networks:
+      - scanner
+    <<: *logging
+
+  # OPTIONAL mail catcher for a demo deployment without a real SMTP provider.
+  # Enable with: --profile mail, and point SMTP_HOST at `mailpit`, SMTP_PORT 1025.
+  # It accepts everything and delivers nothing: never enable it for real users.
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: ['mail']
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8025:8025'
+    <<: *logging
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  # Shared only by the three services that need it: the worker consumes its
+  # queue from `redis` and posts findings to `web`. Everything else — Postgres in
+  # particular — stays on the default network and is unreachable from here.
+  scanner:
