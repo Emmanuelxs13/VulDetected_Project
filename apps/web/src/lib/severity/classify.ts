@@ -13,6 +13,15 @@ export type SeverityRationale =
   | 'cookieMissingHttpOnly'
   | 'cookieMissingSameSite'
   | 'cookieOther'
+  | 'reflectedXss'
+  | 'sqlInjection'
+  | 'openRedirect'
+  | 'corsReflectedWithCredentials'
+  | 'corsReflectedOrigin'
+  | 'corsWildcard'
+  | 'directoryListing'
+  | 'exposedSecretFile'
+  | 'exposedConfigFile'
   | 'unknownCheck';
 
 export interface Classification {
@@ -31,12 +40,15 @@ export interface Classification {
  * below is that rule. It is pure — the same finding always gets the same
  * severity — and it is ordered so the more specific match wins.
  *
- * ## WHY CRITICAL IS EMPTY TODAY
+ * ## WHY CRITICAL IS RARE
  *
- * These four checks cannot prove remote code execution, so nothing they emit
- * earns `critical`. Reserving `critical` for a class of finding that genuinely
- * deserves it keeps the colour meaningful (ADR 0003 §5); a check that cannot
- * justify it stays below.
+ * A severity has to be defensible from what the check actually observed. Four
+ * checks cannot prove remote code execution, so nothing they emit earns
+ * `critical`. Two active checks can: an error-based SQL injection proves the
+ * value reaches a query, and an exposed `.env`/`.git`/database dump exposes
+ * credentials directly. Reserving `critical` for evidence of that strength keeps
+ * the colour meaningful (ADR 0003 §5); a check that cannot justify it stays
+ * below.
  */
 export function classifyFinding(
   checkName: string,
@@ -49,6 +61,55 @@ export function classifyFinding(
 
     case 'redirects':
       return { severity: 'high', rationale: 'httpsDowngrade' };
+
+    case 'xss':
+      // Reflected XSS runs attacker script in the victim's session. It cannot
+      // prove server compromise, so it stops at high.
+      return { severity: 'high', rationale: 'reflectedXss' };
+
+    case 'sqli':
+      // A database error caused by a quote proves the value is concatenated
+      // into SQL. That is direct access to the data store, not a browser-level
+      // issue, so it is the one active check that earns critical.
+      return { severity: 'critical', rationale: 'sqlInjection' };
+
+    case 'open_redirect':
+      // Phishing enabler on a trusted domain. Real, but it neither reads nor
+      // writes data on its own.
+      return { severity: 'medium', rationale: 'openRedirect' };
+
+    case 'cors': {
+      const reflected = evidence.reflected === true;
+      const wildcard = evidence.wildcard === true;
+      const credentials = evidence.allowCredentials === true || evidence.allow_credentials === true;
+
+      if (reflected && credentials) {
+        return { severity: 'high', rationale: 'corsReflectedWithCredentials' };
+      }
+      if (reflected) {
+        return { severity: 'medium', rationale: 'corsReflectedOrigin' };
+      }
+      if (wildcard) {
+        // Browsers refuse `*` together with credentials, so the combination is
+        // a misconfiguration rather than a live cross-origin read.
+        return { severity: 'low', rationale: 'corsWildcard' };
+      }
+      return { severity: 'medium', rationale: 'corsReflectedOrigin' };
+    }
+
+    case 'directory_listing':
+      return { severity: 'medium', rationale: 'directoryListing' };
+
+    case 'sensitive_files': {
+      const kind = String(evidence.kind ?? '').toLowerCase();
+      // Secrets and source reach critical; configuration and environment
+      // disclosure stays high because it reveals the stack without handing over
+      // a usable credential on its own.
+      if (kind === 'env' || kind === 'git' || kind === 'backup') {
+        return { severity: 'critical', rationale: 'exposedSecretFile' };
+      }
+      return { severity: 'high', rationale: 'exposedConfigFile' };
+    }
 
     case 'cookies': {
       const lower = title.toLowerCase();
@@ -111,6 +172,12 @@ export const RULE_SEVERITIES = {
   redirects: ['high'],
   security_headers: ['high', 'medium', 'low', 'info'],
   cookies: ['medium', 'low'],
+  xss: ['high'],
+  sqli: ['critical'],
+  open_redirect: ['medium'],
+  cors: ['high', 'medium', 'low'],
+  directory_listing: ['medium'],
+  sensitive_files: ['critical', 'high'],
 } as const satisfies Record<string, readonly Severity[]>;
 
 export type RemediatedRule = keyof typeof RULE_SEVERITIES;

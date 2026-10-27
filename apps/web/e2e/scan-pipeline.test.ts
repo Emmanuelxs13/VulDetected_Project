@@ -49,6 +49,7 @@ const MIGRATION_FILES = [
   '0007_real_tombstone.sql',
   '0008_amazing_wonder_man.sql',
   '0009_foamy_mathemanic.sql',
+  '0010_absurd_frank_castle.sql',
 ].map((file) => path.resolve(dirname, '../../../packages/db/drizzle', file));
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -104,6 +105,7 @@ import { GET as getScanEvents, POST as postScanEvent } from '@/app/api/scans/[sc
 import { POST as postScanCallback } from '@/app/api/scans/[scanId]/callback/route';
 import { getServerSession } from '@/features/auth/session';
 import { submitScanAction } from '@/features/scans/actions';
+import { DEFAULT_CHECKS } from '@/features/scans/enqueue';
 
 interface CeleryEnvelope {
   body: string;
@@ -338,7 +340,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
       port: 443,
       base_url: 'https://example.com',
     });
-    expect(decoded[1].checks).toEqual(['security_headers', 'tls', 'cookies', 'redirects']);
+    expect(decoded[1].checks).toEqual([...DEFAULT_CHECKS]);
     expect(decoded[1].callback_base_url).toBe('http://localhost:3000');
     expect(decoded[2]).toEqual({
       callbacks: null,

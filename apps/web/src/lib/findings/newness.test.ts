@@ -1,6 +1,29 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { computeFindingKey, computeNewFindingKeys, normalizeFindingUrl } from './newness';
+
+interface FingerprintVector {
+  domainId: string;
+  check: string;
+  rawUrl: string;
+  normalized: string;
+  discriminator: string | null;
+  expected: string;
+}
+
+const fingerprintVectors: FingerprintVector[] = JSON.parse(
+  readFileSync(
+    resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../../../services/scanner/tests/fixtures/fingerprints.json',
+    ),
+    'utf8',
+  ),
+) as FingerprintVector[];
 
 describe('normalizeFindingUrl', () => {
   it('lowercases the host and drops the fragment', () => {
@@ -36,6 +59,22 @@ describe('normalizeFindingUrl', () => {
 });
 
 describe('computeFindingKey', () => {
+  it('matches the Python worker on the shared fingerprint fixture', () => {
+    for (const vector of fingerprintVectors) {
+      expect(normalizeFindingUrl(vector.rawUrl), `normalize ${vector.rawUrl}`).toBe(
+        vector.normalized,
+      );
+      expect(
+        computeFindingKey({
+          domainId: vector.domainId,
+          checkName: vector.check,
+          affectedUrl: vector.rawUrl,
+          discriminator: vector.discriminator ?? undefined,
+        }),
+      ).toBe(vector.expected);
+    }
+  });
+
   it('is stable across URL spellings of the same page', () => {
     const a = computeFindingKey({
       domainId: 'd1',

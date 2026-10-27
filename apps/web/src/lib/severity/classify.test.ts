@@ -61,6 +61,49 @@ describe('classifyFinding', () => {
     });
   });
 
+  it('classifies the active checks by the evidence they actually observed', () => {
+    expect(classifyFinding('xss', { parameter: 'q' })).toEqual({
+      severity: 'high',
+      rationale: 'reflectedXss',
+    });
+    expect(classifyFinding('sqli', { parameter: 'id' })).toEqual({
+      severity: 'critical',
+      rationale: 'sqlInjection',
+    });
+    expect(classifyFinding('open_redirect', { parameter: 'next' })).toEqual({
+      severity: 'medium',
+      rationale: 'openRedirect',
+    });
+    expect(classifyFinding('directory_listing', { path: '/uploads/' })).toEqual({
+      severity: 'medium',
+      rationale: 'directoryListing',
+    });
+  });
+
+  it('scales CORS by reflection and credentials', () => {
+    expect(
+      classifyFinding('cors', { reflected: true, allow_credentials: true }).severity,
+    ).toBe('high');
+    expect(classifyFinding('cors', { reflected: true, allow_credentials: false }).severity).toBe(
+      'medium',
+    );
+    expect(classifyFinding('cors', { reflected: false, wildcard: true }).severity).toBe('low');
+  });
+
+  it('treats an exposed secret as critical and a config file as high', () => {
+    expect(classifyFinding('sensitive_files', { kind: 'env' })).toEqual({
+      severity: 'critical',
+      rationale: 'exposedSecretFile',
+    });
+    expect(classifyFinding('sensitive_files', { kind: 'git' }).severity).toBe('critical');
+    expect(classifyFinding('sensitive_files', { kind: 'backup' }).severity).toBe('critical');
+    expect(classifyFinding('sensitive_files', { kind: 'config' })).toEqual({
+      severity: 'high',
+      rationale: 'exposedConfigFile',
+    });
+    expect(classifyFinding('sensitive_files', { kind: 'phpinfo' }).severity).toBe('high');
+  });
+
   it('leaves an unknown check unclassified instead of guessing', () => {
     expect(classifyFinding('future_nuclei_check', {})).toEqual({
       severity: 'unclassified',
@@ -89,6 +132,15 @@ describe('classifyFinding', () => {
       { check: 'cookies', evidence: {}, title: 'Cookie missing HttpOnly flag' },
       { check: 'cookies', evidence: {}, title: 'Cookie missing SameSite attribute' },
       { check: 'cookies', evidence: {}, title: 'Cookie without SameSite' },
+      { check: 'xss', evidence: { parameter: 'q' } },
+      { check: 'sqli', evidence: { parameter: 'id' } },
+      { check: 'open_redirect', evidence: { parameter: 'next' } },
+      { check: 'cors', evidence: { reflected: true, allow_credentials: true } },
+      { check: 'cors', evidence: { reflected: true, allow_credentials: false } },
+      { check: 'cors', evidence: { reflected: false, wildcard: true } },
+      { check: 'directory_listing', evidence: { path: '/uploads/' } },
+      { check: 'sensitive_files', evidence: { kind: 'env' } },
+      { check: 'sensitive_files', evidence: { kind: 'config' } },
     ];
 
     for (const sample of samples) {

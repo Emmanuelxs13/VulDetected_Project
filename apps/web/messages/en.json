@@ -336,7 +336,16 @@
         "cookieMissingHttpOnly": "Cookie missing HttpOnly flag",
         "cookieMissingSameSite": "Cookie missing SameSite attribute",
         "unknownCheck": "Unknown check",
-        "cookieOther": "Cookie attribute issue outside the specific rules"
+        "cookieOther": "Cookie attribute issue outside the specific rules",
+        "reflectedXss": "Reflected cross-site scripting",
+        "sqlInjection": "SQL injection",
+        "openRedirect": "Open redirect",
+        "corsReflectedWithCredentials": "CORS reflects any origin and allows credentials",
+        "corsReflectedOrigin": "CORS reflects any origin",
+        "corsWildcard": "CORS allows every origin",
+        "directoryListing": "Automatic directory listing",
+        "exposedSecretFile": "Exposed secret or source file",
+        "exposedConfigFile": "Exposed configuration file"
       },
       "filter": {
         "all": "All"

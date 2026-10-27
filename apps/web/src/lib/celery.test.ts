@@ -26,7 +26,18 @@ describe('celery message encoding (golden fixture)', () => {
         port: 443,
         base_url: 'https://example.com',
       },
-      checks: ['security_headers', 'tls', 'cookies', 'redirects'],
+      checks: [
+        'security_headers',
+        'tls',
+        'cookies',
+        'redirects',
+        'xss',
+        'sqli',
+        'open_redirect',
+        'cors',
+        'directory_listing',
+        'sensitive_files',
+      ],
       callback_base_url: 'http://localhost:3000',
     };
 

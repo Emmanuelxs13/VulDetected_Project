@@ -58,13 +58,16 @@ export const scans = pgTable(
     /**
      * The checks to run, as a JSON array.
      *
-     * Defaults to the four deterministic Sprint 2 checks. A default in the
-     * database — rather than only in application code — means a row inserted by
-     * any future path still carries a coherent instruction set for the worker.
+     * Defaults to the full check set (four passive checks plus six active ones).
+     * A default in the database — rather than only in application code — means a
+     * row inserted by any future path still carries a coherent instruction set
+     * for the worker.
      */
     checks: jsonb('checks')
       .notNull()
-      .default(sql`'["security_headers","tls","cookies","redirects"]'::jsonb`),
+      .default(
+        sql`'["security_headers","tls","cookies","redirects","xss","sqli","open_redirect","cors","directory_listing","sensitive_files"]'::jsonb`,
+      ),
 
     /**
      * The Celery task id, echoed into the published message's `id`/`root_id`.

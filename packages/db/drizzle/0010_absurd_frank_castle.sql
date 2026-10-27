@@ -1,0 +1,1 @@
+ALTER TABLE "scans" ALTER COLUMN "checks" SET DEFAULT '["security_headers","tls","cookies","redirects","xss","sqli","open_redirect","cors","directory_listing","sensitive_files"]'::jsonb;

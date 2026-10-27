@@ -12,8 +12,24 @@ import { getEnv } from '@/lib/env';
  * scheduled one ask the worker for the same work. The column default in
  * `scans.checks` carries the same list; both exist because a row can legitimately
  * be inserted by either path.
+ *
+ * The order matters for the user experience, not for security: passive checks
+ * come first so a scan produces useful findings even if a later active check
+ * fails. Active checks are last because they send crafted requests, and the
+ * request budget is shared.
  */
-export const DEFAULT_CHECKS = ['security_headers', 'tls', 'cookies', 'redirects'] as const;
+export const DEFAULT_CHECKS = [
+  'security_headers',
+  'tls',
+  'cookies',
+  'redirects',
+  'xss',
+  'sqli',
+  'open_redirect',
+  'cors',
+  'directory_listing',
+  'sensitive_files',
+] as const;
 
 /** The normalized target a scan is pointed at (SS-1). */
 export interface ScanTarget {
