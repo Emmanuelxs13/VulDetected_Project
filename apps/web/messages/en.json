@@ -594,6 +594,39 @@
         "created": "Created",
         "exports": "Export"
       }
+    },
+    "pdf": {
+      "title": "Executive security report",
+      "subtitle": "Scan result for {host}",
+      "summary": "Summary",
+      "breakdown": "Open findings by severity",
+      "findings": "Findings",
+      "findingsHint": "Ordered from highest to lowest severity. Every finding recorded by the scan is included.",
+      "noFindings": "This scan recorded no findings. A completed scan with no findings is a valid result, not an error.",
+      "remediation": "How to fix it",
+      "page": "Page {current} of {total}",
+      "severityCount": "{severity}: {count}",
+      "fields": {
+        "domain": "Domain",
+        "target": "Target",
+        "scanId": "Scan ID",
+        "scanStatus": "Status",
+        "createdAt": "Scan date",
+        "generatedAt": "Generated",
+        "affectedUrl": "Affected URL",
+        "rule": "Check",
+        "owasp": "OWASP",
+        "rationale": "Classification"
+      },
+      "totals": {
+        "open": "Open findings",
+        "total": "Recorded findings"
+      },
+      "statuses": {
+        "open": "Open",
+        "resolved": "Resolved",
+        "false_positive": "False positive"
+      }
     }
   },
   "remediation": {

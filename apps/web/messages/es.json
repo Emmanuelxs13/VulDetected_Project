@@ -594,6 +594,39 @@
         "created": "Creado",
         "exports": "Exportar"
       }
+    },
+    "pdf": {
+      "title": "Reporte ejecutivo de seguridad",
+      "subtitle": "Resultado del escaneo de {host}",
+      "summary": "Resumen",
+      "breakdown": "Hallazgos abiertos por severidad",
+      "findings": "Hallazgos",
+      "findingsHint": "Ordenados de mayor a menor severidad. Se incluyen todos los hallazgos registrados por el escaneo.",
+      "noFindings": "Este escaneo no registró hallazgos. Un escaneo completado sin hallazgos es un resultado válido, no un error.",
+      "remediation": "Cómo corregirlo",
+      "page": "Página {current} de {total}",
+      "severityCount": "{severity}: {count}",
+      "fields": {
+        "domain": "Dominio",
+        "target": "Objetivo",
+        "scanId": "ID del escaneo",
+        "scanStatus": "Estado",
+        "createdAt": "Fecha del escaneo",
+        "generatedAt": "Generado",
+        "affectedUrl": "URL afectada",
+        "rule": "Comprobación",
+        "owasp": "OWASP",
+        "rationale": "Clasificación"
+      },
+      "totals": {
+        "open": "Hallazgos abiertos",
+        "total": "Hallazgos registrados"
+      },
+      "statuses": {
+        "open": "Abierto",
+        "resolved": "Resuelto",
+        "false_positive": "Falso positivo"
+      }
     }
   },
   "remediation": {
