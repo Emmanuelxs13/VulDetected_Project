@@ -26,12 +26,24 @@ export interface FindingRow {
   scanId?: string;
 }
 
-export async function FindingsList({ findings }: { findings: FindingRow[] }) {
+export async function FindingsList({
+  findings,
+  emptyTitle,
+  emptyDescription,
+}: {
+  findings: FindingRow[];
+  /** Overrides the scan-detail empty copy when the list is not scoped to one scan. */
+  emptyTitle?: string;
+  emptyDescription?: string;
+}) {
   const t = await getTranslations('scan');
 
   if (findings.length === 0) {
     return (
-      <EmptyState title={t('findings.empty.title')} description={t('findings.empty.description')} />
+      <EmptyState
+        title={emptyTitle ?? t('findings.empty.title')}
+        description={emptyDescription ?? t('findings.empty.description')}
+      />
     );
   }
 
@@ -42,8 +54,11 @@ export async function FindingsList({ findings }: { findings: FindingRow[] }) {
           <TableHead>{t('findings.table.severity')}</TableHead>
           <TableHead>{t('findings.table.check')}</TableHead>
           <TableHead>{t('findings.table.finding')}</TableHead>
+          <TableHead>{t('findings.table.status')}</TableHead>
           <TableHead>{t('findings.table.affectedUrl')}</TableHead>
-          <TableHead></TableHead>
+          <TableHead>
+            <span className="sr-only">{t('findings.table.actions')}</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

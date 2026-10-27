@@ -1,160 +1,127 @@
-'use client';
+import type { Metadata } from 'next';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Container,
+  EmptyState,
+} from '@vuldetected/ui';
+import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
-import { useState } from 'react';
-import { Badge, Button, Card, CardContent, Container } from '@vuldetected/ui';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@vuldetected/ui';
-import { toast } from 'sonner';
+import { getServerSession } from '@/features/auth/session';
+import { FindingsList } from '@/features/scans/components/findings-list';
+import { FindingsPagination } from '@/features/scans/components/findings-pagination';
+import { getSeverityCounts, listFindingsPage } from '@/features/scans/queries/findings-page';
+import { SEVERITY_ORDER, getSeverityVariant } from '@/lib/severity/classify';
 
-type FindingStatus = 'open' | 'resolved' | 'false-positive';
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('findingsPage');
 
-const initialFindings = [
-  {
-    id: 1,
-    severity: 'high' as const,
-    title: 'Cross-Site Scripting (XSS) Reflejado',
-    description: 'Se detectó una vulnerabilidad de XSS reflejado en el parámetro de búsqueda. Un atacante puede inyectar código JavaScript malicioso.',
-    location: 'https://ejemplo.com/search?q=',
-    evidence: "<script>alert('XSS')</script>",
-    status: 'open' as FindingStatus,
-    owasp: 'A03: Injection',
-  },
-  {
-    id: 2,
-    severity: 'medium' as const,
-    title: 'Cabeceras de Seguridad Faltantes',
-    description: 'Faltan cabeceras importantes como Content-Security-Policy, X-Frame-Options o Strict-Transport-Security.',
-    location: 'https://ejemplo.com/',
-    evidence: 'Headers ausentes: CSP, X-Frame-Options',
-    status: 'open' as FindingStatus,
-    owasp: 'A05: Security Misconfiguration',
-  },
-];
+  return { title: t('title') };
+}
 
-export default function FindingsPage() {
-  const [findings, setFindings] = useState(initialFindings);
-  const [severityFilter, setSeverityFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+/**
+ * Every finding the caller owns, across all their domains.
+ *
+ * ## WHY THIS EXISTS INSTEAD OF A PER-SCAN LIST
+ *
+ * The per-scan view answers "what did this run find". A reader who wants to fix
+ * things asks the opposite question: "what is open right now, worst first". Both
+ * need the same rows, so this page reuses the same paged query and the same
+ * table instead of a second implementation that could drift.
+ *
+ * ## WHY THE COUNTS AND THE ROWS DO NOT MATCH WHEN NOTHING IS FILTERED
+ *
+ * The filter counts only open findings, because that is the number the dashboard
+ * light is built from. The table shows resolved and dismissed rows too, so the
+ * reader can confirm their triage stuck. The description says so where they
+ * could otherwise assume the numbers are broken.
+ */
+export default async function FindingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ severity?: string; cursor?: string }>;
+}) {
+  const t = await getTranslations('findingsPage');
+  const tScan = await getTranslations('scan');
+  const query = (await searchParams) ?? {};
 
-  const updateStatus = (id: number, newStatus: FindingStatus) => {
-    setFindings(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
-    if (newStatus === 'resolved') {
-      toast.success('Hallazgo marcado como resuelto');
-    } else if (newStatus === 'false-positive') {
-      toast.info('Hallazgo marcado como falso positivo');
-    }
-  };
+  const session = await getServerSession();
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copiado al portapapeles');
-  };
+  if (!session?.user) {
+    return (
+      <Container size="narrow" className="py-12">
+        <EmptyState
+          title={t('sessionRequired.title')}
+          description={t('sessionRequired.description')}
+        />
+      </Container>
+    );
+  }
 
-  const filteredFindings = findings.filter((f) => {
-    const finding = f as { severity: string; status: string };
-    if (severityFilter !== 'all' && finding.severity !== severityFilter) return false;
-    if (statusFilter !== 'all' && finding.status !== statusFilter) return false;
-    return true;
-  });
+  const userId = session.user.id;
 
-  const counts = {
-    total: findings.length,
-    open: findings.filter(f => f.status === 'open').length,
-    high: findings.filter(f => f.severity === 'high').length,
-  };
+  const [page, severityTotals] = await Promise.all([
+    listFindingsPage({
+      ownerUserId: userId,
+      severity: query.severity,
+      cursor: query.cursor,
+    }),
+    getSeverityCounts(userId),
+  ]);
 
   return (
     <Container className="flex flex-col gap-6 py-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Hallazgos / Vulnerabilidades</h1>
-        <p className="text-text-muted">Listado con filtros y gestión de estados</p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{counts.total}</div>
-            <p className="text-sm text-text-muted">Total de hallazgos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-critical">{counts.high}</div>
-            <p className="text-sm text-text-muted">Críticos/Altos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-medium">{counts.open}</div>
-            <p className="text-sm text-text-muted">Abiertos</p>
-          </CardContent>
-        </Card>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-text-muted">{t('description')}</p>
       </div>
 
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <select 
-              value={severityFilter} 
-              onChange={(e) => setSeverityFilter(e.target.value)}
-              className="w-full sm:w-[200px] px-3 py-2 bg-surface border border-border rounded-md text-sm"
-            >
-              <option value="all">Todas las severidades</option>
-              <option value="critical">Crítica</option>
-              <option value="high">Alta</option>
-              <option value="medium">Media</option>
-              <option value="low">Baja</option>
-            </select>
-            <select 
-              value={statusFilter} 
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full sm:w-[200px] px-3 py-2 bg-surface border border-border rounded-md text-sm"
-            >
-              <option value="all">Todos los estados</option>
-              <option value="open">Abierto</option>
-              <option value="resolved">Resuelto</option>
-              <option value="false-positive">Falso Positivo</option>
-            </select>
+        <CardHeader>
+          <CardTitle>{t('list.title')}</CardTitle>
+          <CardDescription>{t('list.description')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant={!query.severity ? 'secondary' : 'ghost'} size="sm">
+              <Link href="/findings">
+                {tScan('findings.filter.all')} ({severityTotals.total})
+              </Link>
+            </Button>
+            {SEVERITY_ORDER.map((severity) => (
+              <Button
+                asChild
+                key={severity}
+                variant={query.severity === severity ? 'secondary' : 'ghost'}
+                size="sm"
+              >
+                <Link href={`/findings?severity=${severity}`}>
+                  <Badge variant={getSeverityVariant(severity)}>
+                    {tScan(`findings.severity.${severity}`)} ({severityTotals.counts[severity]})
+                  </Badge>
+                </Link>
+              </Button>
+            ))}
           </div>
 
-          <Accordion type="single" collapsible className="w-full">
-            {filteredFindings.map((finding) => {
-              const f = finding as { id: number; severity: string; title: string; status: string; owasp: string; location: string; description: string; evidence: string };
-              return (
-                <AccordionItem key={f.id} value={`item-${f.id}`}>
-                  <AccordionTrigger>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Badge variant={f.severity === 'high' ? 'high' : f.severity === 'medium' ? 'medium' : f.severity === 'critical' ? 'critical' : f.severity === 'low' ? 'low' : 'unknown'}>{f.severity === 'high' ? 'Alta' : f.severity === 'medium' ? 'Media' : f.severity === 'critical' ? 'Crítica' : f.severity === 'low' ? 'Baja' : 'Desconocido'}</Badge>
-                      <span className="text-left">{f.title}</span>
-                      {f.status === 'resolved' && <Badge variant="low">Resuelto</Badge>}
-                      {f.status === 'false-positive' && <Badge variant="unknown">Falso Positivo</Badge>}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-4">
-                      <div className="grid gap-2 text-sm">
-                        <div><span className="font-medium">OWASP:</span> <span className="text-text-muted">{f.owasp}</span></div>
-                        <div><span className="font-medium">Ubicación:</span> <span className="text-text-muted">{f.location}</span></div>
-                      </div>
-                      <p className="text-text-muted">{f.description}</p>
-                      <div>
-                        <p className="text-sm font-medium mb-2">Evidencia:</p>
-                        <div className="rounded bg-surface p-3 font-mono text-xs overflow-x-auto"><code>{f.evidence}</code></div>
-                      </div>
-                      <div className="flex gap-2 flex-wrap">
-                        {f.status === 'open' && (
-                          <>
-                            <Button size="sm" variant="secondary" onClick={() => updateStatus(f.id, 'resolved')}>Marcar como Resuelto</Button>
-                            <Button size="sm" variant="ghost" onClick={() => updateStatus(f.id, 'false-positive')}>Falso Positivo</Button>
-                          </>
-                        )}
-                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(f.evidence)}>Copiar Evidencia</Button>
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
+          <FindingsList
+            findings={page.rows}
+            emptyTitle={t('empty.title')}
+            emptyDescription={t('empty.description')}
+          />
+
+          <FindingsPagination
+            basePath="/findings"
+            params={{ severity: query.severity }}
+            nextCursor={page.nextCursor}
+            isPaged={Boolean(query.cursor)}
+          />
         </CardContent>
       </Card>
     </Container>
