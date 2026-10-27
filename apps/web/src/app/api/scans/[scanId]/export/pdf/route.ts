@@ -1,19 +1,41 @@
 import 'server-only';
 
-import { and, domains, eq, findings, scans, users } from '@vuldetected/db';
+import { and, domains, eq, findings, scans } from '@vuldetected/db';
 import { NextResponse } from 'next/server';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
 import { db } from '@/lib/db';
-import { classifyFinding } from '@/lib/severity/classify';
+import { getRemediation } from '@/lib/remediation/registry';
+import {
+  classifyFinding,
+  type Severity,
+} from '@/lib/severity/classify';
+import {
+  generateScanReportPdf,
+  type ReportFindingInput,
+  type ReportInput,
+} from '@/lib/reports/pdf';
 
 export const dynamic = 'force-dynamic';
 
-function formatDate(d: Date) {
-  return d.toISOString().slice(0, 16).replace('T', ' ');
-}
-
+/**
+ * Executive PDF for one scan.
+ *
+ * ## WHY THERE IS NO PLAN CHECK
+ *
+ * The Free plan runs the whole product; plans differ in capacity, not in
+ * features (see `lib/plans.ts`). This route used to answer 403 for `free`, which
+ * made the one deliverable buyers evaluate the product with unavailable during
+ * the trial. The limits that do exist are numeric and enforced where work is
+ * created, not here.
+ *
+ * ## WHY THE ROUTE DOES NOT BUILD THE DOCUMENT
+ *
+ * Layout lives in `lib/reports/pdf.ts`, which is pure and tested without a
+ * database. This handler only resolves the caller's identity, proves ownership,
+ * reads the rows and supplies the translated copy.
+ */
 export async function GET(_req: Request, { params }: { params: Promise<{ scanId: string }> }) {
   const { scanId } = await params;
   const session = await getServerSession();
@@ -21,141 +43,158 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // The scan is reached through the domain it belongs to, and the domain
+  // through the account that proved ownership of it. A scan id is not a secret.
   const scanRows = await db()
     .select({
-      scan: scans,
+      id: scans.id,
+      targetUrl: scans.targetUrl,
+      status: scans.status,
+      createdAt: scans.createdAt,
       hostname: domains.normalizedHostname,
-      subscriptionPlan: users.subscriptionPlan,
     })
     .from(scans)
     .innerJoin(domains, eq(scans.domainId, domains.id))
-    .innerJoin(users, eq(domains.userId, users.id))
     .where(and(eq(scans.id, scanId), eq(domains.userId, session.user.id)))
     .limit(1);
 
-  if (scanRows.length === 0) {
+  const scan = scanRows[0];
+  if (!scan) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const scan = scanRows[0]?.scan;
-  const hostname = scanRows[0]?.hostname;
-  const subscriptionPlan = scanRows[0]?.subscriptionPlan;
-  if (!scan || !hostname) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-  if (subscriptionPlan === 'free') {
-    return NextResponse.json({ error: 'PDF export requires Pro or Business.' }, { status: 403 });
-  }
+  const [tPdf, tScan, tDashboard] = await Promise.all([
+    getTranslations('reports.pdf'),
+    getTranslations('scan'),
+    getTranslations('dashboard'),
+  ]);
 
   const findingRows = await db()
     .select({
       severity: findings.severity,
+      status: findings.status,
       checkName: findings.checkName,
       title: findings.title,
       description: findings.description,
       affectedUrl: findings.affectedUrl,
       evidence: findings.evidence,
+      owaspCategory: findings.owaspCategory,
     })
     .from(findings)
     .where(eq(findings.scanId, scanId))
     .orderBy(findings.createdAt);
 
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595, 842]); // A4
-  const { height } = page.getSize();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const reportFindings: ReportFindingInput[] = findingRows.map((row) => {
+    const classification = classifyFinding(
+      row.checkName,
+      (row.evidence ?? {}) as Record<string, unknown>,
+      row.title,
+    );
+    const remediation = getRemediation(row.checkName);
 
-  let y = height - 60;
-  const margin = 50;
-  const line = 16;
+    // The classifier returns a vocabulary key, not a sentence. Rendering it raw
+    // would print `missingHsts` in an executive document.
+    const rationaleKey = `findings.rationale.${classification.rationale}` as never;
+    const rationale = tScan.has(rationaleKey) ? tScan(rationaleKey) : classification.rationale;
 
-  const draw = (text: string, size = 10, bold = false, x = margin) => {
-    page.drawText(text.length > 110 ? text.slice(0, 107) + '...' : text, {
-      x,
-      y,
-      size,
-      font: bold ? fontBold : font,
-      color: rgb(0, 0, 0),
-    });
-    y -= line;
+    return {
+      severity: row.severity,
+      status: row.status,
+      checkName: row.checkName,
+      title: row.title,
+      description: row.description,
+      affectedUrl: row.affectedUrl,
+      owaspCategory: row.owaspCategory,
+      rationale,
+      remediation: remediation
+        ? { title: remediation.developerGuide.title, steps: remediation.developerGuide.steps }
+        : undefined,
+    };
+  });
+
+  const scanStatusKey = `status.${scan.status}` as never;
+  const scanStatus = tScan.has(scanStatusKey) ? tScan(scanStatusKey) : scan.status;
+
+  const severityCopy: Record<Severity, string> = {
+    critical: tScan('findings.severity.critical'),
+    high: tScan('findings.severity.high'),
+    medium: tScan('findings.severity.medium'),
+    low: tScan('findings.severity.low'),
+    info: tScan('findings.severity.info'),
+    unclassified: tScan('findings.severity.unclassified'),
   };
 
-  draw('VulDetected - Executive Report', 18, true);
-  y -= 4;
-  draw(`Domain: ${hostname}`, 10);
-  draw(`Target: ${scan.targetUrl}`, 10);
-  draw(`Scan ID: ${scan.id}`, 10);
-  draw(`Status: ${scan.status}`, 10);
-  draw(`Created: ${formatDate(scan.createdAt)}`, 10);
-  draw(`Generated: ${formatDate(new Date())}`, 10);
-  y -= 10;
+  const input: ReportInput = {
+    hostname: scan.hostname,
+    targetUrl: scan.targetUrl,
+    scanId: scan.id,
+    scanStatus,
+    createdAt: scan.createdAt,
+    generatedAt: new Date(),
+    findings: reportFindings,
+    copy: {
+      title: tPdf('title'),
+      subtitle: tPdf('subtitle'),
+      summary: tPdf('summary'),
+      breakdown: tPdf('breakdown'),
+      findings: tPdf('findings'),
+      findingsHint: tPdf('findingsHint'),
+      noFindings: tPdf('noFindings'),
+      remediation: tPdf('remediation'),
+      page: tPdf('page'),
+      severityCount: tPdf('severityCount'),
+      fields: {
+        domain: tPdf('fields.domain'),
+        target: tPdf('fields.target'),
+        scanId: tPdf('fields.scanId'),
+        scanStatus: tPdf('fields.scanStatus'),
+        createdAt: tPdf('fields.createdAt'),
+        generatedAt: tPdf('fields.generatedAt'),
+        affectedUrl: tPdf('fields.affectedUrl'),
+        rule: tPdf('fields.rule'),
+        owasp: tPdf('fields.owasp'),
+        rationale: tPdf('fields.rationale'),
+      },
+      totals: {
+        open: tPdf('totals.open'),
+        total: tPdf('totals.total'),
+      },
+      risk: {
+        label: tDashboard('risk.label'),
+        level: {
+          high: tDashboard('risk.high'),
+          medium: tDashboard('risk.medium'),
+          safe: tDashboard('risk.safe'),
+        },
+        hint: {
+          high: tDashboard('risk.highHint'),
+          medium: tDashboard('risk.mediumHint'),
+          safe: tDashboard('risk.safeHint'),
+        },
+      },
+      severity: severityCopy,
+      status: {
+        open: tPdf('statuses.open'),
+        resolved: tPdf('statuses.resolved'),
+        false_positive: tPdf('statuses.false_positive'),
+      },
+    },
+  };
 
-  // Severity breakdown
-  const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0, unclassified: 0 } as Record<
-    string,
-    number
-  >;
-  for (const f of findingRows) {
-    counts[f.severity] = (counts[f.severity] || 0) + 1;
-  }
-  draw('Severity breakdown', 14, true);
-  draw(
-    `Critical: ${counts.critical} | High: ${counts.high} | Medium: ${counts.medium} | Low: ${counts.low} | Info: ${counts.info} | Unclassified: ${counts.unclassified}`,
-    10,
-  );
-  y -= 10;
+  const pdfBytes = await generateScanReportPdf(input);
 
-  draw(`Total findings: ${findingRows.length}`, 12, true);
-  y -= 6;
-
-  if (findingRows.length === 0) {
-    draw('No findings recorded for this scan.', 10);
-  } else {
-    // Critical and High first
-    const criticalHigh = findingRows.filter(
-      (f) => f.severity === 'critical' || f.severity === 'high',
-    );
-    if (criticalHigh.length > 0) {
-      draw('Critical / High findings', 14, true);
-      for (const f of criticalHigh) {
-        if (y < 80) break;
-        const cls = classifyFinding(
-          f.checkName,
-          (f.evidence ?? {}) as Record<string, unknown>,
-          f.title,
-        );
-        draw(`[${f.severity.toUpperCase()}] ${f.title}`, 11, true);
-        draw(`Affected: ${f.affectedUrl}`, 9);
-        draw(`Rule: ${cls.rationale} (check: ${f.checkName})`, 9);
-        draw(`Description: ${f.description}`, 9);
-        y -= 4;
-      }
-      y -= 6;
-    }
-
-    draw('All findings', 14, true);
-    for (const f of findingRows) {
-      if (y < 60) break;
-      const cls = classifyFinding(
-        f.checkName,
-        (f.evidence ?? {}) as Record<string, unknown>,
-        f.title,
-      );
-      draw(`[${f.severity.toUpperCase()}] ${f.title} - ${f.affectedUrl}`, 9);
-      draw(`Rule: ${cls.rationale}`, 8);
-      y -= 2;
-    }
-  }
-
-  const pdfBytes = await pdfDoc.save();
-  const filename = `vuldetected-scan-${scan.id.slice(0, 8)}.pdf`;
+  const safeHost = scan.hostname.replace(/[^a-z0-9.-]/gi, '_');
+  const filename = `vuldetected-${safeHost}-${scan.id.slice(0, 8)}.pdf`;
 
   return new NextResponse(new Uint8Array(pdfBytes), {
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
+      // The document contains the account's own findings: no shared cache may
+      // keep a copy.
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }
