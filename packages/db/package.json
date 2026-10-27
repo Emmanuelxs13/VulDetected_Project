@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:generate:custom": "drizzle-kit generate --custom",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:verify": "node scripts/verify-schema.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
