@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 import { findingStatusEnum, severityEnum } from './enums';
 import { scans } from './scans';
@@ -44,6 +53,23 @@ export const findings = pgTable(
 
     /** Which deterministic check produced the finding (e.g. `security_headers`). */
     checkName: text('check_name').notNull(),
+
+    /**
+     * OWASP Top 10 (2021) category code (`A01`, `A03`, …).
+     *
+     * Nullable on purpose. A check that cannot be mapped honestly must leave this
+     * empty instead of guessing: a wrong category turns a real finding into
+     * misleading remediation advice, which is worse than "not mapped yet".
+     */
+    owaspCategory: text('owasp_category'),
+
+    /**
+     * True when this occurrence did NOT appear in the previous scan of the same
+     * domain. Computed at ingest time by comparing `finding_key` against the
+     * latest earlier scan, because "new" is a fact about a moment: recomputing it
+     * later from a changing scan history would silently rewrite the past.
+     */
+    isNew: boolean('is_new').notNull().default(false),
 
     title: text('title').notNull(),
     description: text('description').notNull(),

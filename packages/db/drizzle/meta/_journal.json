@@ -64,6 +64,13 @@
       "when": 1792859129342,
       "tag": "0008_amazing_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793068744354,
+      "tag": "0009_foamy_mathemanic",
+      "breakpoints": true
     }
   ]
 }

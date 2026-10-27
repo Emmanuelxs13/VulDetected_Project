@@ -16,6 +16,8 @@ import { accounts } from './accounts';
 import { auditLogs } from './audit-logs';
 import { domains } from './domains';
 import { findings } from './findings';
+import { mailOutbox } from './mail-outbox';
+import { scanCredentials } from './scan-credentials';
 import { scanEvents } from './scan-events';
 import { scanSchedules } from './scan-schedules';
 import { scans } from './scans';
@@ -28,6 +30,8 @@ export {
   accountStatusEnum,
   citext,
   findingStatusEnum,
+  mailStatusEnum,
+  scanSourceValues,
   scanStatusEnum,
   severityEnum,
   subscriptionPlanEnum,
@@ -37,6 +41,8 @@ export {
 export type {
   AccountStatus,
   FindingStatus,
+  MailStatus,
+  ScanSource,
   ScanStatus,
   Severity,
   SubscriptionPlan,
@@ -76,11 +82,18 @@ export type { NewScanSchedule, ScanSchedule } from './scan-schedules';
 export { notifications } from './notifications';
 export type { NewNotification, Notification } from './notifications';
 
+export { mailOutbox } from './mail-outbox';
+export type { MailOutboxRow, NewMailOutboxRow } from './mail-outbox';
+
+export { scanCredentials } from './scan-credentials';
+export type { NewScanCredential, ScanCredential } from './scan-credentials';
+
 export {
   accountsRelations,
   auditLogsRelations,
   domainsRelations,
   findingsRelations,
+  scanCredentialsRelations,
   scanEventsRelations,
   scanSchedulesRelations,
   scansRelations,
@@ -109,4 +122,6 @@ export const schema = {
   scanEvents,
   scanSchedules,
   notifications,
+  mailOutbox,
+  scanCredentials,
 };

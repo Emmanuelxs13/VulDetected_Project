@@ -100,6 +100,21 @@ export const severityEnum = pgEnum('severity', [
 export const findingStatusEnum = pgEnum('finding_status', ['open', 'false_positive', 'resolved']);
 
 /**
+ * Mail outbox lifecycle.
+ *
+ * `sending` exists so the outbox can be processed by more than one runner
+ * without double-sending: a worker claims a row by moving it from `pending` to
+ * `sending` in the same UPDATE that selects it, and a row stuck in `sending`
+ * past its lease can be reclaimed. Without that intermediate state an at-least-
+ * once delivery becomes an at-least-twice delivery.
+ */
+export const mailStatusEnum = pgEnum('mail_status', ['pending', 'sending', 'sent', 'failed']);
+
+/** Where a scan came from. A CHECK-constrained text is enough for two values. */
+export const scanSourceValues = ['manual', 'schedule'] as const;
+export type ScanSource = (typeof scanSourceValues)[number];
+
+/**
  * `inet` — a validated IP address, in either family.
  *
  * A `text` column accepts "not-an-ip", "1.2.3.4.5", and "::ffff:1.2.3.4" with
@@ -123,3 +138,4 @@ export type TokenPurpose = (typeof tokenPurposeEnum.enumValues)[number];
 export type ScanStatus = (typeof scanStatusEnum.enumValues)[number];
 export type Severity = (typeof severityEnum.enumValues)[number];
 export type FindingStatus = (typeof findingStatusEnum.enumValues)[number];
+export type MailStatus = (typeof mailStatusEnum.enumValues)[number];
