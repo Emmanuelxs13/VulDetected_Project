@@ -13,7 +13,15 @@
     "badge": "Sprint 2",
     "signIn": "Iniciar sesión",
     "createAccount": "Crear cuenta",
-    "signOut": "Cerrar sesión"
+    "signOut": "Cerrar sesión",
+    "findings": "Hallazgos",
+    "reports": "Informes",
+    "remediation": "Remediación",
+    "schedules": "Programaciones",
+    "settings": "Configuración",
+    "expandSidebar": "Expandir barra lateral",
+    "collapseSidebar": "Colapsar barra lateral",
+    "openMenu": "Abrir menú"
   },
   "home": {
     "badge": "Sprint 2 · capa de datos, autenticación y escaneos",
@@ -126,47 +134,38 @@
   },
   "dashboard": {
     "title": "Panel",
+    "description": "Estado de seguridad de los dominios que has verificado.",
     "noSession": {
       "title": "Sesión no activa",
-      "description": "Inicia sesión para ver tu cuenta."
+      "description": "Inicia sesión para ver tu panel."
     },
-    "fallbackName": "Tu cuenta",
-    "account": {
-      "title": "Cuenta",
-      "description": "Leído de la fila `users` asociada a tu sesión.",
-      "email": "Correo electrónico",
-      "verified": "Verificado",
-      "notVerified": "Sin verificar",
-      "status": "Estado",
-      "locale": "Idioma",
-      "userId": "ID de usuario",
-      "memberSince": "Miembro desde"
+    "stats": {
+      "domains": "Dominios verificados",
+      "scans": "Escaneos",
+      "openFindings": "Hallazgos abiertos",
+      "riskyFindings": "Críticos y altos"
     },
-    "findings": {
-      "title": "Los hallazgos todavía no se agregan aquí",
-      "description": "Abre un escaneo para ver sus hallazgos. La correlación de CVE todavía no está implementada."
+    "risk": {
+      "label": "Riesgo actual",
+      "high": "Riesgo Alto",
+      "medium": "Riesgo Medio",
+      "safe": "Seguro / Riesgo Bajo",
+      "highHint": "Hay hallazgos críticos o altos abiertos. Revísalos y corrígelos.",
+      "mediumHint": "Hay hallazgos medios o sin clasificar abiertos.",
+      "safeHint": "No hay hallazgos abiertos de severidad media o superior."
     },
-    "severityBreakdown": "Desglose por severidad",
-    "scans": "Escaneos",
-    "findingsList": "Todos los hallazgos",
-    "filter": "Filtrar",
-    "filterAll": "Todos",
-    "filterDescription": "Filtre por severidad. Los conteos incluyen todos sus hallazgos.",
-    "scansDescription": "Los 20 escaneos más recientes de los dominios que verificó.",
-    "trend": {
-      "title": "Tendencia de postura",
-      "description": "Hallazgos altos y críticos del último escaneo completado de cada dominio, frente al anterior.",
-      "empty": "Todavía no hay escaneos completados, así que no hay tendencia que mostrar.",
-      "riskyFindings": "altos/críticos",
-      "improved": "Mejoró",
-      "worsened": "Empeoró",
-      "unchanged": "Sin cambios",
-      "firstScan": "Primer escaneo",
-      "table": {
-        "domain": "Dominio",
-        "latest": "Último escaneo",
-        "delta": "Cambio"
-      }
+    "severity": {
+      "title": "Hallazgos abiertos por severidad",
+      "description": "Solo se cuentan los hallazgos en estado abierto.",
+      "empty": "No hay hallazgos abiertos.",
+      "viewAll": "Ver todos los hallazgos"
+    },
+    "recent": {
+      "title": "Escaneos recientes",
+      "description": "Los últimos escaneos de tus dominios verificados.",
+      "empty": "Todavía no has lanzado ningún escaneo",
+      "emptyHint": "Verifica un dominio y lanza tu primer escaneo desde la página de escaneos.",
+      "viewAll": "Ver todos los escaneos"
     }
   },
   "notFound": {
@@ -348,7 +347,9 @@
         "severity": "Severidad",
         "check": "Comprobación",
         "finding": "Hallazgo",
-        "affectedUrl": "URL afectada"
+        "affectedUrl": "URL afectada",
+        "status": "Estado",
+        "actions": "Acciones"
       },
       "severity": {
         "unclassified": "Sin clasificar",
@@ -402,6 +403,11 @@
         "label": "Paginación de hallazgos",
         "next": "Página siguiente",
         "first": "Primera página"
+      },
+      "status": {
+        "resolved": "Resuelto",
+        "falsePositive": "Falso positivo",
+        "reopen": "Reabrir"
       }
     },
     "export": {
@@ -531,5 +537,103 @@
       }
     },
     "pageTitle": "Configuración"
+  },
+  "findingsPage": {
+    "title": "Hallazgos",
+    "description": "Todos los hallazgos de tus dominios verificados, del más reciente al más antiguo.",
+    "sessionRequired": {
+      "title": "Sesión no activa",
+      "description": "Inicia sesión para ver tus hallazgos."
+    },
+    "list": {
+      "title": "Hallazgos",
+      "description": "Los conteos de los filtros incluyen solo hallazgos abiertos. La tabla muestra también los resueltos y los descartados."
+    },
+    "empty": {
+      "title": "Sin hallazgos",
+      "description": "Ninguno de tus escaneos ha registrado hallazgos todavía."
+    }
+  },
+  "reports": {
+    "title": "Informes",
+    "description": "Qué está abierto, si la postura mejora y qué puedes descargar.",
+    "sessionRequired": {
+      "title": "Sesión no activa",
+      "description": "Inicia sesión para ver tus informes."
+    },
+    "severity": {
+      "title": "Hallazgos abiertos por severidad",
+      "description": "Solo se cuentan los hallazgos en estado abierto.",
+      "empty": "No hay hallazgos abiertos."
+    },
+    "trend": {
+      "title": "Tendencia de postura",
+      "description": "Hallazgos críticos y altos del último escaneo completado de cada dominio, frente al anterior.",
+      "empty": "Todavía no hay escaneos completados, así que no hay tendencia que mostrar.",
+      "riskyFindings": "críticos/altos",
+      "improved": "Mejoró",
+      "worsened": "Empeoró",
+      "unchanged": "Sin cambios",
+      "firstScan": "Primer escaneo",
+      "table": {
+        "domain": "Dominio",
+        "latest": "Último escaneo",
+        "delta": "Cambio"
+      }
+    },
+    "scans": {
+      "title": "Escaneos completados",
+      "description": "Los 20 escaneos completados más recientes. Cada fila ofrece las mismas exportaciones que el detalle del escaneo.",
+      "empty": {
+        "title": "Todavía no hay escaneos completados",
+        "description": "Cuando un escaneo termine, aparecerá aquí con sus exportaciones."
+      },
+      "table": {
+        "target": "Objetivo",
+        "domain": "Dominio",
+        "created": "Creado",
+        "exports": "Exportar"
+      }
+    }
+  },
+  "remediation": {
+    "title": "Guías de remediación",
+    "description": "Cómo corregir los hallazgos abiertos de tus dominios, ordenados por severidad.",
+    "sessionRequired": {
+      "title": "Sesión no activa",
+      "description": "Inicia sesión para ver tus guías de remediación."
+    },
+    "empty": {
+      "title": "No hay hallazgos abiertos",
+      "description": "Cuando un escaneo deje hallazgos abiertos, aquí verás cómo corregirlos."
+    },
+    "openFindings": "{count, plural, one {# hallazgo abierto} other {# hallazgos abiertos}}",
+    "noGuide": {
+      "title": "Hallazgos sin guía específica",
+      "description": "Estas comprobaciones todavía no tienen una guía de remediación. No es un resultado limpio: revísalas manualmente."
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "description": "Tu cuenta, los dominios que has verificado y las credenciales de escaneo.",
+    "profile": {
+      "title": "Perfil",
+      "description": "Datos de la cuenta asociada a tu sesión.",
+      "name": "Nombre",
+      "noName": "Sin nombre",
+      "email": "Correo electrónico",
+      "emailVerified": "Verificado",
+      "emailNotVerified": "Sin verificar"
+    },
+    "domains": {
+      "title": "Dominios verificados",
+      "description": "Solo estos dominios pueden escanearse. La verificación es la prueba de que los controlas.",
+      "verified": "Verificado",
+      "verifiedAt": "Verificado el {date}",
+      "empty": {
+        "title": "Todavía no hay dominios verificados",
+        "description": "Verifica un dominio desde la página de escaneos para poder escanearlo."
+      }
+    }
   }
 }

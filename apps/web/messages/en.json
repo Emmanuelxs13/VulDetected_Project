@@ -13,7 +13,15 @@
     "badge": "Sprint 2",
     "signIn": "Sign in",
     "createAccount": "Create account",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "findings": "Findings",
+    "reports": "Reports",
+    "remediation": "Remediation",
+    "schedules": "Schedules",
+    "settings": "Settings",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "openMenu": "Open menu"
   },
   "home": {
     "badge": "Sprint 2 · data layer, authentication and scanning",
@@ -126,47 +134,38 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "description": "Security posture of the domains you have verified.",
     "noSession": {
       "title": "No active session",
-      "description": "Sign in to see your account."
+      "description": "Sign in to see your dashboard."
     },
-    "fallbackName": "Your account",
-    "account": {
-      "title": "Account",
-      "description": "Read from the `users` row behind your session.",
-      "email": "Email",
-      "verified": "Verified",
-      "notVerified": "Not verified",
-      "status": "Status",
-      "locale": "Locale",
-      "userId": "User ID",
-      "memberSince": "Member since"
+    "stats": {
+      "domains": "Verified domains",
+      "scans": "Scans",
+      "openFindings": "Open findings",
+      "riskyFindings": "Critical and high"
     },
-    "findings": {
-      "title": "Findings are not aggregated here yet",
-      "description": "Open a scan to see its findings. CVE correlation is not built yet."
+    "risk": {
+      "label": "Current risk",
+      "high": "High risk",
+      "medium": "Medium risk",
+      "safe": "Safe / Low risk",
+      "highHint": "There are open critical or high findings. Review and fix them.",
+      "mediumHint": "There are open medium or unclassified findings.",
+      "safeHint": "No open findings at medium severity or above."
     },
-    "severityBreakdown": "Severity breakdown",
-    "scans": "Scans",
-    "findingsList": "All findings",
-    "filter": "Filter",
-    "filterAll": "All",
-    "filterDescription": "Filter by severity. Counts cover every finding you own.",
-    "scansDescription": "The 20 most recent scans of the domains you verified.",
-    "trend": {
-      "title": "Posture trend",
-      "description": "High and critical findings in the newest completed scan of each domain, compared with the scan before it.",
-      "empty": "No completed scans yet, so there is no trend to show.",
-      "riskyFindings": "high/critical",
-      "improved": "Improved",
-      "worsened": "Worsened",
-      "unchanged": "Unchanged",
-      "firstScan": "First scan",
-      "table": {
-        "domain": "Domain",
-        "latest": "Latest scan",
-        "delta": "Change"
-      }
+    "severity": {
+      "title": "Open findings by severity",
+      "description": "Only open findings are counted.",
+      "empty": "No open findings.",
+      "viewAll": "View all findings"
+    },
+    "recent": {
+      "title": "Recent scans",
+      "description": "The latest scans of your verified domains.",
+      "empty": "You have not launched any scan yet",
+      "emptyHint": "Verify a domain and launch your first scan from the scans page.",
+      "viewAll": "View all scans"
     }
   },
   "notFound": {
@@ -348,7 +347,9 @@
         "severity": "Severity",
         "check": "Check",
         "finding": "Finding",
-        "affectedUrl": "Affected URL"
+        "affectedUrl": "Affected URL",
+        "status": "Status",
+        "actions": "Actions"
       },
       "severity": {
         "unclassified": "Unclassified",
@@ -402,6 +403,11 @@
         "label": "Findings pagination",
         "next": "Next page",
         "first": "First page"
+      },
+      "status": {
+        "resolved": "Resolved",
+        "falsePositive": "False positive",
+        "reopen": "Reopen"
       }
     },
     "export": {
@@ -531,5 +537,103 @@
       }
     },
     "pageTitle": "Settings"
+  },
+  "findingsPage": {
+    "title": "Findings",
+    "description": "Every finding across your verified domains, newest first.",
+    "sessionRequired": {
+      "title": "No active session",
+      "description": "Sign in to see your findings."
+    },
+    "list": {
+      "title": "Findings",
+      "description": "Filter counts include open findings only. The table also shows resolved and dismissed rows."
+    },
+    "empty": {
+      "title": "No findings",
+      "description": "None of your scans has recorded a finding yet."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "description": "What is open, whether posture is improving, and what you can download.",
+    "sessionRequired": {
+      "title": "No active session",
+      "description": "Sign in to see your reports."
+    },
+    "severity": {
+      "title": "Open findings by severity",
+      "description": "Only open findings are counted.",
+      "empty": "No open findings."
+    },
+    "trend": {
+      "title": "Posture trend",
+      "description": "Critical and high findings in the newest completed scan of each domain, compared with the one before it.",
+      "empty": "No completed scans yet, so there is no trend to show.",
+      "riskyFindings": "critical/high",
+      "improved": "Improved",
+      "worsened": "Worsened",
+      "unchanged": "Unchanged",
+      "firstScan": "First scan",
+      "table": {
+        "domain": "Domain",
+        "latest": "Latest scan",
+        "delta": "Change"
+      }
+    },
+    "scans": {
+      "title": "Completed scans",
+      "description": "The 20 most recent completed scans. Each row offers the same exports as the scan detail.",
+      "empty": {
+        "title": "No completed scans yet",
+        "description": "When a scan finishes it will appear here with its exports."
+      },
+      "table": {
+        "target": "Target",
+        "domain": "Domain",
+        "created": "Created",
+        "exports": "Export"
+      }
+    }
+  },
+  "remediation": {
+    "title": "Remediation guides",
+    "description": "How to fix the open findings on your domains, ordered by severity.",
+    "sessionRequired": {
+      "title": "No active session",
+      "description": "Sign in to see your remediation guides."
+    },
+    "empty": {
+      "title": "No open findings",
+      "description": "When a scan leaves open findings, you will see how to fix them here."
+    },
+    "openFindings": "{count, plural, one {# open finding} other {# open findings}}",
+    "noGuide": {
+      "title": "Findings without a specific guide",
+      "description": "These checks do not have remediation guidance yet. That is not a clean result: review them manually."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Your account, the domains you verified, and the scan credentials.",
+    "profile": {
+      "title": "Profile",
+      "description": "Account data behind your session.",
+      "name": "Name",
+      "noName": "No name",
+      "email": "Email",
+      "emailVerified": "Verified",
+      "emailNotVerified": "Not verified"
+    },
+    "domains": {
+      "title": "Verified domains",
+      "description": "Only these domains can be scanned. Verification is the proof that you control them.",
+      "verified": "Verified",
+      "verifiedAt": "Verified on {date}",
+      "empty": {
+        "title": "No verified domains yet",
+        "description": "Verify a domain from the scans page before scanning it."
+      }
+    }
   }
 }
