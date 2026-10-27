@@ -20,13 +20,13 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.6",
+    "drizzle-orm": "^0.45.4",
     "postgres": "^3.4.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.11",
     "@types/node": "^22.18.6",
-    "drizzle-kit": "^0.31.5",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }
