@@ -1,0 +1,293 @@
+# =============================================================================
+# Continuous integration
+# =============================================================================
+# Six jobs, each one answering a question a reviewer would otherwise have to
+# answer by hand:
+#
+#   static   the code lints and type-checks
+#   test     the unit and end-to-end suites pass with NO services running
+#   python   the scan worker's own suite passes
+#   smoke    the real production artifact boots and answers its probes against a
+#            real Postgres and a real Redis, then serves a translated page
+#   audit    no dependency has a high or critical advisory
+#   docker   the production image still builds
+#
+# ## Why `format:check` is NOT a gate
+#
+# `pnpm format:check` currently fails on 54 pre-existing files. Wiring it into CI
+# would either block every pull request on unrelated reformatting or force one
+# enormous whitespace diff through review. The command stays available locally;
+# adopting it repository-wide is its own change, and this job gains the step the
+# day that lands.
+#
+# ## Why `test` has no service containers, on purpose
+#
+# The unit suites mock the data layer and the E2E suite runs against an
+# in-process PGlite database. That is a guarantee worth enforcing, not a
+# coincidence: `pnpm test` on a laptop with no Docker must be green. If a future
+# test needs Redis or Postgres, it belongs in `smoke`, where they exist for real,
+# and not here where they would be a hidden requirement.
+#
+# ## Why `smoke` exists
+#
+# Locally there is no Redis, so `/api/ready` has only ever been seen answering
+# `degraded`. This job is the only place that observes the `ok` branch, against
+# the exact tree the container ships (`.next/standalone` plus the static copy),
+# and it re-applies the migrations the `migrate` service applies on deploy.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, 'sprint/**', 'feature/**']
+  pull_request:
+
+# A new push to the same branch makes the previous run obsolete.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Turborepo's remote cache is not configured for this repository; disabling
+  # the daemon keeps CI logs reproducible and avoids a background process.
+  TURBO_TELEMETRY_DISABLED: '1'
+  NEXT_TELEMETRY_DISABLED: '1'
+  CI: 'true'
+
+jobs:
+  static:
+    name: Lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `version:` input: the action reads `packageManager` from
+      # package.json, so the CI pnpm is the one the repository pins.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  test:
+    name: Unit and E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm test:e2e
+
+  python:
+    name: Scanner worker
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/scanner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/scanner/pyproject.toml
+
+      # Installs the package the same way the image does, plus the dev extras.
+      # `pip install .` also proves the packaging metadata is still valid.
+      - run: pip install '.[dev]'
+      - run: python -m pytest -q
+
+  smoke:
+    name: Production artifact smoke test
+    runs-on: ubuntu-latest
+    needs: [static]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vuldetected
+          POSTGRES_PASSWORD: vuldetected
+          POSTGRES_DB: vuldetected
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vuldetected -d vuldetected"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://vuldetected:vuldetected@localhost:5432/vuldetected
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/0
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The same two commands the `migrate` service runs on deploy: apply, then
+      # assert the result. Applied twice on purpose — a redeploy with no new
+      # migration is the common case and must be a no-op.
+      - name: Apply and verify migrations
+        # `NODE_ENV=production` makes the journal check fatal, which is the same
+        # mode the migrator image runs in.
+        env:
+          NODE_ENV: production
+        run: |
+          pnpm --filter @vuldetected/db db:migrate
+          pnpm --filter @vuldetected/db db:migrate
+          pnpm --filter @vuldetected/db db:verify
+
+      # Builds with NO application environment set: the build must not require
+      # secrets, because that would mean CI (and any fresh clone) cannot build.
+      - run: pnpm build
+
+      # Exactly what the Dockerfile copies. If this step is wrong, the image
+      # serves HTML without CSS and the smoke test below still passes — which is
+      # why the page assertion also checks for a stylesheet link.
+      - name: Assemble the artifact the image ships
+        working-directory: apps/web
+        run: cp -r .next/static .next/standalone/.next/static
+
+      - name: Boot the standalone server
+        working-directory: apps/web
+        env:
+          NODE_ENV: production
+          PORT: '3000'
+          HOSTNAME: '127.0.0.1'
+          AUTH_SECRET: ci-only-auth-secret-at-least-32-bytes-long
+          AUTH_URL: http://127.0.0.1:3000
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+          SCANNER_CALLBACK_SECRET: ci-only-scanner-callback-secret
+          MAIL_DISPATCH_SECRET: ci-only-mail-dispatch-secret
+          SMTP_HOST: localhost
+          EMAIL_FROM: VulDetected <no-reply@vuldetected.test>
+          # 32 raw bytes, base64. Not a secret: it exists only for this run.
+          CREDENTIALS_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+        run: |
+          node .next/standalone/server.js > "$RUNNER_TEMP/server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/server.pid"
+
+          for _ in $(seq 1 30); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "server is up"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "server did not start"
+          cat "$RUNNER_TEMP/server.log"
+          exit 1
+
+      - name: Liveness answers without a dependency
+        run: |
+          body=$(curl -fsS --max-time 5 http://127.0.0.1:3000/api/health)
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"'
+
+      # THE assertion this job exists for: both dependencies reachable, so the
+      # probe takes its `ok` branch instead of the `degraded` one.
+      - name: Readiness answers ok with Postgres and Redis up
+        run: |
+          body=$(curl -fsS --max-time 10 http://127.0.0.1:3000/api/ready)
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"'
+          echo "$body" | grep -q '"database":{"ok":true'
+          echo "$body" | grep -q '"redis":{"ok":true'
+
+      - name: The traced server still renders both languages
+        run: |
+          # `messages/*.json` are loaded through a template literal, so they are
+          # only in the artifact because `outputFileTracingIncludes` says so.
+          # Losing that entry produces a page in the fallback language with no
+          # error, which is why it is asserted here.
+          es=$(curl -fsS --max-time 15 -H 'Cookie: locale=es' http://127.0.0.1:3000/login)
+          en=$(curl -fsS --max-time 15 -H 'Cookie: locale=en' http://127.0.0.1:3000/login)
+          echo "$es" | grep -q '<html lang="es"'
+          echo "$en" | grep -q '<html lang="en"'
+          echo "$en" | grep -q 'Sign in'
+          # The locale cookie must actually change the payload, not just the tag.
+          test "$es" != "$en"
+
+      # The stylesheet link only exists if `.next/static` was copied; without it
+      # the page renders unstyled and nobody notices until a user does.
+      - name: Static assets shipped with the artifact
+        run: |
+          page=$(curl -fsS --max-time 15 http://127.0.0.1:3000/login)
+          css=$(echo "$page" | grep -o '/_next/static/[^"]*\.css' | head -n 1)
+          test -n "$css"
+          echo "css: $css"
+          curl -fsS --max-time 10 "http://127.0.0.1:3000$css" | head -c 200
+
+      - name: Server log
+        if: always()
+        run: cat "$RUNNER_TEMP/server.log"
+
+      - name: Stop the server
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/server.pid")" || true
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      # High and critical block. Moderate advisories that need a breaking major
+      # are triaged by hand instead of freezing the pipeline.
+      - run: pnpm audit --audit-level=high
+
+  docker:
+    name: Production image
+    runs-on: ubuntu-latest
+    needs: [static]
+    steps:
+      - uses: actions/checkout@v4
+
+      # The only environment where the image is actually built: locally there is
+      # no daemon, so a broken Dockerfile would otherwise reach a deploy.
+      - name: Build the runtime target
+        run: docker build --target runtime -t vuldetected-web:ci .
+
+      - name: Build the migrator target
+        run: docker build --target migrator -t vuldetected-migrator:ci .
