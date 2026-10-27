@@ -100,7 +100,8 @@
       "genericRegister": "We could not create that account. If the address is already registered, try signing in instead.",
       "createFailed": "We could not create that account. Try again in a moment.",
       "tooManyRequests": "Too many requests in a row. Wait a few minutes and try again.",
-      "resetTokenInvalid": "The link is not valid or has expired. Request a new one."
+      "resetTokenInvalid": "The link is not valid or has expired. Request a new one.",
+      "emailInUse": "That email is already registered. Sign in or reset your password."
     },
     "validation": {
       "emailRequired": "Email is required.",
