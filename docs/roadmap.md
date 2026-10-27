@@ -185,7 +185,7 @@ las decisiones de producto que no deben quedar implícitas.
 | ---------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | OAuth con Google / GitHub    | Implementado; pendiente validar credenciales reales y flujo de vinculación.                               | Cerrar configuración en entorno de despliegue |
 | Facturación con Stripe       | Sigue fuera de alcance hasta decidir cuotas, medición y retención.                                        | Sprint 5, después de medir uso real           |
-| Exportaciones PDF ejecutivas | Implementado para el modelo actual de severidad y remediación.                                            | Añadir pruebas de contenido y descarga        |
+| Exportaciones PDF ejecutivas | Implementado con pruebas de contenido, paginación, codificación de fuente, autorización y cabeceras.        | Validar la descarga en un navegador real       |
 | Escaneos programados         | CRUD, runner protegido y UI implementados; falta ejecución operativa periódica y pruebas de concurrencia. | Configurar reloj externo y observabilidad     |
 
 ---

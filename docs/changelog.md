@@ -17,9 +17,13 @@ a partir de `0.1.0`.
 - Endurecido el runner: procesa las ejecuciones vencidas en orden y cada
   dominio admite una sola programación mediante un índice único.
 - Corregida la reanudación de programaciones para conservar la cadencia semanal.
-- Añadidas la exportación PDF ejecutiva y la autenticación social como base de
-  Sprint 4; queda pendiente validar credenciales y pruebas de integración en un
-  entorno configurado.
+- Añadida la autenticación social como base de Sprint 4; queda pendiente validar
+  las credenciales reales en un entorno configurado.
+- Reescrita la exportación PDF ejecutiva: documento A4 paginado con semáforo,
+  desglose por severidad, hallazgos ordenados de crítica a informativa y
+  remediación solo para los hallazgos que exigen acción, en español e inglés.
+  Cubierta por pruebas de contenido, paginación, codificación de fuente,
+  autorización y cabeceras de descarga.
 
 Base del Sprint 1 — **completa y verificada de extremo a extremo** contra el
 servidor local de PostgreSQL 18.3. El primer commit llega con este hito.
