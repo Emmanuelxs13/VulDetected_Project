@@ -41,8 +41,13 @@ function getBearerToken(req: Request) {
   return null;
 }
 
-export async function POST(req: Request, { params }: { params: { scanId: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ scanId: string }> }) {
   try {
+    // Next 15 hands route params as a Promise. Reading `params.scanId` without
+    // awaiting yields `undefined`, the scan lookup throws, and the handler
+    // answers 400 for every terminal callback — the exact failure the E2E
+    // suite reproduces.
+    const { scanId } = await params;
     const env = getEnv();
     const expected = env.SCANNER_CALLBACK_SECRET;
     if (!expected) {
@@ -54,7 +59,6 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const scanId = params.scanId;
     const body = await req.json();
 
     const scanRows = await db().select().from(scans).where(eq(scans.id, scanId)).limit(1);
@@ -120,25 +124,29 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
               const checkName = f.check;
               const evidence = f.evidence ?? {};
               const { severity } = classifyFinding(checkName, evidence, f.title ?? '');
-              await tx
-                .insert(findings)
-                .values({
-                  scanId,
-                  findingKey: f.key,
-                  severity,
-                  checkName,
-                  title: f.title,
-                  description: f.description ?? '',
-                  affectedUrl: f.affected_url ?? f.affectedUrl ?? body.base_url ?? '',
-                  evidence,
-                  raw: f.raw ?? {},
-                })
-                .onConflictDoNothing();
+              // Savepoint per row: without it, a single rejected INSERT marks
+              // the surrounding transaction aborted and every later statement
+              // fails with "current transaction is aborted" — which is how one
+              // bad finding used to lose the whole batch.
+              await tx.transaction(async (sp) => {
+                await sp
+                  .insert(findings)
+                  .values({
+                    scanId,
+                    findingKey: f.key,
+                    severity,
+                    checkName,
+                    title: f.title,
+                    description: f.description ?? '',
+                    affectedUrl: f.affected_url ?? f.affectedUrl ?? body.base_url ?? '',
+                    evidence,
+                    raw: f.raw ?? {},
+                  })
+                  .onConflictDoNothing();
+              });
             } catch {
-              const _err: unknown = undefined;
-              void _err;
-
-              // ignore
+              // A finding that cannot be persisted is skipped, but the batch
+              // and the terminal status transition still commit.
             }
           }
         }

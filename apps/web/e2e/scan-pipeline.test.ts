@@ -32,7 +32,23 @@ import type { ScanJobKwargs } from '@/lib/celery';
  */
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const MIGRATION_PATH = path.resolve(dirname, '../../../packages/db/drizzle/0003_scan_domain.sql');
+
+/**
+ * Every migration that belongs to the scan domain, in journal order.
+ *
+ * Applying only `0003` was the harness drifting from production: `findings.status`
+ * arrives in `0007` and the notifications table in `0008`, so the real INSERT the
+ * callback issues referenced a column the test database never had. Fidelity to
+ * the production schema is the point of running against Postgres at all.
+ */
+const MIGRATION_FILES = [
+  '0003_scan_domain.sql',
+  '0004_warm_pretty_boy.sql',
+  '0005_third_goblin_queen.sql',
+  '0006_grey_sleeper.sql',
+  '0007_real_tombstone.sql',
+  '0008_amazing_wonder_man.sql',
+].map((file) => path.resolve(dirname, '../../../packages/db/drizzle', file));
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_USER_ID = '22222222-2222-4222-8222-222222222222';
@@ -153,7 +169,9 @@ beforeAll(async () => {
   // Apply the REAL Sprint 2 migration, so the constraints under test are the
   // ones production gets. This is not `drizzle-kit migrate` (prohibited); it is
   // the same SQL executed against an in-process database.
-  const migration = readFileSync(MIGRATION_PATH, 'utf8');
+  const migration = MIGRATION_FILES.map((file) => readFileSync(file, 'utf8')).join(
+    '--> statement-breakpoint',
+  );
   for (const statement of migration.split('--> statement-breakpoint')) {
     if (statement.trim().length > 0) {
       await database.exec(statement);
@@ -236,7 +254,7 @@ async function startScan(scanId: string): Promise<void> {
       status: 'running',
       events: [{ seq: 1, type: 'scan.started', payload: {} }],
     }),
-    { params: { scanId } },
+    { params: Promise.resolve({ scanId }) },
   );
 
   expect(response.status).toBe(200);
@@ -264,7 +282,7 @@ async function completeScan(scanId: string): Promise<void> {
         },
       ],
     }),
-    { params: { scanId } },
+    { params: Promise.resolve({ scanId }) },
   );
 
   expect(response.status).toBe(200);
@@ -342,7 +360,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     };
 
     const first = await postScanCallback(callbackRequest(scanId, progress), {
-      params: { scanId },
+      params: Promise.resolve({ scanId }),
     });
     expect(first.status).toBe(200);
     expect(await first.json()).toEqual({ ok: true });
@@ -350,7 +368,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     // Same payload again: a worker retry. The unique constraint rejects both
     // rows and `onConflictDoNothing()` turns the retry into a no-op.
     const retry = await postScanCallback(callbackRequest(scanId, progress), {
-      params: { scanId },
+      params: Promise.resolve({ scanId }),
     });
     expect(retry.status).toBe(200);
 
@@ -402,7 +420,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
           },
         ],
       }),
-      { params: { scanId } },
+      { params: Promise.resolve({ scanId }) },
     );
 
     expect(response.status).toBe(200);
@@ -420,7 +438,10 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     expect(rows.map((row) => row.findingKey)).toEqual(['a'.repeat(64), 'b'.repeat(64)]);
 
     const header = rows[0];
-    expect(header?.severity).toBe('unclassified');
+    // Sprint 3 replaced the `unclassified` default with the real classifier:
+    // a missing Content-Security-Policy is a high-severity finding.
+    expect(header?.severity).toBe('high');
+    expect(header?.status).toBe('open');
     expect(header?.checkName).toBe('security_headers');
     expect(header?.title).toBe('Missing Content-Security-Policy header');
     // The worker's `affected_url` wins over the `base_url` fallback: the fixture
@@ -451,7 +472,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
           },
         ],
       }),
-      { params: { scanId } },
+      { params: Promise.resolve({ scanId }) },
     );
 
     expect(duplicate.status).toBe(200);
@@ -529,7 +550,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
 
   it('enforces the Bearer contract, 404 for unknown scans and 400 for malformed bodies', async () => {
     const scanId = await insertQueuedScan();
-    const params = { params: { scanId } };
+    const params = { params: Promise.resolve({ scanId }) };
 
     const missing = await postScanCallback(callbackRequest(scanId, {}, null), params);
     expect(missing.status).toBe(401);
@@ -546,7 +567,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     expect(short.status).toBe(401);
 
     const unknown = await postScanCallback(callbackRequest(randomUUID(), {}, SECRET), {
-      params: { scanId: randomUUID() },
+      params: Promise.resolve({ scanId: randomUUID() }),
     });
     expect(unknown.status).toBe(404);
 
@@ -638,7 +659,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
    */
   it('persists the worker snake_case `affected_url` instead of falling back to base_url', async () => {
     const scanId = await insertQueuedScan();
-    const params = { params: { scanId } };
+    const params = { params: Promise.resolve({ scanId }) };
 
     const body = {
       status: 'completed',

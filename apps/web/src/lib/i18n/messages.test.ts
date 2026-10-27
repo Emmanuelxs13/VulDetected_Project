@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
@@ -65,7 +66,10 @@ describe('i18n messages', () => {
   });
 
   it('resolves every statically referenced key', () => {
-    const root = join(process.cwd(), 'src');
+    // Resolved from this file, not `process.cwd()`: the suite runs both from
+    // `apps/web` (package script) and from the repository root (Turborepo),
+    // and a cwd-relative path only works for the first.
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
     const missing: string[] = [];
     let checked = 0;
 
