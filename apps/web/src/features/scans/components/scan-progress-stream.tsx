@@ -5,6 +5,8 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { estimateScanProgress, formatDuration } from '@/lib/scan-progress';
+
 import { isTerminalStatus, ScanStatusBadge } from './scan-status';
 import type { ScanStatus } from './scan-status';
 
@@ -108,27 +110,37 @@ export function ScanProgressStream({
     return () => source.close();
   }, [alreadyTerminal, initialEvents, router, scanId]);
 
-  const completedChecks = useMemo(() => {
-    const names = new Set<string>();
-    for (const event of events) {
-      if (event.type === 'check.completed') {
-        const name = readCheckName(event.payload);
-        if (name !== null) {
-          names.add(name);
-        }
-      }
-    }
-    return names;
-  }, [events]);
-
-  const total = checks.length;
-  const percent = total > 0 ? Math.round((completedChecks.size / total) * 100) : 0;
+  /**
+   * Progress, percentage and ETA all come from one pure function so a reload
+   * and a live update cannot disagree: both feed it the same events and the
+   * same expected check list.
+   */
+  const estimate = useMemo(() => estimateScanProgress(events, checks), [events, checks]);
+  const total = estimate.total;
+  const percent = estimate.percent;
 
   const connectionLabels: Record<Connection, string> = {
     connecting: t('progress.connection.connecting'),
     live: t('progress.connection.live'),
     lost: t('progress.connection.lost'),
   };
+
+  /**
+   * One sentence under the bar: how far along the scan is, and — while it runs
+   * — how long the remaining checks should take. `estimateScanProgress` returns
+   * `null` until one check has finished, because averaging zero samples would
+   * be a guess dressed as a measurement.
+   */
+  const eta =
+    status === 'running'
+      ? estimate.remainingMs !== null
+        ? t('progress.estimate.remaining', { duration: formatDuration(estimate.remainingMs) })
+        : total > 0
+          ? t('progress.estimate.waiting')
+          : null
+      : null;
+
+  const summary = total > 0 ? t('progress.summary', { completed: estimate.completed, total }) : null;
 
   function describeEvent(event: ScanStreamEvent): string {
     const check = readCheckName(event.payload);
@@ -140,6 +152,8 @@ export function ScanProgressStream({
         return t('progress.event.completed');
       case 'scan.failed':
         return t('progress.event.failed');
+      case 'scan.cancelled':
+        return t('progress.event.cancelled');
       case 'check.started':
         return t('progress.event.checkStarted', { check: check ?? '—' });
       case 'check.completed':
@@ -160,6 +174,14 @@ export function ScanProgressStream({
 
       {total > 0 ? (
         <Progress value={percent} label={t('progress.checksCompleted')} showValue />
+      ) : null}
+
+      {summary || eta ? (
+        <p className="text-xs text-text-muted" aria-live="polite">
+          {summary}
+          {summary && eta ? ' · ' : null}
+          {eta}
+        </p>
       ) : null}
 
       <div className="flex flex-col gap-1">
@@ -198,6 +220,8 @@ function statusFromEvent(event: ScanStreamEvent, current: ScanStatus): ScanStatu
       return 'completed';
     case 'scan.failed':
       return 'failed';
+    case 'scan.cancelled':
+      return 'cancelled';
     default:
       return current;
   }

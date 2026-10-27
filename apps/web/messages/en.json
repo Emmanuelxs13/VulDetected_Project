@@ -244,10 +244,25 @@
         "submitting": "Creating..."
       }
     },
+    "actions": {
+      "cancel": "Cancel scan",
+      "cancelPending": "Cancelling…",
+      "retry": "Retry scan",
+      "retryPending": "Retrying…"
+    },
     "errors": {
       "challengeFailed": "Could not issue the verification challenge.",
       "verifyFailed": "Could not verify domain ownership.",
-      "submitFailed": "Could not submit the scan."
+      "submitFailed": "Could not submit the scan.",
+      "codes": {
+        "rate_limited": "You reached the hourly scan limit. Try again later.",
+        "domain_limit": "Your plan reached its maximum number of verified domains. Remove one or upgrade.",
+        "monthly_scan_limit": "Your plan reached its monthly scan allowance. It resets on the 1st (UTC).",
+        "concurrent_scan_limit": "Your plan already has the maximum number of scans running at once. Wait for one to finish.",
+        "schedule_limit": "Your plan reached its maximum number of active schedules.",
+        "scan_not_cancellable": "This scan can no longer be cancelled.",
+        "scan_not_retryable": "Only failed or cancelled scans can be retried."
+      }
     },
     "queued": {
       "title": "Scan queued",
@@ -280,12 +295,18 @@
         "lost": "Connection lost. Reconnecting…"
       },
       "checksCompleted": "Checks completed",
+      "summary": "{completed} of {total} checks",
+      "estimate": {
+        "remaining": "≈ {duration} left",
+        "waiting": "Waiting for the first check to finish…"
+      },
       "events": "Events",
       "noEvents": "No events yet. The scan starts when the worker picks up the job.",
       "event": {
         "started": "Scan started",
         "completed": "Scan completed",
         "failed": "Scan failed",
+        "cancelled": "Scan cancelled",
         "checkStarted": "Check started: {check}",
         "checkCompleted": "Check completed: {check}",
         "progress": "Progress updated"

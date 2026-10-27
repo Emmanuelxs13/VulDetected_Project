@@ -244,10 +244,25 @@
         "submitting": "Creando..."
       }
     },
+    "actions": {
+      "cancel": "Cancelar escaneo",
+      "cancelPending": "Cancelando…",
+      "retry": "Reintentar escaneo",
+      "retryPending": "Reintentando…"
+    },
     "errors": {
       "challengeFailed": "No se pudo emitir el reto de verificación.",
       "verifyFailed": "No se pudo verificar la propiedad del dominio.",
-      "submitFailed": "No se pudo enviar el escaneo."
+      "submitFailed": "No se pudo enviar el escaneo.",
+      "codes": {
+        "rate_limited": "Alcanzaste el límite de escaneos por hora. Inténtalo de nuevo más tarde.",
+        "domain_limit": "Tu plan alcanzó el máximo de dominios verificados. Elimina uno o mejora el plan.",
+        "monthly_scan_limit": "Tu plan alcanzó el límite mensual de escaneos. Se renueva el día 1 (UTC).",
+        "concurrent_scan_limit": "Ya tienes el máximo de escaneos simultáneos de tu plan. Espera a que termine uno.",
+        "schedule_limit": "Tu plan alcanzó el máximo de programaciones activas.",
+        "scan_not_cancellable": "Este escaneo ya no se puede cancelar.",
+        "scan_not_retryable": "Solo se pueden reintentar escaneos fallidos o cancelados."
+      }
     },
     "queued": {
       "title": "Escaneo en cola",
@@ -280,12 +295,18 @@
         "lost": "Conexión interrumpida. Reintentando…"
       },
       "checksCompleted": "Comprobaciones completadas",
+      "summary": "{completed} de {total} comprobaciones",
+      "estimate": {
+        "remaining": "≈ {duration} restante",
+        "waiting": "Esperando a que termine la primera comprobación…"
+      },
       "events": "Eventos",
       "noEvents": "Todavía no hay eventos. El escaneo empieza cuando el worker toma la tarea.",
       "event": {
         "started": "Escaneo iniciado",
         "completed": "Escaneo completado",
         "failed": "Escaneo fallido",
+        "cancelled": "Escaneo cancelado",
         "checkStarted": "Comprobación iniciada: {check}",
         "checkCompleted": "Comprobación finalizada: {check}",
         "progress": "Progreso actualizado"

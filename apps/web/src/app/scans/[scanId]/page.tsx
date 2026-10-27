@@ -21,8 +21,9 @@ import type { FindingRow } from '@/features/scans/components/findings-list';
 import { FindingsPagination } from '@/features/scans/components/findings-pagination';
 import { ScanProgressStream } from '@/features/scans/components/scan-progress-stream';
 import { CancelScanButton } from '@/features/scans/components/cancel-scan-button';
+import { RetryScanButton } from '@/features/scans/components/retry-scan-button';
 import type { ScanStreamEvent } from '@/features/scans/components/scan-progress-stream';
-import { ScanStatusBadge } from '@/features/scans/components/scan-status';
+import { isActiveStatus, ScanStatusBadge } from '@/features/scans/components/scan-status';
 import type { ScanStatus } from '@/features/scans/components/scan-status';
 import { getSeverityCounts, listFindingsPage } from '@/features/scans/queries/findings-page';
 import { db } from '@/lib/db';
@@ -136,11 +137,19 @@ export default async function ScanDetailPage({
   // The stored value is a machine code (`enqueue_failed`, the worker's own
   // reason string, …). It is never rendered: the reader gets a translated
   // message and the raw value stays in the database for diagnostics.
-  const errorMessage = scan.error
-    ? scan.error === 'enqueue_failed'
-      ? t('errors.submitFailed')
-      : t('status.failed')
-    : null;
+  //
+  // A user cancellation also writes `error = 'cancelled_by_user'`, but it is an
+  // outcome, not a failure: the status badge already says "cancelled", so it
+  // must not raise a critical banner on top of it.
+  const errorMessage =
+    scan.error && scan.error !== 'cancelled_by_user'
+      ? scan.error === 'enqueue_failed'
+        ? t('errors.submitFailed')
+        : t('status.failed')
+      : null;
+
+  const cancellable = isActiveStatus(scan.status as ScanStatus);
+  const retryable = scan.status === 'failed' || scan.status === 'cancelled';
 
   return (
     <Container size="default" className="flex flex-col gap-6 py-12">
@@ -155,7 +164,12 @@ export default async function ScanDetailPage({
         <p className="text-xs text-text-muted">
           {t('detail.verifiedDomainLabel')} <span className="font-mono">{scan.hostname}</span>
         </p>
-        {scan.status === 'queued' ? <CancelScanButton scanId={scan.id} /> : null}
+        {cancellable || retryable ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {cancellable ? <CancelScanButton scanId={scan.id} /> : null}
+            {retryable ? <RetryScanButton scanId={scan.id} /> : null}
+          </div>
+        ) : null}
         {checks.length > 0 ? (
           <p className="text-xs text-text-muted">
             {t('detail.checksLabel')} <span className="font-mono">{checks.join(', ')}</span>
