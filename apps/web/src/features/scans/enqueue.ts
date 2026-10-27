@@ -6,6 +6,7 @@ import { audit } from '@/lib/audit';
 import { enqueueScanJob } from '@/lib/celery';
 import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
+import { checkScanAllowance, type PlanLimitCode } from '@/lib/plan-limits';
 
 /**
  * The default check set, kept in one place so a manually submitted scan and a
@@ -42,7 +43,8 @@ export interface ScanTarget {
 }
 
 export type EnqueueScanOutcome =
-  { ok: true; scanId: string } | { ok: false; error: 'domain_missing' | 'enqueue_failed' };
+  | { ok: true; scanId: string }
+  | { ok: false; error: 'domain_missing' | 'enqueue_failed' | PlanLimitCode };
 
 /**
  * Inserts a `queued` scan row and publishes the job, in that order (SS-6).
@@ -72,13 +74,25 @@ export async function enqueueScanForDomain(input: {
   source: 'manual' | 'schedule';
 }): Promise<EnqueueScanOutcome> {
   const domainRows = await db()
-    .select({ id: domains.id })
+    .select({ id: domains.id, userId: domains.userId })
     .from(domains)
     .where(eq(domains.id, input.domainId))
     .limit(1);
 
-  if (domainRows.length === 0) {
+  const domain = domainRows[0];
+  if (domain === undefined) {
     return { ok: false, error: 'domain_missing' };
+  }
+
+  /**
+   * Plan limits are enforced HERE, at the single choke point both the manual
+   * submission and the scheduler pass through. A limit checked only in the UI is
+   * a suggestion: `submitScanAction` is a public endpoint, and the scheduler runs
+   * with no UI at all.
+   */
+  const limit = await checkScanAllowance(domain.userId);
+  if (limit !== null) {
+    return { ok: false, error: limit };
   }
 
   const scanRows = await db()

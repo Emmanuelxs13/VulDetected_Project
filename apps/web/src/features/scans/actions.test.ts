@@ -2,10 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveTxt } from 'node:dns/promises';
 
 import { requireUser } from '@/features/auth/session';
+import { requestScanCancellation } from '@/lib/scan-cancellation';
 import { safeFetch } from '@/lib/ssrf';
 import { dbCalls, dbQueue, resetDbMock } from '@test/db-mock';
 
-import { requestOwnershipChallengeAction, verifyOwnershipAction } from './actions';
+import {
+  cancelScanAction,
+  requestOwnershipChallengeAction,
+  retryScanAction,
+  verifyOwnershipAction,
+} from './actions';
+import { enqueueScanForDomain } from './enqueue';
 
 vi.mock('@/lib/db', async () => {
   const { createDbMock } = await import('@test/db-mock');
@@ -25,6 +32,20 @@ vi.mock('@/lib/ssrf', () => ({
   safeFetch: vi.fn(async () => new Response('missing', { status: 404 })),
 }));
 
+vi.mock('@/lib/rate-limit', () => ({
+  consumeRateLimit: vi.fn(async () => undefined),
+  RateLimitError: class RateLimitError extends Error {},
+}));
+
+vi.mock('@/lib/scan-cancellation', () => ({
+  requestScanCancellation: vi.fn(async () => true),
+}));
+
+vi.mock('./enqueue', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./enqueue')>();
+  return { ...actual, enqueueScanForDomain: vi.fn(async () => ({ ok: true, scanId: 'scan-2' })) };
+});
+
 beforeEach(() => {
   resetDbMock();
   vi.clearAllMocks();
@@ -32,6 +53,17 @@ beforeEach(() => {
 
 const TOKEN = 'b'.repeat(64);
 const PENDING_TOKEN = { id: 'token-1', value: TOKEN };
+
+/**
+ * The single row `checkDomainAllowance` reads: plan, domains owned, and whether
+ * this hostname is one of them. Values chosen so the common case is allowed.
+ */
+const ALLOWED = {
+  subscriptionPlan: 'free' as const,
+  domainCount: 1,
+  alreadyOwned: 0,
+  ownedByAnotherAccount: 0,
+};
 
 describe('requestOwnershipChallengeAction', () => {
   it('stores a domain_ownership token and returns publish instructions (DO-3)', async () => {
@@ -75,6 +107,7 @@ describe('verifyOwnershipAction', () => {
   it('verifies via DNS TXT and persists method, record and verified_at (DO-2/DO-4)', async () => {
     dbQueue.push([PENDING_TOKEN]);
     vi.mocked(resolveTxt).mockResolvedValueOnce([[TOKEN]]);
+    dbQueue.push([ALLOWED]);
     dbQueue.push([{ id: 'domain-1' }]);
     dbQueue.push([1]);
 
@@ -109,6 +142,7 @@ describe('verifyOwnershipAction', () => {
       { id: 'newer', value: TOKEN },
     ]);
     vi.mocked(resolveTxt).mockResolvedValueOnce([['a'.repeat(64)]]);
+    dbQueue.push([ALLOWED]);
     dbQueue.push([{ id: 'domain-1' }]);
     dbQueue.push([1]);
 
@@ -150,6 +184,7 @@ describe('verifyOwnershipAction', () => {
   it('verifies via the well-known file and stores the path as the record (DO-2/DO-4)', async () => {
     dbQueue.push([PENDING_TOKEN]);
     vi.mocked(safeFetch).mockResolvedValueOnce(new Response(TOKEN, { status: 200 }));
+    dbQueue.push([ALLOWED]);
     dbQueue.push([{ id: 'domain-1' }]);
     dbQueue.push([1]);
 
@@ -180,6 +215,7 @@ describe('verifyOwnershipAction', () => {
   it('refuses a domain verified by another account without consuming the token', async () => {
     dbQueue.push([PENDING_TOKEN]);
     vi.mocked(resolveTxt).mockResolvedValueOnce([[TOKEN]]);
+    dbQueue.push([{ ...ALLOWED, ownedByAnotherAccount: 1 }]);
     // The upsert writes nothing: the unique row belongs to another user.
     dbQueue.push([]);
 
@@ -192,6 +228,30 @@ describe('verifyOwnershipAction', () => {
     expect(dbCalls.some((call) => call.method === 'delete')).toBe(false);
   });
 
+  it('refuses a new domain over the plan cap without consuming the token', async () => {
+    dbQueue.push([PENDING_TOKEN]);
+    vi.mocked(resolveTxt).mockResolvedValueOnce([[TOKEN]]);
+    dbQueue.push([{ ...ALLOWED, domainCount: 3 }]);
+
+    const result = await verifyOwnershipAction({ hostname: 'new.example.com', method: 'dns_txt' });
+
+    expect(result).toEqual({ success: false, error: 'domain_limit' });
+    expect(dbCalls.some((call) => call.method === 'transaction')).toBe(false);
+    expect(dbCalls.some((call) => call.method === 'delete')).toBe(false);
+  });
+
+  it('does not charge a slot to re-verify a domain the account already owns', async () => {
+    dbQueue.push([PENDING_TOKEN]);
+    vi.mocked(resolveTxt).mockResolvedValueOnce([[TOKEN]]);
+    dbQueue.push([{ ...ALLOWED, domainCount: 3, alreadyOwned: 1 }]);
+    dbQueue.push([{ id: 'domain-1' }]);
+    dbQueue.push([1]);
+
+    const result = await verifyOwnershipAction({ hostname: 'example.com', method: 'dns_txt' });
+
+    expect(result.success).toBe(true);
+  });
+
   it('rejects unknown methods: the action is a public endpoint', async () => {
     const result = await verifyOwnershipAction({
       hostname: 'example.com',
@@ -200,5 +260,73 @@ describe('verifyOwnershipAction', () => {
 
     expect(result.success).toBe(false);
     expect(dbCalls).toHaveLength(0);
+  });
+});
+
+describe('cancelScanAction', () => {
+  it('cancels an owned active scan and signals the worker', async () => {
+    dbQueue.push([{ id: 'scan-1' }]);
+    dbQueue.push([{ id: 'scan-1' }]);
+
+    const result = await cancelScanAction('scan-1');
+
+    expect(result.success).toBe(true);
+    expect(vi.mocked(requestScanCancellation)).toHaveBeenCalledWith('scan-1');
+  });
+
+  it('refuses when the scan already left the active states', async () => {
+    dbQueue.push([]);
+
+    const result = await cancelScanAction('scan-1');
+
+    expect(result).toEqual({ success: false, error: 'scan_not_cancellable' });
+    expect(vi.mocked(requestScanCancellation)).not.toHaveBeenCalled();
+  });
+});
+
+describe('retryScanAction', () => {
+  it('queues a new scan for the same target and records the retry', async () => {
+    dbQueue.push([
+      { domainId: 'domain-1', targetUrl: 'https://example.com', status: 'failed' as const },
+    ]);
+
+    const result = await retryScanAction('scan-1');
+
+    expect(result).toEqual({ success: true, data: { scanId: 'scan-2' } });
+    expect(vi.mocked(enqueueScanForDomain)).toHaveBeenCalledWith({
+      domainId: 'domain-1',
+      target: {
+        url: 'https://example.com',
+        scheme: 'https',
+        host: 'example.com',
+        port: 443,
+        baseUrl: 'https://example.com',
+      },
+      actorUserId: 'user-1',
+      source: 'manual',
+    });
+  });
+
+  it('refuses a scan that is not failed or cancelled', async () => {
+    dbQueue.push([]);
+
+    const result = await retryScanAction('scan-1');
+
+    expect(result).toEqual({ success: false, error: 'scan_not_retryable' });
+    expect(vi.mocked(enqueueScanForDomain)).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the plan limit instead of pretending the retry started', async () => {
+    dbQueue.push([
+      { domainId: 'domain-1', targetUrl: 'https://example.com', status: 'cancelled' as const },
+    ]);
+    vi.mocked(enqueueScanForDomain).mockResolvedValueOnce({
+      ok: false,
+      error: 'concurrent_scan_limit',
+    });
+
+    const result = await retryScanAction('scan-1');
+
+    expect(result).toEqual({ success: false, error: 'concurrent_scan_limit' });
   });
 });
