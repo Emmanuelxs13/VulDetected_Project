@@ -4,6 +4,7 @@ import { timingSafeEqual } from 'node:crypto';
 
 import {
   and,
+  desc,
   domains,
   eq,
   findings,
@@ -19,7 +20,9 @@ import { NextResponse } from 'next/server';
 import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
+import { computeFindingKey } from '@/lib/findings/newness';
 import { classifyFinding } from '@/lib/severity/classify';
+import { owaspCategoryCodeFor } from '@/lib/severity/owasp';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,13 +120,63 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
           .where(eq(scans.id, scanId))
           .limit(1);
         if (current[0]?.status === 'cancelled') return;
+
+        /**
+         * The previous completed scan of this domain, newest first.
+         *
+         * "New" is a comparison, so it needs the baseline at ingest time: the
+         * next scan will compare against THIS one, and recomputing later would
+         * rewrite history. A first scan has no baseline and therefore marks
+         * every finding new.
+         */
+        const previousScanRows = await tx
+          .select({ id: scans.id })
+          .from(scans)
+          .where(
+            and(
+              eq(scans.domainId, scan.domainId),
+              ne(scans.id, scanId),
+              eq(scans.status, 'completed'),
+            ),
+          )
+          .orderBy(desc(scans.createdAt))
+          .limit(1);
+
+        const previousKeys = new Set<string>();
+        if (previousScanRows[0]) {
+          const previousFindings = await tx
+            .select({ findingKey: findings.findingKey })
+            .from(findings)
+            .where(eq(findings.scanId, previousScanRows[0].id));
+          for (const row of previousFindings) previousKeys.add(row.findingKey);
+        }
+
         if (Array.isArray(body.findings)) {
           for (const f of body.findings) {
-            if (!f || !f.key) continue;
+            if (!f) continue;
+            const checkName = f.check;
+            if (typeof checkName !== 'string' || checkName === '') continue;
+            const evidence = f.evidence ?? {};
+            const affectedUrl = f.affected_url ?? f.affectedUrl ?? body.base_url ?? '';
+
+            /**
+             * The worker sends the finished key. The fallback keeps an older or
+             * partially upgraded worker from silently dropping findings: it
+             * reproduces the same rule, with the finding title as discriminator
+             * when the worker sent none.
+             */
+            const findingKey =
+              typeof f.key === 'string' && f.key.trim() !== ''
+                ? f.key
+                : computeFindingKey({
+                    domainId: scan.domainId,
+                    checkName,
+                    affectedUrl,
+                    discriminator: evidence.header ?? f.title,
+                  });
+
+            const { severity } = classifyFinding(checkName, evidence, f.title ?? '');
             try {
-              const checkName = f.check;
-              const evidence = f.evidence ?? {};
-              const { severity } = classifyFinding(checkName, evidence, f.title ?? '');
               // Savepoint per row: without it, a single rejected INSERT marks
               // the surrounding transaction aborted and every later statement
               // fails with "current transaction is aborted" — which is how one
@@ -133,12 +186,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
                   .insert(findings)
                   .values({
                     scanId,
-                    findingKey: f.key,
+                    findingKey,
                     severity,
+                    status: 'open',
+                    owaspCategory: owaspCategoryCodeFor(checkName),
+                    isNew: !previousKeys.has(findingKey),
                     checkName,
                     title: f.title,
                     description: f.description ?? '',
-                    affectedUrl: f.affected_url ?? f.affectedUrl ?? body.base_url ?? '',
+                    affectedUrl,
                     evidence,
                     raw: f.raw ?? {},
                   })

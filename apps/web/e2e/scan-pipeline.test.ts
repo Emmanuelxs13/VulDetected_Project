@@ -48,6 +48,7 @@ const MIGRATION_FILES = [
   '0006_grey_sleeper.sql',
   '0007_real_tombstone.sql',
   '0008_amazing_wonder_man.sql',
+  '0009_foamy_mathemanic.sql',
 ].map((file) => path.resolve(dirname, '../../../packages/db/drizzle', file));
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -442,6 +443,10 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     // a missing Content-Security-Policy is a high-severity finding.
     expect(header?.severity).toBe('high');
     expect(header?.status).toBe('open');
+    // Mapped at ingest, so the UI and the PDF do not each re-derive it.
+    expect(header?.owaspCategory).toBe('A05');
+    // A first scan has no baseline: every finding in it is new.
+    expect(header?.isNew).toBe(true);
     expect(header?.checkName).toBe('security_headers');
     expect(header?.title).toBe('Missing Content-Security-Policy header');
     // The worker's `affected_url` wins over the `base_url` fallback: the fixture
@@ -449,6 +454,56 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     expect(header?.affectedUrl).toBe('https://example.com/');
     expect(header?.evidence).toEqual({ header: 'content-security-policy' });
     expect(header?.raw).toEqual({ observed: { present: false } });
+  });
+
+  it('marks a finding new only when the previous completed scan did not contain it', async () => {
+    const firstScan = await insertQueuedScan();
+    await completeScan(firstScan);
+
+    const firstRows = await readFindings(firstScan);
+    expect(firstRows.map((row) => row.isNew)).toEqual([true]);
+
+    const secondScan = await insertQueuedScan();
+    const response = await postScanCallback(
+      callbackRequest(secondScan, {
+        scan_id: secondScan,
+        task_id: 'task-e2e-2',
+        status: 'completed',
+        error: null,
+        base_url: 'https://example.com',
+        events: [{ seq: 1, type: 'scan.completed', payload: {} }],
+        findings: [
+          {
+            // Same identity as the previous scan: a regression that survived.
+            key: 'a'.repeat(64),
+            check: 'security_headers',
+            title: 'Missing Content-Security-Policy header',
+            description: 'The response does not send a Content-Security-Policy header.',
+            affected_url: 'https://example.com/',
+            evidence: { header: 'content-security-policy' },
+            raw: {},
+          },
+          {
+            // New in this scan: the whole point of the flag.
+            key: 'b'.repeat(64),
+            check: 'tls',
+            title: 'HTTPS not available',
+            description: 'Target is not served over HTTPS.',
+            affected_url: 'https://example.com/',
+            evidence: { scheme: 'http' },
+            raw: {},
+          },
+        ],
+      }),
+      { params: Promise.resolve({ scanId: secondScan }) },
+    );
+
+    expect(response.status).toBe(200);
+
+    const rows = await readFindings(secondScan);
+    const byKey = new Map(rows.map((row) => [row.findingKey, row]));
+    expect(byKey.get('a'.repeat(64))?.isNew).toBe(false);
+    expect(byKey.get('b'.repeat(64))?.isNew).toBe(true);
   });
 
   it('treats a duplicate terminal callback as a no-op', async () => {
