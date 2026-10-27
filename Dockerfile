@@ -55,13 +55,17 @@ COPY . .
 RUN pnpm --filter @vuldetected/web build
 
 # ------------------------------------------------------------ migrator ----
-# One-shot: applies pending migrations, then exits. `drizzle-kit migrate` is
-# idempotent (it records applied files in `drizzle.__drizzle_migrations`), so a
-# redeploy with no new migration is a no-op.
+# One-shot: applies pending migrations, then asserts the result against the
+# migration files. `drizzle-kit migrate` is idempotent (it records applied files
+# in `drizzle.__drizzle_migrations`), so a redeploy with no new migration is a
+# no-op — and `db:verify` is what turns "the command exited 0" into "the schema
+# the app queries actually exists". `depends_on: service_completed_successfully`
+# in the other services means a failed verification stops the whole stack
+# instead of starting it against a half-migrated database.
 FROM build AS migrator
 WORKDIR /repo/packages/db
 ENV NODE_ENV=production
-CMD ["pnpm", "db:migrate"]
+CMD ["sh", "-c", "pnpm db:migrate && pnpm db:verify"]
 
 # ------------------------------------------------------------- runtime ----
 FROM node:22-bookworm-slim AS runtime

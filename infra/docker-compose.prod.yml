@@ -90,10 +90,12 @@ services:
       retries: 10
     <<: *logging
 
-  # Applies pending migrations and exits. `depends_on: condition:
-  # service_completed_successfully` keeps the app from starting against a schema
-  # that has not been migrated yet — the failure mode that turns a deploy into a
-  # wave of 500s instead of one clear error.
+  # Applies pending migrations, verifies the result, then exits. `depends_on:
+  # condition: service_completed_successfully` keeps the app from starting against
+  # a schema that has not been migrated yet — the failure mode that turns a deploy
+  # into a wave of 500s instead of one clear error. The verification step is what
+  # makes that condition meaningful: a migration that exits 0 without creating the
+  # tables the app queries would otherwise pass.
   migrate:
     build:
       context: ..
