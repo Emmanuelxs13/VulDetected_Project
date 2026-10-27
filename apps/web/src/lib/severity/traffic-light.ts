@@ -36,6 +36,26 @@ export interface TrafficLightResult {
 }
 
 /**
+ * The rule, expressed over counts.
+ *
+ * Split out because the dashboard counts in SQL (`count(*) group by severity`,
+ * bounded to six rows) instead of loading every finding into memory, while the
+ * PDF and the e-mail build the counts from rows. Both entry points have to reach
+ * the same colour, so both delegate here instead of re-stating the thresholds.
+ */
+export function levelFromCounts(counts: TrafficLightCounts): TrafficLightLevel {
+  if (counts.critical > 0 || counts.high > 0) {
+    return 'high';
+  }
+
+  if (counts.medium > 0 || counts.unclassified > 0) {
+    return 'medium';
+  }
+
+  return 'safe';
+}
+
+/**
  * Computes the risk light from a scan's findings (SEV-2).
  *
  * ## WHAT COUNTS
@@ -58,9 +78,7 @@ export interface TrafficLightResult {
  * same data produces the same colour in a test, in the dashboard and in a PDF
  * generated six months later.
  */
-export function computeTrafficLight(
-  findings: readonly TrafficLightFinding[],
-): TrafficLightResult {
+export function computeTrafficLight(findings: readonly TrafficLightFinding[]): TrafficLightResult {
   const counts: TrafficLightCounts = {
     critical: 0,
     high: 0,
@@ -97,12 +115,7 @@ export function computeTrafficLight(
     }
   }
 
-  const level: TrafficLightLevel =
-    counts.critical > 0 || counts.high > 0
-      ? 'high'
-      : counts.medium > 0 || counts.unclassified > 0
-        ? 'medium'
-        : 'safe';
+  const level = levelFromCounts(counts);
 
   return { level, label: TRAFFIC_LIGHT_LABELS[level], counts, openFindings };
 }
