@@ -88,10 +88,42 @@ const envSchema = z.object({
    */
   NEXT_PUBLIC_APP_URL: z.string().url('NEXT_PUBLIC_APP_URL must be an absolute URL').optional(),
 
-  /** Dev mail. Consumed by the Sprint 2 mailer; declared now to fix the contract. */
-  SMTP_HOST: z.string().optional(),
+  /**
+   * Outgoing mail. When `SMTP_HOST` is absent the mailer targets Mailpit on
+   * `localhost:1025`, which is what a developer gets from
+   * `docker compose up mailpit` and what the integration tests assume.
+   *
+   * Production requires it explicitly (see the refinement below): silently
+   * defaulting to localhost in production means every transactional email is
+   * accepted by the app, written to the outbox, delivered to nothing, and
+   * marked `sent` — the failure mode that looks like success.
+   */
+  SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
-  EMAIL_FROM: z.string().optional(),
+
+  /**
+   * SMTP credentials. Omitted together for a local Mailpit, which speaks plain
+   * unauthenticated SMTP. Real providers (Resend, SES, Postmark) need both.
+   */
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+
+  /**
+   * Implicit TLS (port 465). Deliberately an enum of strings rather than
+   * `z.coerce.boolean()`: that helper maps the string `"false"` to `true`,
+   * which would silently turn on TLS where the operator turned it off.
+   */
+  SMTP_SECURE: z.enum(['true', 'false']).optional(),
+
+  /** `From:` header. RFC 5322 allows `Name <address>`; not validated further. */
+  EMAIL_FROM: z.string().min(1).optional(),
+
+  /**
+   * Bearer secret for `POST /api/mail/dispatch`, the endpoint a cron job calls
+   * to flush the outbox. Without it the endpoint refuses every request instead
+   * of being an unauthenticated "send all queued mail" trigger.
+   */
+  MAIL_DISPATCH_SECRET: z.string().min(16).optional(),
 
   /** Redis URL for Celery broker and rate limiting (Sprint 2). */
   REDIS_URL: z.string().min(1).optional(),
@@ -113,6 +145,36 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 });
 
+/**
+ * Production-only requirements.
+ *
+ * A missing SMTP host in production is not "mail is off" — the outbox still
+ * accepts messages, the sender still resolves, and every message is delivered
+ * to `localhost:1025` where nothing is listening. Failing at boot with the
+ * variable named is the only version of this that gets fixed.
+ */
+const productionMailRefinement = (value: z.infer<typeof envSchema>, ctx: z.RefinementCtx): void => {
+  if (value.NODE_ENV !== 'production') {
+    return;
+  }
+  if (!value.SMTP_HOST) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['SMTP_HOST'],
+      message: 'SMTP_HOST is required in production; there is no localhost fallback.',
+    });
+  }
+  if (!value.EMAIL_FROM) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['EMAIL_FROM'],
+      message: 'EMAIL_FROM is required in production: transactional mail needs a sender identity.',
+    });
+  }
+};
+
+const validatedEnvSchema = envSchema.superRefine(productionMailRefinement);
+
 export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | null = null;
@@ -129,7 +191,7 @@ export function getEnv(): Env {
     return cached;
   }
 
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = validatedEnvSchema.safeParse(process.env);
 
   if (!parsed.success) {
     const problems = parsed.error.issues
