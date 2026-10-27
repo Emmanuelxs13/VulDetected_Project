@@ -221,7 +221,17 @@ export async function getDomainPostureTrends(ownerUserId: string): Promise<Postu
   const riskyRows = await db()
     .select({ scanId: findings.scanId, total: sql<number>`count(*)::int` })
     .from(findings)
-    .where(and(inArray(findings.scanId, scanIds), inArray(findings.severity, ['critical', 'high'])))
+    .where(
+      and(
+        inArray(findings.scanId, scanIds),
+        inArray(findings.severity, ['critical', 'high']),
+        // Only open findings count. The dashboard light uses the same rule, and
+        // the whole point of the trend is "did my fix work": if a finding the
+        // user resolved still counted as risky, fixing it would never move the
+        // line and the two numbers on the same screen would disagree.
+        eq(findings.status, 'open'),
+      ),
+    )
     .groupBy(findings.scanId);
 
   const riskyByScan = new Map(riskyRows.map((row) => [row.scanId, row.total]));
