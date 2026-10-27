@@ -123,7 +123,7 @@ export default function FindingsPage() {
                 <AccordionItem key={f.id} value={`item-${f.id}`}>
                   <AccordionTrigger>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <Badge variant={f.severity}>{f.severity === 'high' ? 'Alta' : f.severity === 'medium' ? 'Media' : f.severity === 'critical' ? 'Crítica' : 'Baja'}</Badge>
+                      <Badge variant={f.severity === 'high' ? 'high' : f.severity === 'medium' ? 'medium' : f.severity === 'critical' ? 'critical' : f.severity === 'low' ? 'low' : 'unknown'}>{f.severity === 'high' ? 'Alta' : f.severity === 'medium' ? 'Media' : f.severity === 'critical' ? 'Crítica' : f.severity === 'low' ? 'Baja' : 'Desconocido'}</Badge>
                       <span className="text-left">{f.title}</span>
                       {f.status === 'resolved' && <Badge variant="low">Resuelto</Badge>}
                       {f.status === 'false-positive' && <Badge variant="unknown">Falso Positivo</Badge>}

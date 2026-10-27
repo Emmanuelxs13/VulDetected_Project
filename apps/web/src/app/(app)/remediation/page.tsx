@@ -75,7 +75,8 @@ export default function RemediationPage() {
   const [framework, setFramework] = useState('javascript');
 
   const copyCode = () => {
-    const code = activeGuide?.codeExamples?.[framework] || '';
+    const examples = activeGuide?.codeExamples as Record<string, string> | undefined;
+    const code = examples?.[framework] || '';
     navigator.clipboard.writeText(code);
     toast.success('Código copiado al portapapeles');
   };
@@ -97,7 +98,7 @@ export default function RemediationPage() {
                   key={guide.id}
                   onClick={() => setActiveGuide(guide)}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    activeGuide.id === guide.id 
+                    activeGuide?.id === guide.id 
                       ? 'bg-brand/10 text-brand font-medium' 
                       : 'text-text-muted hover:text-text hover:bg-surface'
                   }`}
@@ -149,7 +150,7 @@ export default function RemediationPage() {
               <div className="rounded-lg bg-surface p-4 relative">
                 <pre className="overflow-x-auto text-sm">
                   <code className="text-text">
-                    {activeGuide?.codeExamples?.[framework] || ''}
+                    {((activeGuide?.codeExamples as Record<string, string>)?.[framework]) || ''}
                   </code>
                 </pre>
                 <Button 
