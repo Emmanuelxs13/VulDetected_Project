@@ -30,14 +30,23 @@ class CallbackClient:
             raise CallbackError(f"callback failed: {resp.status_code}")
         # 4xx other than maybe acceptable? design says retry on 5xx; treat others as best effort? but follow contract
 
-    def send_callback(self, scan_id: str, task_id: str, status: str, findings: List[Dict[str, Any]] | None = None, events: List[Dict[str, Any]] | None = None, error: str | None = None) -> Dict[str, Any]:
+    def send_callback(
+        self,
+        scan_id: str,
+        task_id: str,
+        status: str,
+        findings: List[Dict[str, Any]] | None = None,
+        events: List[Dict[str, Any]] | None = None,
+        error: str | None = None,
+        checks_run: List[str] | None = None,
+    ) -> Dict[str, Any]:
         url = f"{self.callback_base_url}/api/scans/{scan_id}/callback"
         body = {
             "scan_id": scan_id,
             "task_id": task_id,
             "status": status,
             "error": error,
-            "checks_run": ["security_headers", "tls", "cookies", "redirects"],
+            "checks_run": checks_run or [],
             "events": events or [],
             "findings": findings or [],
         }
