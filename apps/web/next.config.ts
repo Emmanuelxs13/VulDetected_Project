@@ -55,7 +55,7 @@ const config: NextConfig = {
    * translated page; see `docs/deployment.md`.
    */
   outputFileTracingIncludes: {
-    '/**': ['./messages/**/*.json'],
+    '/**': ['./messages/**/*.json', './node_modules/next/dist/server/lib/cpu-profile*.js'],
   },
 
 
