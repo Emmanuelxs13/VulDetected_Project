@@ -4,6 +4,7 @@ import { accounts } from './accounts';
 import { auditLogs } from './audit-logs';
 import { domains } from './domains';
 import { findings } from './findings';
+import { scanCredentials } from './scan-credentials';
 import { scanEvents } from './scan-events';
 import { scanSchedules } from './scan-schedules';
 import { scans } from './scans';
@@ -51,6 +52,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   auditLogs: many(auditLogs),
   domains: many(domains),
   scanSchedules: many(scanSchedules),
+  scanCredentials: many(scanCredentials),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -77,12 +79,23 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 export const domainsRelations = relations(domains, ({ one, many }) => ({
   user: one(users, { fields: [domains.userId], references: [users.id] }),
   scans: many(scans),
+  credentials: many(scanCredentials),
 }));
 
 export const scansRelations = relations(scans, ({ one, many }) => ({
   domain: one(domains, { fields: [scans.domainId], references: [domains.id] }),
+  credential: one(scanCredentials, {
+    fields: [scans.credentialId],
+    references: [scanCredentials.id],
+  }),
   findings: many(findings),
   scanEvents: many(scanEvents),
+}));
+
+export const scanCredentialsRelations = relations(scanCredentials, ({ one, many }) => ({
+  domain: one(domains, { fields: [scanCredentials.domainId], references: [domains.id] }),
+  user: one(users, { fields: [scanCredentials.userId], references: [users.id] }),
+  scans: many(scans),
 }));
 
 export const findingsRelations = relations(findings, ({ one }) => ({

@@ -37,10 +37,12 @@ function createChain(result: unknown): Chain {
 
   const chain: Chain = {
     from: calls('from'),
+    innerJoin: calls('innerJoin'),
     where: calls('where'),
     limit: calls('limit'),
     orderBy: calls('orderBy'),
     values: calls('values'),
+    set: calls('set'),
     onConflictDoUpdate: calls('onConflictDoUpdate'),
     returning: calls('returning'),
     then,
@@ -52,7 +54,7 @@ function createChain(result: unknown): Chain {
 export function createDbMock() {
   const nextResult = () => (dbQueue.length > 0 ? dbQueue.shift() : []);
 
-  const builder = (method: 'select' | 'insert' | 'delete') =>
+  const builder = (method: 'select' | 'insert' | 'update' | 'delete') =>
     vi.fn(() => {
       dbCalls.push({ method, args: [] });
       return createChain(nextResult());
@@ -61,6 +63,7 @@ export function createDbMock() {
   const dbObject = {
     select: builder('select'),
     insert: builder('insert'),
+    update: builder('update'),
     delete: builder('delete'),
     transaction: vi.fn(async (cb: (tx: unknown) => unknown) => {
       dbCalls.push({ method: 'transaction', args: [] });

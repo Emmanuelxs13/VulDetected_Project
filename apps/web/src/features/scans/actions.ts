@@ -6,11 +6,14 @@ import { and, desc, domains, eq, gt, or, scans, verificationTokens } from '@vuld
 
 import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
+import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
+import { checkDomainAllowance } from '@/lib/plan-limits';
 import { consumeRateLimit, RateLimitError } from '@/lib/rate-limit';
+import { requestScanCancellation } from '@/lib/scan-cancellation';
 import { safeFetch } from '@/lib/ssrf';
 
-import { enqueueScanForDomain } from './enqueue';
+import { enqueueScanForDomain, type EnqueueScanOutcome } from './enqueue';
 import { requireVerifiedDomain } from './guard';
 import {
   hostnameSchema,
@@ -90,7 +93,7 @@ export async function requestOwnershipChallengeAction(
 ): Promise<ActionResult<OwnershipChallenge>> {
   // Auth gate even though `verification_tokens` has no user column: challenges
   // are an authenticated feature and the rate limiter (4.3) keys on session.
-  await requireUser();
+  const { userId } = await requireUser();
 
   const parsed = hostnameSchema.safeParse(hostname);
   if (!parsed.success) {
@@ -115,6 +118,13 @@ export async function requestOwnershipChallengeAction(
       value: token,
       expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
     });
+
+  await audit({
+    action: 'domain.ownership.challenge_issued',
+    actorUserId: userId,
+    targetType: 'domain',
+    targetId: normalizedHostname,
+  });
 
   return {
     success: true,
@@ -199,6 +209,19 @@ export async function verifyOwnershipAction(input: {
     };
   }
 
+  /**
+   * Plan enforcement (production requirement: limits live on the server).
+   *
+   * Checked only once the proof is valid, so a wrong TXT record costs no plan
+   * query, and checked here rather than in the UI, because this action is a
+   * public endpoint. Re-verifying a domain the account already owns is not
+   * limited — see `checkDomainAllowance`.
+   */
+  const domainLimit = await checkDomainAllowance(userId, normalizedHostname);
+  if (domainLimit !== null) {
+    return { success: false, error: domainLimit };
+  }
+
   const verificationRecord = method === 'dns_txt' ? matched.value : WELL_KNOWN_PATH;
   const verifiedAt = new Date();
   const proofState = {
@@ -240,8 +263,16 @@ export async function verifyOwnershipAction(input: {
     };
   }
 
-  // Audit `domain.ownership.verified` is wired in task 4.3, with the rate
-  // limiter, across every action that needs it.
+  // Audit `domain.ownership.verified` is wired with the rest of the ownership
+  // events: a successful proof is the moment an account gains the right to scan
+  // a hostname, so it is exactly the row an incident review looks for.
+  await audit({
+    action: 'domain.ownership.verified',
+    actorUserId: userId,
+    targetType: 'domain',
+    targetId: normalizedHostname,
+    metadata: { method },
+  });
 
   return {
     success: true,
@@ -315,7 +346,7 @@ export async function submitScanAction(input: {
     await consumeRateLimit({ key: `user:${userId}:scan`, limit: 5, windowSec: 3600 });
   } catch (err) {
     if (err instanceof RateLimitError) {
-      return { success: false, error: 'Rate limit exceeded' };
+      return { success: false, error: 'rate_limited' };
     }
   }
 
@@ -358,10 +389,27 @@ export async function submitScanAction(input: {
   });
 
   if (!outcome.ok) {
-    return { success: false, error: 'Service unavailable' };
+    return { success: false, error: scanOutcomeError(outcome.error) };
   }
 
   return { success: true, data: { scanId: outcome.scanId } };
+}
+
+/**
+ * Turns an enqueue failure into the value the action returns.
+ *
+ * Plan limits travel as their own code so the UI can explain exactly which
+ * ceiling was hit and what to do about it; the rest keep the existing wording.
+ */
+function scanOutcomeError(error: Extract<EnqueueScanOutcome, { ok: false }>['error']): string {
+  switch (error) {
+    case 'domain_missing':
+      return 'Domain not verified';
+    case 'enqueue_failed':
+      return 'Service unavailable';
+    default:
+      return error;
+  }
 }
 
 export async function cancelScanAction(scanId: string): Promise<ActionResult<null>> {
@@ -378,7 +426,7 @@ export async function cancelScanAction(scanId: string): Promise<ActionResult<nul
       ),
     )
     .limit(1);
-  if (!owned[0]) return { success: false, error: 'Scan is no longer cancellable.' };
+  if (!owned[0]) return { success: false, error: 'scan_not_cancellable' };
 
   const updated = await db()
     .update(scans)
@@ -392,8 +440,111 @@ export async function cancelScanAction(scanId: string): Promise<ActionResult<nul
     .returning({ id: scans.id });
 
   if (updated.length === 0) {
-    return { success: false, error: 'Scan is no longer cancellable.' };
+    return { success: false, error: 'scan_not_cancellable' };
   }
 
+  /**
+   * The row is already `cancelled`, which is the durable truth: the callback
+   * refuses to write findings onto a cancelled scan. The Redis flag only makes
+   * a running worker stop early, so a Redis outage must not fail the user's
+   * cancellation — `requestScanCancellation` swallows it and reports `false`.
+   */
+  const signalled = await requestScanCancellation(scanId);
+
+  await audit({
+    action: 'scan.cancelled',
+    actorUserId: userId,
+    targetType: 'scan',
+    targetId: scanId,
+    metadata: { workerSignalled: signalled },
+  });
+
   return { success: true, data: null };
+}
+
+/**
+ * Queues a fresh scan for the same target as a failed or cancelled one.
+ *
+ * ## WHY A NEW ROW INSTEAD OF RESETTING THE OLD ONE
+ *
+ * `scan_events` and `findings` are append-only history tied to one scan id. A
+ * reset would either lose that history or make two runs share it, and the
+ * progress stream's cursor would replay the previous attempt. A new row keeps
+ * each attempt auditable and makes "run it again" a normal enqueue.
+ *
+ * ## WHY THE TARGET IS RE-PARSED
+ *
+ * `scans.target_url` is data written by an older version of the app. Parsing it
+ * again runs the same SSRF and hostname rules the first submission had to pass,
+ * so a stored value that would no longer be accepted today cannot slip into a
+ * new job.
+ */
+export async function retryScanAction(scanId: string): Promise<ActionResult<{ scanId: string }>> {
+  let userId: string;
+  try {
+    const user = await requireUser();
+    userId = user.userId;
+  } catch {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  try {
+    await consumeRateLimit({ key: `user:${userId}:scan`, limit: 5, windowSec: 3600 });
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      return { success: false, error: 'rate_limited' };
+    }
+  }
+
+  const rows = await db()
+    .select({
+      domainId: scans.domainId,
+      targetUrl: scans.targetUrl,
+      status: scans.status,
+    })
+    .from(scans)
+    .innerJoin(domains, eq(scans.domainId, domains.id))
+    .where(
+      and(
+        eq(scans.id, scanId),
+        eq(domains.userId, userId),
+        or(eq(scans.status, 'failed'), eq(scans.status, 'cancelled')),
+      ),
+    )
+    .limit(1);
+
+  const previous = rows[0];
+  if (previous === undefined) {
+    return { success: false, error: 'scan_not_retryable' };
+  }
+
+  const parsed = targetUrlSchema.safeParse(previous.targetUrl);
+  if (!parsed.success) {
+    // A stored target the current rules reject is not retryable: offering the
+    // button would only produce the same rejection again.
+    return { success: false, error: 'scan_not_retryable' };
+  }
+
+  const { normalizedHostname, url, baseUrl, port, scheme } = parsed.data;
+
+  const outcome = await enqueueScanForDomain({
+    domainId: previous.domainId,
+    target: { url, scheme, host: normalizedHostname, port, baseUrl },
+    actorUserId: userId,
+    source: 'manual',
+  });
+
+  if (!outcome.ok) {
+    return { success: false, error: scanOutcomeError(outcome.error) };
+  }
+
+  await audit({
+    action: 'scan.retried',
+    actorUserId: userId,
+    targetType: 'scan',
+    targetId: outcome.scanId,
+    metadata: { previousScanId: scanId, previousStatus: previous.status },
+  });
+
+  return { success: true, data: { scanId: outcome.scanId } };
 }

@@ -21,11 +21,8 @@ import { getTranslations } from 'next-intl/server';
 
 import { getServerSession } from '@/features/auth/session';
 import { NewScanForm } from '@/features/scans/components/new-scan-form';
-import { NewScheduleForm } from '@/features/scans/components/new-schedule-form';
 import { ScanStatusBadge } from '@/features/scans/components/scan-status';
-import { SchedulesList } from '@/features/scans/components/schedules-list';
 import type { ScanStatus } from '@/features/scans/components/scan-status';
-import { listSchedulesAction } from '@/features/scans/schedule-actions';
 import { db } from '@/lib/db';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,6 +40,14 @@ export async function generateMetadata(): Promise<Metadata> {
  * there is no reason to ship them to the browser and fetch them again from
  * there. The server renders the truth; the only interactive part is the form,
  * which is a small client island.
+ *
+ * ## WHY SCHEDULES ARE NOT ON THIS PAGE
+ *
+ * They used to be, next to the history, while `/schedules` showed a disabled
+ * "coming soon" button. Two places claiming the same feature is how one of them
+ * rots. The list, the create form and the pause/resume/delete controls live on
+ * `/schedules`; this page is the history and the ownership flow, and it links
+ * there.
  *
  * ## WHY THE SESSION IS NOT ENOUGH
  *
@@ -68,7 +73,7 @@ export default async function ScansPage() {
 
   const userId = session.user.id;
 
-  const [verifiedDomains, scanRows, schedulesResult] = await Promise.all([
+  const [verifiedDomains, scanRows] = await Promise.all([
     db()
       .select({ id: domains.id, hostname: domains.normalizedHostname })
       .from(domains)
@@ -87,18 +92,18 @@ export default async function ScansPage() {
       .where(eq(domains.userId, userId))
       .orderBy(desc(scans.createdAt))
       .limit(50),
-    listSchedulesAction(),
   ]);
-
-  if (!schedulesResult.success) {
-    throw new Error(schedulesResult.error);
-  }
 
   return (
     <Container size="default" className="flex flex-col gap-6 py-12">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('list.title')}</h1>
-        <p className="max-w-prose text-sm text-text-muted">{t('list.description')}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">{t('list.title')}</h1>
+          <p className="max-w-prose text-sm text-text-muted">{t('list.description')}</p>
+        </div>
+        <Button asChild variant="secondary" size="sm">
+          <Link href="/schedules">{t('schedules.title')}</Link>
+        </Button>
       </div>
 
       <Card>
@@ -108,17 +113,6 @@ export default async function ScansPage() {
         </CardHeader>
         <CardContent>
           <NewScanForm verifiedHosts={verifiedDomains.map((domain) => domain.hostname)} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('schedules.title')}</CardTitle>
-          <CardDescription>{t('schedules.description')}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          <NewScheduleForm verifiedHosts={verifiedDomains} />
-          <SchedulesList schedules={schedulesResult.data} />
         </CardContent>
       </Card>
 

@@ -13,7 +13,15 @@
     "badge": "Sprint 2",
     "signIn": "Sign in",
     "createAccount": "Create account",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "findings": "Findings",
+    "reports": "Reports",
+    "remediation": "Remediation",
+    "schedules": "Schedules",
+    "settings": "Settings",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "openMenu": "Open menu"
   },
   "home": {
     "badge": "Sprint 2 · data layer, authentication and scanning",
@@ -61,11 +69,12 @@
       "submit": "Sign in",
       "submitting": "Working…",
       "noAccount": "No account yet?",
-      "createOne": "Create one"
+      "createOne": "Create one",
+      "forgotPassword": "Forgot your password?"
     },
     "register": {
       "title": "Create an account",
-      "description": "Email verification is disabled for now, so you can sign in straight away.",
+      "description": "We will email you a link to confirm your address. You can start using the account right away.",
       "nameDescription": "Optional. Used to address you in the dashboard.",
       "passwordHint": "At least {min} characters. Length is what matters: capital letters, symbols and digits are not required.",
       "submit": "Create account",
@@ -73,11 +82,34 @@
       "haveAccount": "Already registered?",
       "signIn": "Sign in"
     },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "description": "Enter your account email and we will send you a link to choose a new password.",
+      "submit": "Send link",
+      "submitting": "Sending…",
+      "sent": "Check your email",
+      "sentDetail": "If that address has an account, the link is on its way. It expires in one hour and can be used once.",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Choose a new password",
+      "description": "Enter the password you want to use from now on.",
+      "submit": "Save password",
+      "submitting": "Saving…",
+      "confirmLabel": "Repeat the password",
+      "passwordHint": "At least {min} characters.",
+      "missingToken": "Incomplete link",
+      "missingTokenDetail": "This link carries no reset token. Request a new one.",
+      "requestNew": "Request a new link"
+    },
     "errors": {
       "checkFields": "Check the highlighted fields.",
       "genericLogin": "We could not sign you in with those details. Check the email and password and try again.",
       "genericRegister": "We could not create that account. If the address is already registered, try signing in instead.",
-      "createFailed": "We could not create that account. Try again in a moment."
+      "createFailed": "We could not create that account. Try again in a moment.",
+      "tooManyRequests": "Too many requests in a row. Wait a few minutes and try again.",
+      "resetTokenInvalid": "The link is not valid or has expired. Request a new one.",
+      "emailInUse": "That email is already registered. Sign in or reset your password."
     },
     "validation": {
       "emailRequired": "Email is required.",
@@ -87,6 +119,8 @@
       "passwordMax": "Use at most {max} characters.",
       "passwordOnlySpaces": "Password cannot be only spaces.",
       "passwordRequired": "Password is required.",
+      "passwordMismatch": "The two passwords do not match.",
+      "resetTokenRequired": "The link is missing its token.",
       "nameEmpty": "Name cannot be empty.",
       "nameTooLong": "Name is too long."
     },
@@ -100,47 +134,38 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "description": "Security posture of the domains you have verified.",
     "noSession": {
       "title": "No active session",
-      "description": "Sign in to see your account."
+      "description": "Sign in to see your dashboard."
     },
-    "fallbackName": "Your account",
-    "account": {
-      "title": "Account",
-      "description": "Read from the `users` row behind your session.",
-      "email": "Email",
-      "verified": "Verified",
-      "notVerified": "Not verified",
-      "status": "Status",
-      "locale": "Locale",
-      "userId": "User ID",
-      "memberSince": "Member since"
+    "stats": {
+      "domains": "Verified domains",
+      "scans": "Scans",
+      "openFindings": "Open findings",
+      "riskyFindings": "Critical and high"
     },
-    "findings": {
-      "title": "Findings are not aggregated here yet",
-      "description": "Open a scan to see its findings. CVE correlation is not built yet."
+    "risk": {
+      "label": "Current risk",
+      "high": "High risk",
+      "medium": "Medium risk",
+      "safe": "Safe / Low risk",
+      "highHint": "There are open critical or high findings. Review and fix them.",
+      "mediumHint": "There are open medium or unclassified findings.",
+      "safeHint": "No open findings at medium severity or above."
     },
-    "severityBreakdown": "Severity breakdown",
-    "scans": "Scans",
-    "findingsList": "All findings",
-    "filter": "Filter",
-    "filterAll": "All",
-    "filterDescription": "Filter by severity. Counts cover every finding you own.",
-    "scansDescription": "The 20 most recent scans of the domains you verified.",
-    "trend": {
-      "title": "Posture trend",
-      "description": "High and critical findings in the newest completed scan of each domain, compared with the scan before it.",
-      "empty": "No completed scans yet, so there is no trend to show.",
-      "riskyFindings": "high/critical",
-      "improved": "Improved",
-      "worsened": "Worsened",
-      "unchanged": "Unchanged",
-      "firstScan": "First scan",
-      "table": {
-        "domain": "Domain",
-        "latest": "Latest scan",
-        "delta": "Change"
-      }
+    "severity": {
+      "title": "Open findings by severity",
+      "description": "Only open findings are counted.",
+      "empty": "No open findings.",
+      "viewAll": "View all findings"
+    },
+    "recent": {
+      "title": "Recent scans",
+      "description": "The latest scans of your verified domains.",
+      "empty": "You have not launched any scan yet",
+      "emptyHint": "Verify a domain and launch your first scan from the scans page.",
+      "viewAll": "View all scans"
     }
   },
   "notFound": {
@@ -244,10 +269,26 @@
         "submitting": "Creating..."
       }
     },
+    "actions": {
+      "cancel": "Cancel scan",
+      "cancelPending": "Cancelling…",
+      "retry": "Retry scan",
+      "retryPending": "Retrying…"
+    },
     "errors": {
       "challengeFailed": "Could not issue the verification challenge.",
       "verifyFailed": "Could not verify domain ownership.",
-      "submitFailed": "Could not submit the scan."
+      "submitFailed": "Could not submit the scan.",
+      "codes": {
+        "rate_limited": "You reached the hourly scan limit. Try again later.",
+        "domain_limit": "Your plan reached its maximum number of verified domains. Remove one or upgrade.",
+        "monthly_scan_limit": "Your plan reached its monthly scan allowance. It resets on the 1st (UTC).",
+        "concurrent_scan_limit": "Your plan already has the maximum number of scans running at once. Wait for one to finish.",
+        "schedule_limit": "Your plan reached its maximum number of active schedules.",
+        "scan_not_cancellable": "This scan can no longer be cancelled.",
+        "scan_not_retryable": "Only failed or cancelled scans can be retried.",
+        "credential_unavailable": "This domain has a scan credential that could not be used. Save it again in Settings."
+      }
     },
     "queued": {
       "title": "Scan queued",
@@ -280,12 +321,18 @@
         "lost": "Connection lost. Reconnecting…"
       },
       "checksCompleted": "Checks completed",
+      "summary": "{completed} of {total} checks",
+      "estimate": {
+        "remaining": "≈ {duration} left",
+        "waiting": "Waiting for the first check to finish…"
+      },
       "events": "Events",
       "noEvents": "No events yet. The scan starts when the worker picks up the job.",
       "event": {
         "started": "Scan started",
         "completed": "Scan completed",
         "failed": "Scan failed",
+        "cancelled": "Scan cancelled",
         "checkStarted": "Check started: {check}",
         "checkCompleted": "Check completed: {check}",
         "progress": "Progress updated"
@@ -300,7 +347,9 @@
         "severity": "Severity",
         "check": "Check",
         "finding": "Finding",
-        "affectedUrl": "Affected URL"
+        "affectedUrl": "Affected URL",
+        "status": "Status",
+        "actions": "Actions"
       },
       "severity": {
         "unclassified": "Unclassified",
@@ -336,7 +385,16 @@
         "cookieMissingHttpOnly": "Cookie missing HttpOnly flag",
         "cookieMissingSameSite": "Cookie missing SameSite attribute",
         "unknownCheck": "Unknown check",
-        "cookieOther": "Cookie attribute issue outside the specific rules"
+        "cookieOther": "Cookie attribute issue outside the specific rules",
+        "reflectedXss": "Reflected cross-site scripting",
+        "sqlInjection": "SQL injection",
+        "openRedirect": "Open redirect",
+        "corsReflectedWithCredentials": "CORS reflects any origin and allows credentials",
+        "corsReflectedOrigin": "CORS reflects any origin",
+        "corsWildcard": "CORS allows every origin",
+        "directoryListing": "Automatic directory listing",
+        "exposedSecretFile": "Exposed secret or source file",
+        "exposedConfigFile": "Exposed configuration file"
       },
       "filter": {
         "all": "All"
@@ -345,6 +403,11 @@
         "label": "Findings pagination",
         "next": "Next page",
         "first": "First page"
+      },
+      "status": {
+        "resolved": "Resolved",
+        "falsePositive": "False positive",
+        "reopen": "Reopen"
       }
     },
     "export": {
@@ -435,6 +498,174 @@
       "rateLimit": {
         "title": "No rate limiting at the edge yet",
         "description": "Per-account lockout exists, but there is no IP-level limiter in front of the auth route. Server-side throttling is a Sprint 2 item and is required before this is exposed publicly."
+      }
+    }
+  },
+  "credentials": {
+    "title": "Scan credentials",
+    "description": "Let the scanner reach pages that require a session. They are stored encrypted and never shown again.",
+    "empty": "You have not stored any credentials yet.",
+    "domain": "Domain",
+    "label": "Label",
+    "labelPlaceholder": "Production, staging…",
+    "kind": "Authentication type",
+    "username": "Username",
+    "password": "Password",
+    "token": "Token",
+    "headerName": "Header name",
+    "headerValue": "Header value",
+    "save": "Save credential",
+    "saving": "Saving…",
+    "saved": "Credential saved. It will be used on the next scan.",
+    "revoke": "Revoke",
+    "revoking": "Revoking…",
+    "revoked": "Credential revoked. New scans will no longer use it.",
+    "lastUsed": "Last used",
+    "neverUsed": "Never used",
+    "noVerified": "Verify a domain before storing a credential.",
+    "kinds": {
+      "basic": "Username and password",
+      "bearer": "Bearer token",
+      "header": "Custom header"
+    },
+    "errors": {
+      "codes": {
+        "invalid_credential": "Check the credential fields.",
+        "domain_not_verified": "That domain is not verified on your account.",
+        "storage_unavailable": "The credential could not be stored. Encryption is not configured in this deployment.",
+        "credential_not_found": "That credential no longer exists or was revoked."
+      }
+    },
+    "pageTitle": "Settings"
+  },
+  "findingsPage": {
+    "title": "Findings",
+    "description": "Every finding across your verified domains, newest first.",
+    "sessionRequired": {
+      "title": "No active session",
+      "description": "Sign in to see your findings."
+    },
+    "list": {
+      "title": "Findings",
+      "description": "Filter counts include open findings only. The table also shows resolved and dismissed rows."
+    },
+    "empty": {
+      "title": "No findings",
+      "description": "None of your scans has recorded a finding yet."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "description": "What is open, whether posture is improving, and what you can download.",
+    "sessionRequired": {
+      "title": "No active session",
+      "description": "Sign in to see your reports."
+    },
+    "severity": {
+      "title": "Open findings by severity",
+      "description": "Only open findings are counted.",
+      "empty": "No open findings."
+    },
+    "trend": {
+      "title": "Posture trend",
+      "description": "Critical and high findings in the newest completed scan of each domain, compared with the one before it.",
+      "empty": "No completed scans yet, so there is no trend to show.",
+      "riskyFindings": "critical/high",
+      "improved": "Improved",
+      "worsened": "Worsened",
+      "unchanged": "Unchanged",
+      "firstScan": "First scan",
+      "table": {
+        "domain": "Domain",
+        "latest": "Latest scan",
+        "delta": "Change"
+      }
+    },
+    "scans": {
+      "title": "Completed scans",
+      "description": "The 20 most recent completed scans. Each row offers the same exports as the scan detail.",
+      "empty": {
+        "title": "No completed scans yet",
+        "description": "When a scan finishes it will appear here with its exports."
+      },
+      "table": {
+        "target": "Target",
+        "domain": "Domain",
+        "created": "Created",
+        "exports": "Export"
+      }
+    },
+    "pdf": {
+      "title": "Executive security report",
+      "subtitle": "Scan result for {host}",
+      "summary": "Summary",
+      "breakdown": "Open findings by severity",
+      "findings": "Findings",
+      "findingsHint": "Ordered from highest to lowest severity. Every finding recorded by the scan is included.",
+      "noFindings": "This scan recorded no findings. A completed scan with no findings is a valid result, not an error.",
+      "remediation": "How to fix it",
+      "page": "Page {current} of {total}",
+      "severityCount": "{severity}: {count}",
+      "fields": {
+        "domain": "Domain",
+        "target": "Target",
+        "scanId": "Scan ID",
+        "scanStatus": "Status",
+        "createdAt": "Scan date",
+        "generatedAt": "Generated",
+        "affectedUrl": "Affected URL",
+        "rule": "Check",
+        "owasp": "OWASP",
+        "rationale": "Classification"
+      },
+      "totals": {
+        "open": "Open findings",
+        "total": "Recorded findings"
+      },
+      "statuses": {
+        "open": "Open",
+        "resolved": "Resolved",
+        "false_positive": "False positive"
+      }
+    }
+  },
+  "remediation": {
+    "title": "Remediation guides",
+    "description": "How to fix the open findings on your domains, ordered by severity.",
+    "sessionRequired": {
+      "title": "No active session",
+      "description": "Sign in to see your remediation guides."
+    },
+    "empty": {
+      "title": "No open findings",
+      "description": "When a scan leaves open findings, you will see how to fix them here."
+    },
+    "openFindings": "{count, plural, one {# open finding} other {# open findings}}",
+    "noGuide": {
+      "title": "Findings without a specific guide",
+      "description": "These checks do not have remediation guidance yet. That is not a clean result: review them manually."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Your account, the domains you verified, and the scan credentials.",
+    "profile": {
+      "title": "Profile",
+      "description": "Account data behind your session.",
+      "name": "Name",
+      "noName": "No name",
+      "email": "Email",
+      "emailVerified": "Verified",
+      "emailNotVerified": "Not verified"
+    },
+    "domains": {
+      "title": "Verified domains",
+      "description": "Only these domains can be scanned. Verification is the proof that you control them.",
+      "verified": "Verified",
+      "verifiedAt": "Verified on {date}",
+      "empty": {
+        "title": "No verified domains yet",
+        "description": "Verify a domain from the scans page before scanning it."
       }
     }
   }

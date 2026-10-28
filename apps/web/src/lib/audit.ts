@@ -4,6 +4,7 @@ import { auditLogs } from '@vuldetected/db';
 import { headers } from 'next/headers';
 
 import { db } from './db';
+import { getLogger } from './logger';
 
 /**
  * Audit trail writer.
@@ -36,11 +37,19 @@ export type AuditAction =
   | 'auth.login_succeeded'
   | 'auth.login_failed'
   | 'auth.logged_out'
+  | 'password_reset.requested'
+  | 'password_reset.completed'
   | 'scan.enqueued'
+  | 'scan.completed'
   | 'scan.failed'
+  | 'scan.cancelled'
+  | 'scan.retried'
+  | 'plan.limit_rejected'
   | 'scan_schedule.created'
   | 'scan_schedule.updated'
   | 'scan_schedule.deleted'
+  | 'scan_credential.created'
+  | 'scan_credential.revoked'
   | 'domain.ownership.verified'
   | 'domain.ownership.challenge_issued';
 
@@ -123,11 +132,14 @@ export async function audit(event: AuditEvent, explicitIp?: string | null): Prom
       });
   } catch (error) {
     // The catch is the feature. Losing an audit row must not lose the request.
-    console.error('[audit] failed to write audit row', {
-      action: event.action,
-      actorUserId: event.actorUserId ?? null,
-      targetId: event.targetId ?? null,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    getLogger('audit').error(
+      {
+        err: error,
+        action: event.action,
+        actorUserId: event.actorUserId ?? null,
+        targetId: event.targetId ?? null,
+      },
+      'failed to write audit row',
+    );
   }
 }

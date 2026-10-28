@@ -13,7 +13,15 @@
     "badge": "Sprint 2",
     "signIn": "Iniciar sesión",
     "createAccount": "Crear cuenta",
-    "signOut": "Cerrar sesión"
+    "signOut": "Cerrar sesión",
+    "findings": "Hallazgos",
+    "reports": "Informes",
+    "remediation": "Remediación",
+    "schedules": "Programaciones",
+    "settings": "Configuración",
+    "expandSidebar": "Expandir barra lateral",
+    "collapseSidebar": "Colapsar barra lateral",
+    "openMenu": "Abrir menú"
   },
   "home": {
     "badge": "Sprint 2 · capa de datos, autenticación y escaneos",
@@ -61,11 +69,12 @@
       "submit": "Iniciar sesión",
       "submitting": "Procesando…",
       "noAccount": "¿Todavía no tienes cuenta?",
-      "createOne": "Crea una"
+      "createOne": "Crea una",
+      "forgotPassword": "¿Olvidaste tu contraseña?"
     },
     "register": {
       "title": "Crear una cuenta",
-      "description": "La verificación por correo está desactivada por ahora, así que puedes iniciar sesión de inmediato.",
+      "description": "Te enviaremos un correo para confirmar tu dirección. Puedes empezar a usar la cuenta de inmediato.",
       "nameDescription": "Opcional. Se usa para dirigirse a ti en el panel.",
       "passwordHint": "Al menos {min} caracteres. La longitud es lo que importa: no se exigen mayúsculas, símbolos ni dígitos.",
       "submit": "Crear cuenta",
@@ -73,11 +82,34 @@
       "haveAccount": "¿Ya tienes una cuenta?",
       "signIn": "Inicia sesión"
     },
+    "forgotPassword": {
+      "title": "Restablecer contraseña",
+      "description": "Escribe el correo de tu cuenta y te enviaremos un enlace para elegir una contraseña nueva.",
+      "submit": "Enviar enlace",
+      "submitting": "Enviando…",
+      "sent": "Revisa tu correo",
+      "sentDetail": "Si esa dirección tiene una cuenta, el enlace ya va en camino. Caduca en una hora y solo se puede usar una vez.",
+      "backToLogin": "Volver a iniciar sesión"
+    },
+    "resetPassword": {
+      "title": "Elige una contraseña nueva",
+      "description": "Escribe la contraseña que quieres usar desde ahora.",
+      "submit": "Guardar contraseña",
+      "submitting": "Guardando…",
+      "confirmLabel": "Repite la contraseña",
+      "passwordHint": "Al menos {min} caracteres.",
+      "missingToken": "Enlace incompleto",
+      "missingTokenDetail": "Este enlace no trae un token de restablecimiento. Solicita uno nuevo.",
+      "requestNew": "Solicitar un enlace nuevo"
+    },
     "errors": {
       "checkFields": "Revisa los campos marcados.",
       "genericLogin": "No pudimos iniciar sesión con esos datos. Revisa el correo y la contraseña e inténtalo de nuevo.",
       "genericRegister": "No pudimos crear esa cuenta. Si la dirección ya está registrada, inicia sesión.",
-      "createFailed": "No pudimos crear esa cuenta. Inténtalo de nuevo en un momento."
+      "createFailed": "No pudimos crear esa cuenta. Inténtalo de nuevo en un momento.",
+      "tooManyRequests": "Demasiadas solicitudes seguidas. Espera unos minutos y vuelve a intentarlo.",
+      "resetTokenInvalid": "El enlace no es válido o ya caducó. Solicita uno nuevo.",
+      "emailInUse": "Ese correo ya está registrado. Inicia sesión o restablece tu contraseña."
     },
     "validation": {
       "emailRequired": "El correo electrónico es obligatorio.",
@@ -87,6 +119,8 @@
       "passwordMax": "Usa como máximo {max} caracteres.",
       "passwordOnlySpaces": "La contraseña no puede contener solo espacios.",
       "passwordRequired": "La contraseña es obligatoria.",
+      "passwordMismatch": "Las dos contraseñas no coinciden.",
+      "resetTokenRequired": "Falta el token del enlace.",
       "nameEmpty": "El nombre no puede estar vacío.",
       "nameTooLong": "El nombre es demasiado largo."
     },
@@ -100,47 +134,38 @@
   },
   "dashboard": {
     "title": "Panel",
+    "description": "Estado de seguridad de los dominios que has verificado.",
     "noSession": {
       "title": "Sesión no activa",
-      "description": "Inicia sesión para ver tu cuenta."
+      "description": "Inicia sesión para ver tu panel."
     },
-    "fallbackName": "Tu cuenta",
-    "account": {
-      "title": "Cuenta",
-      "description": "Leído de la fila `users` asociada a tu sesión.",
-      "email": "Correo electrónico",
-      "verified": "Verificado",
-      "notVerified": "Sin verificar",
-      "status": "Estado",
-      "locale": "Idioma",
-      "userId": "ID de usuario",
-      "memberSince": "Miembro desde"
+    "stats": {
+      "domains": "Dominios verificados",
+      "scans": "Escaneos",
+      "openFindings": "Hallazgos abiertos",
+      "riskyFindings": "Críticos y altos"
     },
-    "findings": {
-      "title": "Los hallazgos todavía no se agregan aquí",
-      "description": "Abre un escaneo para ver sus hallazgos. La correlación de CVE todavía no está implementada."
+    "risk": {
+      "label": "Riesgo actual",
+      "high": "Riesgo Alto",
+      "medium": "Riesgo Medio",
+      "safe": "Seguro / Riesgo Bajo",
+      "highHint": "Hay hallazgos críticos o altos abiertos. Revísalos y corrígelos.",
+      "mediumHint": "Hay hallazgos medios o sin clasificar abiertos.",
+      "safeHint": "No hay hallazgos abiertos de severidad media o superior."
     },
-    "severityBreakdown": "Desglose por severidad",
-    "scans": "Escaneos",
-    "findingsList": "Todos los hallazgos",
-    "filter": "Filtrar",
-    "filterAll": "Todos",
-    "filterDescription": "Filtre por severidad. Los conteos incluyen todos sus hallazgos.",
-    "scansDescription": "Los 20 escaneos más recientes de los dominios que verificó.",
-    "trend": {
-      "title": "Tendencia de postura",
-      "description": "Hallazgos altos y críticos del último escaneo completado de cada dominio, frente al anterior.",
-      "empty": "Todavía no hay escaneos completados, así que no hay tendencia que mostrar.",
-      "riskyFindings": "altos/críticos",
-      "improved": "Mejoró",
-      "worsened": "Empeoró",
-      "unchanged": "Sin cambios",
-      "firstScan": "Primer escaneo",
-      "table": {
-        "domain": "Dominio",
-        "latest": "Último escaneo",
-        "delta": "Cambio"
-      }
+    "severity": {
+      "title": "Hallazgos abiertos por severidad",
+      "description": "Solo se cuentan los hallazgos en estado abierto.",
+      "empty": "No hay hallazgos abiertos.",
+      "viewAll": "Ver todos los hallazgos"
+    },
+    "recent": {
+      "title": "Escaneos recientes",
+      "description": "Los últimos escaneos de tus dominios verificados.",
+      "empty": "Todavía no has lanzado ningún escaneo",
+      "emptyHint": "Verifica un dominio y lanza tu primer escaneo desde la página de escaneos.",
+      "viewAll": "Ver todos los escaneos"
     }
   },
   "notFound": {
@@ -244,10 +269,26 @@
         "submitting": "Creando..."
       }
     },
+    "actions": {
+      "cancel": "Cancelar escaneo",
+      "cancelPending": "Cancelando…",
+      "retry": "Reintentar escaneo",
+      "retryPending": "Reintentando…"
+    },
     "errors": {
       "challengeFailed": "No se pudo emitir el reto de verificación.",
       "verifyFailed": "No se pudo verificar la propiedad del dominio.",
-      "submitFailed": "No se pudo enviar el escaneo."
+      "submitFailed": "No se pudo enviar el escaneo.",
+      "codes": {
+        "rate_limited": "Alcanzaste el límite de escaneos por hora. Inténtalo de nuevo más tarde.",
+        "domain_limit": "Tu plan alcanzó el máximo de dominios verificados. Elimina uno o mejora el plan.",
+        "monthly_scan_limit": "Tu plan alcanzó el límite mensual de escaneos. Se renueva el día 1 (UTC).",
+        "concurrent_scan_limit": "Ya tienes el máximo de escaneos simultáneos de tu plan. Espera a que termine uno.",
+        "schedule_limit": "Tu plan alcanzó el máximo de programaciones activas.",
+        "scan_not_cancellable": "Este escaneo ya no se puede cancelar.",
+        "scan_not_retryable": "Solo se pueden reintentar escaneos fallidos o cancelados.",
+        "credential_unavailable": "El dominio tiene una credencial de escaneo que no se pudo usar. Vuelve a guardarla en Configuración."
+      }
     },
     "queued": {
       "title": "Escaneo en cola",
@@ -280,12 +321,18 @@
         "lost": "Conexión interrumpida. Reintentando…"
       },
       "checksCompleted": "Comprobaciones completadas",
+      "summary": "{completed} de {total} comprobaciones",
+      "estimate": {
+        "remaining": "≈ {duration} restante",
+        "waiting": "Esperando a que termine la primera comprobación…"
+      },
       "events": "Eventos",
       "noEvents": "Todavía no hay eventos. El escaneo empieza cuando el worker toma la tarea.",
       "event": {
         "started": "Escaneo iniciado",
         "completed": "Escaneo completado",
         "failed": "Escaneo fallido",
+        "cancelled": "Escaneo cancelado",
         "checkStarted": "Comprobación iniciada: {check}",
         "checkCompleted": "Comprobación finalizada: {check}",
         "progress": "Progreso actualizado"
@@ -300,7 +347,9 @@
         "severity": "Severidad",
         "check": "Comprobación",
         "finding": "Hallazgo",
-        "affectedUrl": "URL afectada"
+        "affectedUrl": "URL afectada",
+        "status": "Estado",
+        "actions": "Acciones"
       },
       "severity": {
         "unclassified": "Sin clasificar",
@@ -336,7 +385,16 @@
         "cookieMissingHttpOnly": "Cookie sin flag HttpOnly",
         "cookieMissingSameSite": "Cookie sin atributo SameSite",
         "unknownCheck": "Comprobación desconocida",
-        "cookieOther": "Problema de atributo de cookie fuera de las reglas específicas"
+        "cookieOther": "Problema de atributo de cookie fuera de las reglas específicas",
+        "reflectedXss": "Cross-site scripting reflejado",
+        "sqlInjection": "Inyección SQL",
+        "openRedirect": "Redirección abierta",
+        "corsReflectedWithCredentials": "CORS refleja cualquier origen y permite credenciales",
+        "corsReflectedOrigin": "CORS refleja cualquier origen",
+        "corsWildcard": "CORS permite cualquier origen",
+        "directoryListing": "Listado automático de directorios",
+        "exposedSecretFile": "Archivo de secretos o código expuesto",
+        "exposedConfigFile": "Archivo de configuración expuesto"
       },
       "filter": {
         "all": "Todos"
@@ -345,6 +403,11 @@
         "label": "Paginación de hallazgos",
         "next": "Página siguiente",
         "first": "Primera página"
+      },
+      "status": {
+        "resolved": "Resuelto",
+        "falsePositive": "Falso positivo",
+        "reopen": "Reabrir"
       }
     },
     "export": {
@@ -435,6 +498,174 @@
       "rateLimit": {
         "title": "Todavía no hay limitación de tasa en el perímetro",
         "description": "Existe bloqueo por cuenta, pero no hay un limitador por IP delante de la ruta de autenticación. La limitación del lado del servidor es una tarea del Sprint 2 y es obligatoria antes de exponer esto públicamente."
+      }
+    }
+  },
+  "credentials": {
+    "title": "Credenciales de escaneo",
+    "description": "Permiten al escáner entrar en las páginas que requieren sesión. Se guardan cifradas y nunca se muestran de nuevo.",
+    "empty": "Todavía no has guardado credenciales.",
+    "domain": "Dominio",
+    "label": "Etiqueta",
+    "labelPlaceholder": "Producción, staging…",
+    "kind": "Tipo de autenticación",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "token": "Token",
+    "headerName": "Nombre de la cabecera",
+    "headerValue": "Valor de la cabecera",
+    "save": "Guardar credencial",
+    "saving": "Guardando…",
+    "saved": "Credencial guardada. Se usará en el próximo escaneo.",
+    "revoke": "Revocar",
+    "revoking": "Revocando…",
+    "revoked": "Credencial revocada. Los escaneos nuevos ya no la usarán.",
+    "lastUsed": "Último uso",
+    "neverUsed": "Nunca usada",
+    "noVerified": "Verifica un dominio antes de guardar una credencial.",
+    "kinds": {
+      "basic": "Usuario y contraseña",
+      "bearer": "Token Bearer",
+      "header": "Cabecera personalizada"
+    },
+    "errors": {
+      "codes": {
+        "invalid_credential": "Revisa los datos de la credencial.",
+        "domain_not_verified": "Ese dominio no está verificado en tu cuenta.",
+        "storage_unavailable": "No se pudo guardar la credencial. El cifrado no está configurado en este despliegue.",
+        "credential_not_found": "Esa credencial ya no existe o fue revocada."
+      }
+    },
+    "pageTitle": "Configuración"
+  },
+  "findingsPage": {
+    "title": "Hallazgos",
+    "description": "Todos los hallazgos de tus dominios verificados, del más reciente al más antiguo.",
+    "sessionRequired": {
+      "title": "Sesión no activa",
+      "description": "Inicia sesión para ver tus hallazgos."
+    },
+    "list": {
+      "title": "Hallazgos",
+      "description": "Los conteos de los filtros incluyen solo hallazgos abiertos. La tabla muestra también los resueltos y los descartados."
+    },
+    "empty": {
+      "title": "Sin hallazgos",
+      "description": "Ninguno de tus escaneos ha registrado hallazgos todavía."
+    }
+  },
+  "reports": {
+    "title": "Informes",
+    "description": "Qué está abierto, si la postura mejora y qué puedes descargar.",
+    "sessionRequired": {
+      "title": "Sesión no activa",
+      "description": "Inicia sesión para ver tus informes."
+    },
+    "severity": {
+      "title": "Hallazgos abiertos por severidad",
+      "description": "Solo se cuentan los hallazgos en estado abierto.",
+      "empty": "No hay hallazgos abiertos."
+    },
+    "trend": {
+      "title": "Tendencia de postura",
+      "description": "Hallazgos críticos y altos del último escaneo completado de cada dominio, frente al anterior.",
+      "empty": "Todavía no hay escaneos completados, así que no hay tendencia que mostrar.",
+      "riskyFindings": "críticos/altos",
+      "improved": "Mejoró",
+      "worsened": "Empeoró",
+      "unchanged": "Sin cambios",
+      "firstScan": "Primer escaneo",
+      "table": {
+        "domain": "Dominio",
+        "latest": "Último escaneo",
+        "delta": "Cambio"
+      }
+    },
+    "scans": {
+      "title": "Escaneos completados",
+      "description": "Los 20 escaneos completados más recientes. Cada fila ofrece las mismas exportaciones que el detalle del escaneo.",
+      "empty": {
+        "title": "Todavía no hay escaneos completados",
+        "description": "Cuando un escaneo termine, aparecerá aquí con sus exportaciones."
+      },
+      "table": {
+        "target": "Objetivo",
+        "domain": "Dominio",
+        "created": "Creado",
+        "exports": "Exportar"
+      }
+    },
+    "pdf": {
+      "title": "Reporte ejecutivo de seguridad",
+      "subtitle": "Resultado del escaneo de {host}",
+      "summary": "Resumen",
+      "breakdown": "Hallazgos abiertos por severidad",
+      "findings": "Hallazgos",
+      "findingsHint": "Ordenados de mayor a menor severidad. Se incluyen todos los hallazgos registrados por el escaneo.",
+      "noFindings": "Este escaneo no registró hallazgos. Un escaneo completado sin hallazgos es un resultado válido, no un error.",
+      "remediation": "Cómo corregirlo",
+      "page": "Página {current} de {total}",
+      "severityCount": "{severity}: {count}",
+      "fields": {
+        "domain": "Dominio",
+        "target": "Objetivo",
+        "scanId": "ID del escaneo",
+        "scanStatus": "Estado",
+        "createdAt": "Fecha del escaneo",
+        "generatedAt": "Generado",
+        "affectedUrl": "URL afectada",
+        "rule": "Comprobación",
+        "owasp": "OWASP",
+        "rationale": "Clasificación"
+      },
+      "totals": {
+        "open": "Hallazgos abiertos",
+        "total": "Hallazgos registrados"
+      },
+      "statuses": {
+        "open": "Abierto",
+        "resolved": "Resuelto",
+        "false_positive": "Falso positivo"
+      }
+    }
+  },
+  "remediation": {
+    "title": "Guías de remediación",
+    "description": "Cómo corregir los hallazgos abiertos de tus dominios, ordenados por severidad.",
+    "sessionRequired": {
+      "title": "Sesión no activa",
+      "description": "Inicia sesión para ver tus guías de remediación."
+    },
+    "empty": {
+      "title": "No hay hallazgos abiertos",
+      "description": "Cuando un escaneo deje hallazgos abiertos, aquí verás cómo corregirlos."
+    },
+    "openFindings": "{count, plural, one {# hallazgo abierto} other {# hallazgos abiertos}}",
+    "noGuide": {
+      "title": "Hallazgos sin guía específica",
+      "description": "Estas comprobaciones todavía no tienen una guía de remediación. No es un resultado limpio: revísalas manualmente."
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "description": "Tu cuenta, los dominios que has verificado y las credenciales de escaneo.",
+    "profile": {
+      "title": "Perfil",
+      "description": "Datos de la cuenta asociada a tu sesión.",
+      "name": "Nombre",
+      "noName": "Sin nombre",
+      "email": "Correo electrónico",
+      "emailVerified": "Verificado",
+      "emailNotVerified": "Sin verificar"
+    },
+    "domains": {
+      "title": "Dominios verificados",
+      "description": "Solo estos dominios pueden escanearse. La verificación es la prueba de que los controlas.",
+      "verified": "Verificado",
+      "verifiedAt": "Verificado el {date}",
+      "empty": {
+        "title": "Todavía no hay dominios verificados",
+        "description": "Verifica un dominio desde la página de escaneos para poder escanearlo."
       }
     }
   }

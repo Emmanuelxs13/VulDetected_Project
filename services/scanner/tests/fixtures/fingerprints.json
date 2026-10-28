@@ -1,0 +1,34 @@
+[
+  {
+    "domainId": "d1",
+    "check": "tls",
+    "rawUrl": "https://Example.com:443",
+    "normalized": "https://example.com/",
+    "discriminator": null,
+    "expected": "7fb81aa2f17361bd3f1f9cf530f2b4318081367d9dba501dd7ca2bbf4aa2d7b1"
+  },
+  {
+    "domainId": "d1",
+    "check": "security_headers",
+    "rawUrl": "https://example.com/?b=2&a=1",
+    "normalized": "https://example.com/?a=1&b=2",
+    "discriminator": "content-security-policy",
+    "expected": "3750953356be0c74976b0a2602a9681d6be6ce3778ee532bb328cfa9c5c4e5a3"
+  },
+  {
+    "domainId": "d2",
+    "check": "xss",
+    "rawUrl": "http://example.com/search?q=a b&lang=es",
+    "normalized": "http://example.com/search?lang=es&q=a+b",
+    "discriminator": "q",
+    "expected": "3b4a4458a5b68b1d1ed49fc466a9c2976e87f39e0842292c8430fccd6c3a64dd"
+  },
+  {
+    "domainId": "d1",
+    "check": "sensitive_files",
+    "rawUrl": "https://example.com/.env",
+    "normalized": "https://example.com/.env",
+    "discriminator": "/.env",
+    "expected": "0df699202ba57f6d982bc3eac4d2b32bb437e299e5cf68ea11287e935f51a911"
+  }
+]

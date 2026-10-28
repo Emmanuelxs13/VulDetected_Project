@@ -1,3 +1,20 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# Security overrides.
+#
+# Both entries exist because the parent packages pin vulnerable transitive
+# versions and have no fixed release that reaches them yet:
+#
+#   * `next@15.5.x` bundles `postcss@8.4.31`, which is inside every published
+#     postcss advisory fixed by 8.5.x. postcss is a CSS parser used at build
+#     time; 8.5 is a compatible minor for the API Next uses.
+#   * `drizzle-kit@0.31.x` (dev-only migration tooling) still depends on
+#     `@esbuild-kit/core-utils`, which pins `esbuild@0.18.20`. esbuild 0.25
+#     keeps `transform`/`build`, the only API that loader uses.
+#
+# Revisit when Next ships a postcss bump or drizzle-kit drops @esbuild-kit.
+overrides:
+  postcss@8.4.31: 8.5.32
+  esbuild@0.18.20: 0.25.12

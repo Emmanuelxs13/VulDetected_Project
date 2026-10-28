@@ -11,6 +11,7 @@ import {
   verifyOwnershipAction,
 } from '../actions';
 import type { OwnershipChallenge } from '../actions';
+import { isScanErrorCode, SCAN_ERROR_KEYS } from '../error-codes';
 import { hostnameSchema, normalizeHostname, targetUrlSchema } from '../schema';
 
 import { OwnershipChallengePanel } from './ownership-challenge';
@@ -39,6 +40,14 @@ import { OwnershipChallengePanel } from './ownership-challenge';
  */
 export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
   const t = useTranslations('scan');
+
+  /**
+   * Refusals travel as codes so the sentence can be translated. Anything that
+   * is still a plain string is shown verbatim, which is how the not-yet-migrated
+   * actions keep working.
+   */
+  const describeError = (error: string): string =>
+    isScanErrorCode(error) ? t(SCAN_ERROR_KEYS[error]) : error;
   const [step, setStep] = useState<'ownership' | 'proof' | 'target'>('ownership');
   const [hostname, setHostname] = useState('');
   const [hostnameError, setHostnameError] = useState<string | undefined>(undefined);
@@ -82,7 +91,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
     if (!result.success) {
       setFailure({
         title: t('errors.challengeFailed'),
-        detail: result.error,
+        detail: describeError(result.error),
       });
       return;
     }
@@ -104,7 +113,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
     if (!result.success) {
       setFailure({
         title: t('errors.verifyFailed'),
-        detail: result.error,
+        detail: describeError(result.error),
       });
       return;
     }
@@ -131,7 +140,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
     if (!result.success) {
       setFailure({
         title: t('errors.submitFailed'),
-        detail: result.error,
+        detail: describeError(result.error),
       });
       return;
     }

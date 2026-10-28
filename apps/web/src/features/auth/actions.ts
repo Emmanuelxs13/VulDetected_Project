@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { audit } from '@/lib/audit';
 import { getAuth } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { consumeRateLimit, RateLimitError } from '@/lib/rate-limit';
 
 import { activeLockMinutes, clearExpiredLock, recordFailure, resetFailures } from './lockout';
 import { authHeaders, requestIp } from './request';
@@ -24,10 +25,20 @@ import { signInEmailSafe, verifyAgainstDecoy } from './sign-in';
 const POST_AUTH_PATH = '/dashboard';
 
 /**
- * Where both "account created" and "that address already exists" land.
+ * New accounts allowed from one IP per hour.
  *
- * Two destinations, and the second one is deliberately indistinguishable from the
- * first. See the duplicate-registration branch below for the full argument.
+ * A named constant rather than a literal because the number is a product
+ * decision and the comment explaining it lives next to the check that uses it.
+ */
+const REGISTER_IP_LIMIT = 5;
+
+/**
+ * Where a successful registration lands.
+ *
+ * `/login`, not `/dashboard`: `autoSignIn` is off (see `lib/auth.ts`), so no
+ * session cookie exists yet and the dashboard would only bounce back here. A
+ * duplicate address no longer shares this path — it returns an inline error
+ * (CA-02) and the form stays put.
  */
 const POST_REGISTRATION_PATH = '/login';
 
@@ -72,11 +83,8 @@ function fieldErrorsOf(error: { issues: { path: PropertyKey[]; message: string }
 /**
  * Registers an account.
  *
- * On an existing email, the flow is deliberately indistinguishable from success:
- * it attempts a sign-in with the same credentials and returns the same shape.
- * See `schema.ts` for the reasoning — this is what lets a real user who already
- * has an account get "you already have an account, sign in" without handing an
- * attacker a registration oracle.
+ * An address that already has an account is rejected with a message that says
+ * so (CA-02). The reasoning, including what that costs, is on the branch itself.
  */
 export async function registerAction(
   _prev: ActionResult | null,
@@ -112,6 +120,31 @@ export async function registerAction(
   const requestHeaders = await authHeaders();
 
   /**
+   * Per-IP budget for account creation.
+   *
+   * Registration writes a row, sends a message, and — since CA-02 — answers "is
+   * this address registered?" explicitly. Without a budget, that answer is a
+   * free enumeration API; with one, it costs an attacker five addresses per hour
+   * per IP.
+   *
+   * Five, not two: a shared office or university NAT legitimately produces
+   * several sign-ups in an afternoon, and throttling a classroom to slow
+   * someone who can rent addresses is the wrong trade.
+   */
+  try {
+    await consumeRateLimit({
+      key: `register:ip:${ip ?? 'unknown'}`,
+      limit: REGISTER_IP_LIMIT,
+      windowSec: 3600,
+    });
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      return { success: false, error: 'errors.tooManyRequests' };
+    }
+    throw error;
+  }
+
+  /**
    * Better Auth's `signUpEmail` requires a name (`sign-up.mjs:150,219` passes it
    * straight into `createUser`, and its input schema is `name: z.string()`), while
    * the form treats the field as optional. Bridged here rather than by making the
@@ -120,8 +153,8 @@ export async function registerAction(
    */
   const displayName = name?.trim() || email.split('@')[0] || email;
 
-  // Pre-checks the address so the branch is decided BEFORE calling Better Auth.
-  // Used only to pick a path — never to build the response message.
+  // Decides which branch to take BEFORE calling Better Auth, whose own duplicate
+  // response is deliberately generic.
   const existing = await db()
     .select({ id: users.id })
     .from(users)
@@ -132,71 +165,30 @@ export async function registerAction(
 
   if (existingId !== null) {
     /**
-     * Absorb the duplicate by attempting a sign-in with the SAME credentials.
+     * CA-02: an address that already has an account is rejected, and the message
+     * says why.
      *
-     * The observable outcome is now identical to a fresh registration unless the
-     * caller already knows the password:
+     * This is the deliberate opposite of the login form, and the asymmetry is the
+     * point. Silence here bought enumeration resistance at the price of a real
+     * user who typed their address wrong, or who registered months ago, watching
+     * the form claim success and then do nothing usable.
      *
-     *   new address                → no cookie → `/login`
-     *   duplicate, wrong password → no cookie → `/login`
-     *   duplicate, right password  → cookie    → `/dashboard`
+     * It also removes a worse problem. The previous implementation absorbed the
+     * duplicate by attempting a sign-in with the submitted password —
+     * `signInEmailSafe` on an endpoint with no lockout ladder — which made this
+     * form an unthrottled password oracle for every registered account. The only
+     * budget in front of it was the per-IP limit added above, and a password
+     * guess costs an attacker nothing to repeat.
      *
-     * An earlier version of this function returned an inline error for the third
-     * case and redirected to `/dashboard` for the first, which was an enumeration
-     * oracle: "submit the form, and the answer is whether the address is
-     * registered." Converging both no-cookie paths on `/login` removes it. The
-     * only remaining difference requires the attacker to already hold the
-     * password — at which point they know the account exists anyway.
-     *
-     * It also closes the timing side channel: `signInEmail` performs a real
-     * argon2id verify, so this branch costs the same as the registration branch
-     * below.
+     * The enumeration cost is accepted and bounded: this reveals what `/login`
+     * already reveals to anyone who tries, and the per-IP budget turns bulk
+     * enumeration into an afternoon of address rotation. Tracked as a documented
+     * trade-off in `docs/security.md`.
      */
-    const signIn = await signInEmailSafe(email, password, requestHeaders);
-
-    if (signIn.ok) {
-      await audit(
-        {
-          action: 'auth.login_succeeded',
-          actorUserId: existingId,
-          targetType: 'user',
-          targetId: existingId,
-          metadata: { via: 'register_duplicate' },
-        },
-        ip,
-      );
-
-      // `redirect()` THROWS a control-flow signal, so it must come after every
-      // write — including the audit row above — or that write is abandoned.
-      redirect(POST_AUTH_PATH);
-    }
-
-    await audit(
-      {
-        action: 'auth.login_failed',
-        actorUserId: existingId,
-        targetType: 'user',
-        targetId: existingId,
-        metadata: { via: 'register_duplicate' },
-      },
-      ip,
-    );
-
-    /**
-     * No error is shown, and no failure is recorded against the account.
-     *
-     * Not recording a failure is a deliberate omission, not an oversight. This
-     * form is unauthenticated and unthrottled by Better Auth's login rate limiter
-     * (that limiter is keyed on the sign-in endpoint, which this bypasses), so
-     * incrementing here would hand anyone who can submit this form a way to lock
-     * an arbitrary victim out — the very denial-of-service the progressive ladder
-     * exists to prevent. The register endpoint's own rate limit is the control
-     * that belongs here.
-     *
-     * Same destination as a successful registration, which is what makes the two
-     * indistinguishable.
-     */
-    redirect(POST_REGISTRATION_PATH);
+    return {
+      success: false,
+      error: 'errors.emailInUse',
+    };
   }
 
   const result = await getAuth().api.signUpEmail({

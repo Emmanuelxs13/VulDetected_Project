@@ -32,7 +32,25 @@ import type { ScanJobKwargs } from '@/lib/celery';
  */
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const MIGRATION_PATH = path.resolve(dirname, '../../../packages/db/drizzle/0003_scan_domain.sql');
+
+/**
+ * Every migration that belongs to the scan domain, in journal order.
+ *
+ * Applying only `0003` was the harness drifting from production: `findings.status`
+ * arrives in `0007` and the notifications table in `0008`, so the real INSERT the
+ * callback issues referenced a column the test database never had. Fidelity to
+ * the production schema is the point of running against Postgres at all.
+ */
+const MIGRATION_FILES = [
+  '0003_scan_domain.sql',
+  '0004_warm_pretty_boy.sql',
+  '0005_third_goblin_queen.sql',
+  '0006_grey_sleeper.sql',
+  '0007_real_tombstone.sql',
+  '0008_amazing_wonder_man.sql',
+  '0009_foamy_mathemanic.sql',
+  '0010_absurd_frank_castle.sql',
+].map((file) => path.resolve(dirname, '../../../packages/db/drizzle', file));
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_USER_ID = '22222222-2222-4222-8222-222222222222';
@@ -87,6 +105,7 @@ import { GET as getScanEvents, POST as postScanEvent } from '@/app/api/scans/[sc
 import { POST as postScanCallback } from '@/app/api/scans/[scanId]/callback/route';
 import { getServerSession } from '@/features/auth/session';
 import { submitScanAction } from '@/features/scans/actions';
+import { DEFAULT_CHECKS } from '@/features/scans/enqueue';
 
 interface CeleryEnvelope {
   body: string;
@@ -153,7 +172,9 @@ beforeAll(async () => {
   // Apply the REAL Sprint 2 migration, so the constraints under test are the
   // ones production gets. This is not `drizzle-kit migrate` (prohibited); it is
   // the same SQL executed against an in-process database.
-  const migration = readFileSync(MIGRATION_PATH, 'utf8');
+  const migration = MIGRATION_FILES.map((file) => readFileSync(file, 'utf8')).join(
+    '--> statement-breakpoint',
+  );
   for (const statement of migration.split('--> statement-breakpoint')) {
     if (statement.trim().length > 0) {
       await database.exec(statement);
@@ -236,7 +257,7 @@ async function startScan(scanId: string): Promise<void> {
       status: 'running',
       events: [{ seq: 1, type: 'scan.started', payload: {} }],
     }),
-    { params: { scanId } },
+    { params: Promise.resolve({ scanId }) },
   );
 
   expect(response.status).toBe(200);
@@ -264,7 +285,7 @@ async function completeScan(scanId: string): Promise<void> {
         },
       ],
     }),
-    { params: { scanId } },
+    { params: Promise.resolve({ scanId }) },
   );
 
   expect(response.status).toBe(200);
@@ -319,7 +340,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
       port: 443,
       base_url: 'https://example.com',
     });
-    expect(decoded[1].checks).toEqual(['security_headers', 'tls', 'cookies', 'redirects']);
+    expect(decoded[1].checks).toEqual([...DEFAULT_CHECKS]);
     expect(decoded[1].callback_base_url).toBe('http://localhost:3000');
     expect(decoded[2]).toEqual({
       callbacks: null,
@@ -342,7 +363,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     };
 
     const first = await postScanCallback(callbackRequest(scanId, progress), {
-      params: { scanId },
+      params: Promise.resolve({ scanId }),
     });
     expect(first.status).toBe(200);
     expect(await first.json()).toEqual({ ok: true });
@@ -350,7 +371,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     // Same payload again: a worker retry. The unique constraint rejects both
     // rows and `onConflictDoNothing()` turns the retry into a no-op.
     const retry = await postScanCallback(callbackRequest(scanId, progress), {
-      params: { scanId },
+      params: Promise.resolve({ scanId }),
     });
     expect(retry.status).toBe(200);
 
@@ -402,7 +423,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
           },
         ],
       }),
-      { params: { scanId } },
+      { params: Promise.resolve({ scanId }) },
     );
 
     expect(response.status).toBe(200);
@@ -420,7 +441,14 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     expect(rows.map((row) => row.findingKey)).toEqual(['a'.repeat(64), 'b'.repeat(64)]);
 
     const header = rows[0];
-    expect(header?.severity).toBe('unclassified');
+    // Sprint 3 replaced the `unclassified` default with the real classifier:
+    // a missing Content-Security-Policy is a high-severity finding.
+    expect(header?.severity).toBe('high');
+    expect(header?.status).toBe('open');
+    // Mapped at ingest, so the UI and the PDF do not each re-derive it.
+    expect(header?.owaspCategory).toBe('A05');
+    // A first scan has no baseline: every finding in it is new.
+    expect(header?.isNew).toBe(true);
     expect(header?.checkName).toBe('security_headers');
     expect(header?.title).toBe('Missing Content-Security-Policy header');
     // The worker's `affected_url` wins over the `base_url` fallback: the fixture
@@ -428,6 +456,56 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     expect(header?.affectedUrl).toBe('https://example.com/');
     expect(header?.evidence).toEqual({ header: 'content-security-policy' });
     expect(header?.raw).toEqual({ observed: { present: false } });
+  });
+
+  it('marks a finding new only when the previous completed scan did not contain it', async () => {
+    const firstScan = await insertQueuedScan();
+    await completeScan(firstScan);
+
+    const firstRows = await readFindings(firstScan);
+    expect(firstRows.map((row) => row.isNew)).toEqual([true]);
+
+    const secondScan = await insertQueuedScan();
+    const response = await postScanCallback(
+      callbackRequest(secondScan, {
+        scan_id: secondScan,
+        task_id: 'task-e2e-2',
+        status: 'completed',
+        error: null,
+        base_url: 'https://example.com',
+        events: [{ seq: 1, type: 'scan.completed', payload: {} }],
+        findings: [
+          {
+            // Same identity as the previous scan: a regression that survived.
+            key: 'a'.repeat(64),
+            check: 'security_headers',
+            title: 'Missing Content-Security-Policy header',
+            description: 'The response does not send a Content-Security-Policy header.',
+            affected_url: 'https://example.com/',
+            evidence: { header: 'content-security-policy' },
+            raw: {},
+          },
+          {
+            // New in this scan: the whole point of the flag.
+            key: 'b'.repeat(64),
+            check: 'tls',
+            title: 'HTTPS not available',
+            description: 'Target is not served over HTTPS.',
+            affected_url: 'https://example.com/',
+            evidence: { scheme: 'http' },
+            raw: {},
+          },
+        ],
+      }),
+      { params: Promise.resolve({ scanId: secondScan }) },
+    );
+
+    expect(response.status).toBe(200);
+
+    const rows = await readFindings(secondScan);
+    const byKey = new Map(rows.map((row) => [row.findingKey, row]));
+    expect(byKey.get('a'.repeat(64))?.isNew).toBe(false);
+    expect(byKey.get('b'.repeat(64))?.isNew).toBe(true);
   });
 
   it('treats a duplicate terminal callback as a no-op', async () => {
@@ -451,7 +529,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
           },
         ],
       }),
-      { params: { scanId } },
+      { params: Promise.resolve({ scanId }) },
     );
 
     expect(duplicate.status).toBe(200);
@@ -529,7 +607,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
 
   it('enforces the Bearer contract, 404 for unknown scans and 400 for malformed bodies', async () => {
     const scanId = await insertQueuedScan();
-    const params = { params: { scanId } };
+    const params = { params: Promise.resolve({ scanId }) };
 
     const missing = await postScanCallback(callbackRequest(scanId, {}, null), params);
     expect(missing.status).toBe(401);
@@ -546,7 +624,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
     expect(short.status).toBe(401);
 
     const unknown = await postScanCallback(callbackRequest(randomUUID(), {}, SECRET), {
-      params: { scanId: randomUUID() },
+      params: Promise.resolve({ scanId: randomUUID() }),
     });
     expect(unknown.status).toBe(404);
 
@@ -638,7 +716,7 @@ describe('scan pipeline (SCANNER_EGRESS_MODE=test)', () => {
    */
   it('persists the worker snake_case `affected_url` instead of falling back to base_url', async () => {
     const scanId = await insertQueuedScan();
-    const params = { params: { scanId } };
+    const params = { params: Promise.resolve({ scanId }) };
 
     const body = {
       status: 'completed',

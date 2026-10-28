@@ -1,12 +1,12 @@
 'use server';
 
-import { and, desc, domains, eq, scanSchedules, users } from '@vuldetected/db';
+import { and, desc, domains, eq, scanSchedules } from '@vuldetected/db';
 
 import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
 import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
-import { getPlanDefinition } from '@/lib/plans';
+import { checkScheduleAllowance } from '@/lib/plan-limits';
 
 import { computeNextRunAt, createScheduleSchema, updateScheduleSchema } from './schedule-schema';
 /** What the schedule list renders. */
@@ -109,16 +109,6 @@ export async function createScheduleAction(input: {
     return { success: false, error: 'Domain not verified' };
   }
 
-  const account = await db()
-    .select({ subscriptionPlan: users.subscriptionPlan })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  const plan = getPlanDefinition(account[0]?.subscriptionPlan ?? 'free');
-  if (plan.scheduledScans === 0) {
-    return { success: false, error: 'Your plan does not include scheduled scans.' };
-  }
-
   const now = new Date();
   const nextRunAt = computeNextRunAt(now, parsed.data.interval);
 
@@ -149,6 +139,16 @@ export async function createScheduleAction(input: {
     });
 
     return { success: true, data: { id } };
+  }
+
+  /**
+   * The cap applies to CREATING a schedule, not to editing one that already
+   * exists: a user at the limit must still be able to change the cadence or
+   * pause the schedule they already have.
+   */
+  const limit = await checkScheduleAllowance(userId);
+  if (limit !== null) {
+    return { success: false, error: limit };
   }
 
   const inserted = await db()

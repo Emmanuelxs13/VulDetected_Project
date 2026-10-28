@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { check, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 import { domains } from './domains';
 import { scanStatusEnum } from './enums';
+import { scanCredentials } from './scan-credentials';
 
 /**
  * `scans` — one request to scan one verified domain (Sprint 2, DM-2).
@@ -33,19 +34,40 @@ export const scans = pgTable(
     /** The normalised, validated target URL that was submitted (SS-1). */
     targetUrl: text('target_url').notNull(),
 
+    /**
+     * Where the scan came from. `manual` is an interactive submission; `schedule`
+     * is the durable scheduler. Recorded because the two have different failure
+     * handling and because "how much of my usage is automated" is a real product
+     * question.
+     */
+    source: text('source').notNull().default('manual'),
+
+    /**
+     * The credential used to reach authenticated pages, if the domain had one at
+     * enqueue time. `ON DELETE SET NULL` never fires in practice (credentials are
+     * soft-revoked, not deleted), but it keeps a hard delete from erasing scan
+     * history.
+     */
+    credentialId: uuid('credential_id').references(() => scanCredentials.id, {
+      onDelete: 'set null',
+    }),
+
     /** Lifecycle state. Starts `queued`; only the web app transitions it (design D9). */
     status: scanStatusEnum('status').notNull().default('queued'),
 
     /**
      * The checks to run, as a JSON array.
      *
-     * Defaults to the four deterministic Sprint 2 checks. A default in the
-     * database — rather than only in application code — means a row inserted by
-     * any future path still carries a coherent instruction set for the worker.
+     * Defaults to the full check set (four passive checks plus six active ones).
+     * A default in the database — rather than only in application code — means a
+     * row inserted by any future path still carries a coherent instruction set
+     * for the worker.
      */
     checks: jsonb('checks')
       .notNull()
-      .default(sql`'["security_headers","tls","cookies","redirects"]'::jsonb`),
+      .default(
+        sql`'["security_headers","tls","cookies","redirects","xss","sqli","open_redirect","cors","directory_listing","sensitive_files"]'::jsonb`,
+      ),
 
     /**
      * The Celery task id, echoed into the published message's `id`/`root_id`.
@@ -80,6 +102,9 @@ export const scans = pgTable(
      * production `CREATE INDEX` under load.
      */
     statusIdx: index('scans_status_idx').on(table.status),
+
+    /** `source` is a two-value CHECK, kept at the database boundary. */
+    sourceCheck: check('scans_source_check', sql`${table.source} IN ('manual', 'schedule')`),
   }),
 );
 

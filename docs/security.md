@@ -404,8 +404,85 @@ comprueba contra la fila de `domains`, no contra el conocimiento del UUID.
 Se registra para que su ausencia sea una decisión y no un descuido:
 
 - WAF / limitación de tasa en el borde (delegado a la plataforma de despliegue).
-- Protección DDoS (preocupación de la plataforma).
+- Protección DDoS (pre preocupación de la plataforma).
 - Controles de aislamiento multitenancy (aplazados hasta el Sprint 4+ — ver
   [ADR 0005](./adr/0005-deferred-multi-tenancy.md)).
 - Prueba de penetración formal de terceros (post-MVP, antes del lanzamiento
   público).
+
+## Trade-off CA-02 (Almacenamiento de token de sesión)
+
+**Contexto (CA-02):** En la implementación actual con Better Auth `1.7.7`, el token de sesión se almacena **en claro** en `sessions.token` (ver §4). El hash propuesto en borradores no es aplicable directamente por el flujo de generación/almacenamiento de Better Auth.
+
+**Trade-off aceptado (Sprint 1):**
+- **Ventaja:** Evita parche frágil sobre la librería de autenticación (adaptador bifurcado) que se rompería en actualizaciones y podría dar falsa sensación de seguridad.
+- **Riesgo:** Volcado de BD expone tokens de sesión. Mitigado con `HttpOnly`, `SameSite=Lax`, `Secure` en producción, caducidad absoluta 7 días, renovación limitada, revocación inmediata (eliminación de fila) y restricción de acceso a volcados.
+- **Condición de salida:** Reevaluar en cada actualización menor de Better Auth y migrar a hash de primera parte si aparece soporte upstream. Hasta entonces, tratar `sessions.token` como secreto.
+
+## Lista exacta de variables (despliegue/producción)
+
+Las variables leídas por código/Compose. Las marcadas **REQUERIDAS** hacen fallar el arranque si faltan (`${VAR:?}`).
+
+### Base de datos
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `POSTGRES_USER` | Sí | Usuario de Postgres (stack compose) |
+| `POSTGRES_PASSWORD` | Sí | Contraseña de Postgres (**cambiar antes del primer arranque**) |
+| `POSTGRES_DB` | Sí | Nombre de base de datos |
+| `DATABASE_URL` | Sí | `postgresql://user:pass@host:5432/db?schema=public` |
+
+### Autenticación
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `AUTH_SECRET` | Sí | Secreto para firmar sesiones (>= 32 bytes). `openssl rand -base64 32` |
+| `AUTH_URL` | Sí | Origen público con esquema, sin barra final (OAuth/correos) |
+| `NEXT_PUBLIC_APP_URL` | No | Copia pública de `AUTH_URL` para componentes cliente |
+
+### Email / SMTP
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `SMTP_HOST` | Sí | Servidor SMTP (producción requiere real) |
+| `SMTP_PORT` | No | Puerto SMTP (default 587) |
+| `SMTP_USER` | No | Usuario SMTP |
+| `SMTP_PASSWORD` | No | Contraseña SMTP |
+| `SMTP_SECURE` | No | `true` solo para TLS implícito en 465, `false` para STARTTLS 587 |
+| `EMAIL_FROM` | Sí | Remitente (debe estar verificado por proveedor) |
+| `MAIL_DISPATCH_SECRET` | Sí | Bearer para `POST /api/mail/dispatch` (>= 16 chars). `openssl rand -base64 32` |
+
+### Scanner / Worker
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `SCANNER_CALLBACK_SECRET` | Sí | Secreto compartido web ↔ worker/scheduler (Bearer). Nunca por broker. |
+| `SCANNER_CALLBACK_BASE_URL` | No | URL base para callbacks (Compose usa `http://web:3000`) |
+| `SCANNER_EGRESS_MODE` | No | `strict` (default) o `test` (solo fixtures). **Nunca** `test` en prod. |
+| `CELERY_BROKER_URL` | No | Broker Redis (Compose usa `redis://redis:6379/0`) |
+
+### Redis / Colas
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `REDIS_URL` | No | URL Redis para rate-limit/cancelación (Compose usa `redis://redis:6379/0`) |
+
+### Cifrado / Credenciales escaneos
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `CREDENTIALS_ENCRYPTION_KEY` | Sí | Clave para cifrado de credenciales (32 bytes). Generar con cuidado. |
+
+### OAuth (opcional)
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | No | OAuth Google |
+| `GOOGLE_CLIENT_SECRET` | No | OAuth Google |
+| `GITHUB_CLIENT_ID` | No | OAuth GitHub |
+| `GITHUB_CLIENT_SECRET` | No | OAuth GitHub |
+
+### Scheduler / Logging
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `SCHEDULER_BASE_URL` | No | Base URL scheduler→web (`http://web:3000` en Compose) |
+| `SCHEDULER_INTERVAL_MS` | No | Intervalo scheduler (default 60000) |
+| `LOG_LEVEL` | No | Nivel de logs (default `info`) |
+
+**Notas:**
+- `.env.prod` debe estar git-ignorado (ver `.gitignore`). Nunca commitear secretos.
+- Variables `NEXT_PUBLIC_*` son públicas por definición.
+- En CI se usan valores dummy para el smoke test (ver `.github/workflows/ci.yml`).

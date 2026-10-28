@@ -14,6 +14,9 @@ coverage/
 .env.local
 .env.*.local
 !.env.example
+# The production stack file is read by `docker compose --env-file` and holds
+# every secret in the deployment.
+infra/.env.prod
 
 # Logs and OS noise
 *.log

@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { createScheduleAction } from '../schedule-actions';
 import { SCAN_INTERVALS } from '../schedule-schema';
+import { isScanErrorCode, SCAN_ERROR_KEYS } from '../error-codes';
 
 export function NewScheduleForm({
   verifiedHosts,
@@ -25,7 +26,10 @@ export function NewScheduleForm({
     const result = await createScheduleAction({ domainId, interval });
     setBusy(false);
     if (!result.success) {
-      setMessage({ type: 'error', text: result.error });
+      setMessage({
+        type: 'error',
+        text: isScanErrorCode(result.error) ? t(SCAN_ERROR_KEYS[result.error]) : result.error,
+      });
       return;
     }
     setMessage({ type: 'success', text: t('schedules.created') });

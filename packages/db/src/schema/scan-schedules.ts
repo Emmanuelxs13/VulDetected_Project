@@ -15,6 +15,14 @@ export const scanSchedules = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     interval: text('interval').notNull().default('daily'),
     enabled: boolean('enabled').notNull().default(true),
+
+    /**
+     * Whether a NEW critical finding must notify the owner. On by default:
+     * silence about a critical regression is the failure mode users cannot
+     * forgive, and it costs nothing to switch off per schedule.
+     */
+    alertOnNewCritical: boolean('alert_on_new_critical').notNull().default(true),
+
     lastRunAt: timestamp('last_run_at', { withTimezone: true }),
     nextRunAt: timestamp('next_run_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

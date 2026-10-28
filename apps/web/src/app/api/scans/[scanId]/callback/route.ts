@@ -4,14 +4,11 @@ import { timingSafeEqual } from 'node:crypto';
 
 import {
   and,
-  domains,
+  desc,
   eq,
   findings,
-  inArray,
-  notifications,
   ne,
   scans,
-  users,
   scanEvents,
 } from '@vuldetected/db';
 import { NextResponse } from 'next/server';
@@ -19,7 +16,10 @@ import { NextResponse } from 'next/server';
 import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
+import { computeFindingKey } from '@/lib/findings/newness';
+import { notifyScanCompleted } from '@/lib/mail/notify';
 import { classifyFinding } from '@/lib/severity/classify';
+import { owaspCategoryCodeFor } from '@/lib/severity/owasp';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,8 +41,13 @@ function getBearerToken(req: Request) {
   return null;
 }
 
-export async function POST(req: Request, { params }: { params: { scanId: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ scanId: string }> }) {
   try {
+    // Next 15 hands route params as a Promise. Reading `params.scanId` without
+    // awaiting yields `undefined`, the scan lookup throws, and the handler
+    // answers 400 for every terminal callback — the exact failure the E2E
+    // suite reproduces.
+    const { scanId } = await params;
     const env = getEnv();
     const expected = env.SCANNER_CALLBACK_SECRET;
     if (!expected) {
@@ -54,7 +59,6 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const scanId = params.scanId;
     const body = await req.json();
 
     const scanRows = await db().select().from(scans).where(eq(scans.id, scanId)).limit(1);
@@ -113,32 +117,89 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
           .where(eq(scans.id, scanId))
           .limit(1);
         if (current[0]?.status === 'cancelled') return;
+
+        /**
+         * The previous completed scan of this domain, newest first.
+         *
+         * "New" is a comparison, so it needs the baseline at ingest time: the
+         * next scan will compare against THIS one, and recomputing later would
+         * rewrite history. A first scan has no baseline and therefore marks
+         * every finding new.
+         */
+        const previousScanRows = await tx
+          .select({ id: scans.id })
+          .from(scans)
+          .where(
+            and(
+              eq(scans.domainId, scan.domainId),
+              ne(scans.id, scanId),
+              eq(scans.status, 'completed'),
+            ),
+          )
+          .orderBy(desc(scans.createdAt))
+          .limit(1);
+
+        const previousKeys = new Set<string>();
+        if (previousScanRows[0]) {
+          const previousFindings = await tx
+            .select({ findingKey: findings.findingKey })
+            .from(findings)
+            .where(eq(findings.scanId, previousScanRows[0].id));
+          for (const row of previousFindings) previousKeys.add(row.findingKey);
+        }
+
         if (Array.isArray(body.findings)) {
           for (const f of body.findings) {
-            if (!f || !f.key) continue;
-            try {
-              const checkName = f.check;
-              const evidence = f.evidence ?? {};
-              const { severity } = classifyFinding(checkName, evidence, f.title ?? '');
-              await tx
-                .insert(findings)
-                .values({
-                  scanId,
-                  findingKey: f.key,
-                  severity,
-                  checkName,
-                  title: f.title,
-                  description: f.description ?? '',
-                  affectedUrl: f.affected_url ?? f.affectedUrl ?? body.base_url ?? '',
-                  evidence,
-                  raw: f.raw ?? {},
-                })
-                .onConflictDoNothing();
-            } catch {
-              const _err: unknown = undefined;
-              void _err;
+            if (!f) continue;
+            const checkName = f.check;
+            if (typeof checkName !== 'string' || checkName === '') continue;
+            const evidence = f.evidence ?? {};
+            const affectedUrl = f.affected_url ?? f.affectedUrl ?? body.base_url ?? '';
 
-              // ignore
+            /**
+             * The worker sends the finished key. The fallback keeps an older or
+             * partially upgraded worker from silently dropping findings: it
+             * reproduces the same rule, with the finding title as discriminator
+             * when the worker sent none.
+             */
+            const findingKey =
+              typeof f.key === 'string' && f.key.trim() !== ''
+                ? f.key
+                : computeFindingKey({
+                    domainId: scan.domainId,
+                    checkName,
+                    affectedUrl,
+                    discriminator: evidence.header ?? f.title,
+                  });
+
+            const { severity } = classifyFinding(checkName, evidence, f.title ?? '');
+            try {
+              // Savepoint per row: without it, a single rejected INSERT marks
+              // the surrounding transaction aborted and every later statement
+              // fails with "current transaction is aborted" — which is how one
+              // bad finding used to lose the whole batch.
+              await tx.transaction(async (sp) => {
+                await sp
+                  .insert(findings)
+                  .values({
+                    scanId,
+                    findingKey,
+                    severity,
+                    status: 'open',
+                    owaspCategory: owaspCategoryCodeFor(checkName),
+                    isNew: !previousKeys.has(findingKey),
+                    checkName,
+                    title: f.title,
+                    description: f.description ?? '',
+                    affectedUrl,
+                    evidence,
+                    raw: f.raw ?? {},
+                  })
+                  .onConflictDoNothing();
+              });
+            } catch {
+              // A finding that cannot be persisted is skipped, but the batch
+              // and the terminal status transition still commit.
             }
           }
         }
@@ -157,44 +218,32 @@ export async function POST(req: Request, { params }: { params: { scanId: string 
       });
 
       if (status === 'completed') {
-        const criticalRows = await db()
-          .select({ userId: domains.userId })
-          .from(findings)
-          .innerJoin(scans, eq(findings.scanId, scans.id))
-          .innerJoin(domains, eq(scans.domainId, domains.id))
-          .innerJoin(users, eq(domains.userId, users.id))
-          .where(
-            and(
-              eq(findings.scanId, scanId),
-              eq(findings.severity, 'critical'),
-              eq(users.subscriptionStatus, 'active'),
-              inArray(users.subscriptionPlan, ['pro', 'business']),
-            ),
-          )
-          .limit(1);
-        if (criticalRows[0]) {
-          await db()
-            .insert(notifications)
-            .values({
-              userId: criticalRows[0].userId,
-              scanId,
-              type: 'critical_finding',
-              message: 'A completed scan contains a critical finding.',
-            })
-            .onConflictDoNothing();
+        /**
+         * Notifications and mail for a finished scan.
+         *
+         * Wrapped so a mail problem cannot turn a successful scan into a failed
+         * callback: the worker would retry the whole terminal report, the scan
+         * would flip to `failed` for a reason that has nothing to do with the
+         * scan, and the findings would already be written. The outbox row is
+         * what makes delivery retryable on its own schedule.
+         */
+        try {
+          await notifyScanCompleted(scanId);
+        } catch (error) {
+          console.error('[mail] could not queue the scan notifications', error);
         }
       }
 
       try {
         if (status === 'completed') {
           await audit({
-            action: 'scan.completed' as unknown as import('@/lib/audit').AuditAction,
+            action: 'scan.completed',
             targetType: 'scan',
             targetId: scanId,
           });
         } else {
           await audit({
-            action: 'scan.failed' as unknown as import('@/lib/audit').AuditAction,
+            action: 'scan.failed',
             targetType: 'scan',
             targetId: scanId,
           });

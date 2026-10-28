@@ -7,6 +7,8 @@ import { nextCookies } from 'better-auth/next-js';
 
 import { db } from './db';
 import { getEnv } from './env';
+import { getLogger } from './logger';
+import { queuePasswordResetEmail, queueVerificationEmail } from './mail/notify';
 import { hashPassword, verifyPassword } from './password';
 
 /**
@@ -178,6 +180,52 @@ function buildAuth() {
       password: {
         hash: hashPassword,
         verify: verifyPassword,
+      },
+
+      /**
+       * A completed reset kills every other session for that account.
+       *
+       * The usual reason someone resets a password is that they believe it is
+       * known to someone else. Leaving the attacker's existing session alive
+       * would keep them inside the account for the full session lifetime, which
+       * makes the reset an inconvenience rather than a recovery. Better Auth does
+       * this only when asked (`password.mjs`, `revokeSessionsOnPasswordReset`),
+       * so it is asked.
+       *
+       * The resetting browser has no session to lose: `resetPasswordAction` sends
+       * the user to `/login` afterwards and never signs them in.
+       */
+      revokeSessionsOnPasswordReset: true,
+
+      /**
+       * Password reset delivery.
+       *
+       * Better Auth builds the URL — `${baseURL}/reset-password/${token}` on its
+       * own endpoint, which redirects to the `redirectTo` the caller passed — and
+       * hands it here. This callback only decides WHEN it is sent: the message is
+       * written to the outbox and delivered by a dispatcher, so a slow or briefly
+       * unavailable SMTP server cannot turn "reset my password" into a 500.
+       *
+       * `expiresInMinutes` in the email body is pinned to the library default in
+       * `mail/notify.ts`; if that default ever changes, the template test fails
+       * rather than the email quietly promising the wrong window.
+       */
+      sendResetPassword: async ({ user, url }) => {
+        try {
+          await queuePasswordResetEmail({
+            to: user.email,
+            locale: (user as { locale?: string | null }).locale,
+            url,
+          });
+        } catch (error) {
+          /**
+           * Swallowed on purpose. The reset request itself succeeded — the token
+           * exists — and surfacing a mail failure here would turn an outbox write
+           * problem into "the form is broken" while leaking whether the address
+           * exists. The dispatcher's `failed` rows are the operational signal.
+           */
+          getLogger('mail').error({ err: error }, 'could not queue the password reset email');
+        }
       },
     },
 
@@ -383,16 +431,38 @@ function buildAuth() {
     },
 
     /**
-     * Do not attempt to email anything.
+     * Email verification.
      *
-     * Sprint 1 has no mailer. Without this, Better Auth's `sendVerificationEmail`
-     * throws at runtime on any signup path that touches it, and the failure
-     * surfaces as a 500 in the middle of a flow the user cannot retry. Mail
-     * arrives in Sprint 2, via Mailpit locally — see
-     * `docs/decisions-pending.md`.
+     * `sendOnSignUp` is ON: registration sends the confirmation link. What stays
+     * OFF is `requireEmailVerification` above — sending proof and requiring it
+     * before the first login are different product decisions, and only the first
+     * one is settled.
+     *
+     * The message goes to the outbox first, for the same reason as the reset: a
+     * registration must not fail because SMTP blinked. A failure here is logged
+     * and swallowed, and the account remains usable and able to re-request.
      */
     emailVerification: {
-      sendOnSignUp: false,
+      sendOnSignUp: true,
+
+      sendVerificationEmail: async ({ user, url }) => {
+        try {
+          await queueVerificationEmail({
+            to: user.email,
+            locale: (user as { locale?: string | null }).locale,
+            url,
+          });
+        } catch (error) {
+          getLogger('mail').error({ err: error }, 'could not queue the verification email');
+        }
+      },
+
+      /**
+       * Where the confirmation link lands after Better Auth verifies the token.
+       * The dashboard is right when a session exists and harmless (it redirects
+       * to the login form) when one does not.
+       */
+      callbackURL: '/dashboard',
 
       /**
        * Hash the `identifier` column. Free, and it defaults the other way.
@@ -406,20 +476,27 @@ function buildAuth() {
        * (`findVerificationValue`), which is what makes this safe to turn on: write
        * and read hash identically, so a hashed row is still findable.
        *
-       * ## WHAT THIS DOES NOT COVER
+       * ## WHAT THIS DOES NOT COVER, NOW THAT MAIL IS LIVE
        *
-       * `verification_tokens.value` is still stored raw. `createVerificationValue`
+       * `verification_tokens.value` is stored RAW. `createVerificationValue`
        * hashes the identifier only and spreads the rest of `data` through
-       * untouched — there is no core option for the token value. (A `storeToken`
-       * option exists, but it belongs to the magic-link *plugin*, not to core
-       * email verification, and wiring it would mean adopting a plugin Sprint 1
-       * does not use.)
+       * untouched, and there is no core option for the token value: the
+       * `storeToken` option that does exactly this belongs to the magic-link
+       * *plugin* (`dist/plugins/magic-link/index.mjs:42-49`), not to core email
+       * verification.
        *
-       * This is accepted because the table is currently INERT: `sendOnSignUp` is
-       * false and Sprint 1 has no mailer, so nothing writes a verification row.
-       * The gap becomes live the moment mail arrives in Sprint 2, so it must be
-       * resolved then — before the first verification email is sent, not after.
-       * Tracked in `docs/security.md`.
+       * Accepted, with the reasoning written down so it is a decision and not an
+       * oversight. A reader of this table can mint a reset token for any account
+       * with one in flight — but the same reader holds `users.password_hash` and
+       * every session row, so the marginal capability is "reset a password now"
+       * rather than "take over accounts eventually". The windows are short (one
+       * hour for reset, one day for verification, single use, deleted on
+       * consumption), and a dump is a full compromise either way.
+       *
+       * What WOULD change the calculus: storing anything in this table that is
+       * both long-lived and independently powerful. Nothing today is, so the
+       * mitigation stays documentation rather than a fork of the library's token
+       * handling.
        */
       storeIdentifier: 'hashed',
     },
