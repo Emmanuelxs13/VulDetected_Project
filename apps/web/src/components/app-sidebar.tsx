@@ -7,6 +7,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { Sheet, SheetContent, SheetTrigger } from '@vuldetected/ui';
+import {
+  IconDashboard,
+  IconScan,
+  IconFindings,
+  IconReport,
+  IconGuides,
+  IconSchedule,
+  IconSettings,
+} from '@/components/icons';
 
 /**
  * The product's navigation.
@@ -24,13 +33,13 @@ function useNavItems() {
   const t = useTranslations('nav');
 
   return [
-    { href: '/dashboard', label: t('dashboard'), icon: '📊' },
-    { href: '/scans', label: t('scans'), icon: '🔍' },
-    { href: '/findings', label: t('findings'), icon: '⚠️' },
-    { href: '/reports', label: t('reports'), icon: '📄' },
-    { href: '/remediation', label: t('remediation'), icon: '📚' },
-    { href: '/schedules', label: t('schedules'), icon: '📅' },
-    { href: '/settings', label: t('settings'), icon: '⚙️' },
+    { href: '/dashboard', label: t('dashboard'), icon: IconDashboard },
+    { href: '/scans', label: t('scans'), icon: IconScan },
+    { href: '/findings', label: t('findings'), icon: IconFindings },
+    { href: '/reports', label: t('reports'), icon: IconReport },
+    { href: '/remediation', label: t('remediation'), icon: IconGuides },
+    { href: '/schedules', label: t('schedules'), icon: IconSchedule },
+    { href: '/settings', label: t('settings'), icon: IconSettings },
   ];
 }
 
@@ -81,9 +90,7 @@ export function AppSidebar({ className }: { className?: string }) {
               )}
               title={collapsed ? item.label : undefined}
             >
-              <span className="text-base" aria-hidden="true">
-                {item.icon}
-              </span>
+              <item.icon className="h-4 w-4" aria-hidden="true" />
               {!collapsed && <span>{item.label}</span>}
             </Link>
           );
@@ -127,9 +134,7 @@ export function MobileSidebar() {
                   isActive ? 'bg-surface-raised text-text font-medium' : 'text-text-muted',
                 )}
               >
-                <span className="text-base" aria-hidden="true">
-                  {item.icon}
-                </span>
+                <item.icon className="h-4 w-4" aria-hidden="true" />
                 <span>{item.label}</span>
               </Link>
             );
