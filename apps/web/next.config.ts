@@ -60,6 +60,10 @@ const config: NextConfig = {
 
 
 
+  experimental: {
+    optimizePackageImports: ['framer-motion', 'sonner', 'vaul', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select', '@radix-ui/react-tabs', '@radix-ui/react-tooltip', '@radix-ui/react-accordion'],
+  },
+
   reactStrictMode: true,
 
   /**
