@@ -34,6 +34,7 @@ function useNavItems() {
 
   return [
     { href: '/dashboard', label: t('dashboard'), icon: IconDashboard },
+    { href: '/scanner', label: 'Escáner', icon: IconScan },
     { href: '/scans', label: t('scans'), icon: IconScan },
     { href: '/findings', label: t('findings'), icon: IconFindings },
     { href: '/reports', label: t('reports'), icon: IconReport },
