@@ -402,7 +402,7 @@ export async function submitScanAction(input: {
   // Análisis pasivo para cualquier URL - requiere crear/buscar dominio temporal o usar lógica diferente
   // Por ahora, permitir escaneo pasivo sin verificación de propiedad
   // Crear o buscar dominio para el host (sin verificar propiedad)
-  let domainRows = await db()
+  const domainRows = await db()
     .select({ id: domains.id, verified: domains.verified })
     .from(domains)
     .where(eq(domains.normalizedHostname, normalizedHostname))
