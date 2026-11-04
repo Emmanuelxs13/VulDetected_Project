@@ -106,6 +106,7 @@ export const ownershipVerifySchema = z.object({
 
 /**
  * Validates a scan target URL for submission (SS-1).
+ * Universal scanning: accepts any valid http(s) URL.
  */
 export const targetUrlSchema = z
   .string()
@@ -120,9 +121,7 @@ export const targetUrlSchema = z
         if (url.username || url.password) {
           return false;
         }
-        if (url.pathname !== '/' || url.search !== '' || url.hash !== '') {
-          // allow paths? design says normalized URL; but be flexible
-        }
+        // Allow paths, queries, fragments for universal scanning
         return true;
       } catch {
         return false;
@@ -140,10 +139,14 @@ export const targetUrlSchema = z
     }
     const port = url.port ? parseInt(url.port, 10) : scheme === 'https' ? 443 : 80;
     const baseUrl = `${scheme}://${normalizedHostname}${port === (scheme === 'https' ? 443 : 80) ? '' : `:${port}`}`;
+    // For universal scanning, preserve the full URL path/query if present
+    const fullUrl = url.pathname !== '/' || url.search || url.hash 
+      ? `${scheme}://${hostname}${url.port ? `:${url.port}` : ''}${url.pathname}${url.search}${url.hash}`
+      : `${scheme}://${normalizedHostname}${port === (scheme === 'https' ? 443 : 80) ? '' : `:${port}`}`;
     return {
       normalizedHostname,
       hostname: normalizedHostname,
-      url: `${scheme}://${normalizedHostname}${port === (scheme === 'https' ? 443 : 80) ? '' : `:${port}`}`,
+      url: fullUrl,
       baseUrl,
       port,
       scheme,

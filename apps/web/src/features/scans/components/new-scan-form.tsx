@@ -134,7 +134,7 @@ export function NewScanForm({ verifiedHosts }: { verifiedHosts: string[] }) {
     setTargetError(undefined);
 
     setBusy(true);
-    const result = await submitScanAction({ url: parsed.url });
+    const result = await submitScanAction({ url: parsed.url, mode: 'passive' });
     setBusy(false);
 
     if (!result.success) {
