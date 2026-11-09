@@ -20,6 +20,47 @@ Las etiquetas **Demostrable hoy**, **En construcción** y **Hoja de ruta**
 separan hechos comprobados de trabajo pendiente. La validación final incluyó
 browser flow, worker real y exportaciones contra datos persistidos.
 
+### Recorrido rápido para la demo
+
+Usa este recorrido cuando necesites demostrar el Sprint 1 sin tener que
+deducir qué pantalla abrir ni qué valores introducir:
+
+1. Levanta la infraestructura y la web siguiendo la preparación del entorno.
+2. Ejecuta `pnpm seed:demo` desde la raíz.
+3. Abre <http://localhost:3000/login>.
+4. Inicia sesión con cualquiera de estas credenciales locales:
+
+   | Correo | Contraseña | Uso |
+   | --- | --- | --- |
+   | `demo.free@vuldetected.local` | `VulDetected-Demo-2026!` | Demo del plan Free |
+   | `demo.pro@vuldetected.local` | `VulDetected-Demo-2026!` | Demo del plan Pro |
+   | `demo.business@vuldetected.local` | `VulDetected-Demo-2026!` | Demo del plan Business |
+
+   Estas credenciales son deliberadamente conocidas y solo sirven para el
+   entorno local creado por `seed:demo`. No las uses en producción ni las
+   confundas con la contraseña de PostgreSQL.
+
+5. Abre **Scanner → Nuevo escaneo** en
+   <http://localhost:3000/scanner/new>.
+6. En el campo de URL escribe exactamente:
+   `http://127-0-0-1.nip.io:8099`.
+7. Copia el token de propiedad que muestra la pantalla y, desde otra terminal,
+   ejecuta:
+
+   ```powershell
+   node scripts/demo/write-token.mjs <token-copiado-de-la-pantalla>
+   ```
+
+8. Vuelve al navegador y pulsa **Verificar propiedad**.
+9. Pulsa **Iniciar escaneo** y abre
+   <http://localhost:3000/scans>.
+10. Espera a que el progreso llegue a 100%. Debes ver 10/10 comprobaciones,
+    los hallazgos agrupados por severidad y las descargas JSON, CSV y PDF.
+
+Si la aplicación se inició en otro puerto, sustituye `3000` únicamente en las
+URL del navegador. La fixture vulnerable continúa siendo
+`http://127-0-0-1.nip.io:8099`.
+
 ## 1. Resumen del Sprint 1
 
 - **Objetivo:** que una persona sin cuenta llegue hasta un hallazgo entendible,
