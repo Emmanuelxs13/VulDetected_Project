@@ -133,9 +133,20 @@ pnpm seed:demo
 ```
 
 `db:verify` confirma que el esquema esperado existe. `seed:demo` crea usuarios
-locales para demostrar el producto sin depender de un correo externo. Las
-credenciales demo se muestran únicamente en la salida local del script y no
-deben documentarse ni reutilizarse en producción.
+locales para demostrar el producto sin depender de un correo externo. Para
+entrar en la demo, abre <http://localhost:3000/login> y usa cualquiera de
+estas credenciales públicas de desarrollo:
+
+| Correo | Contraseña | Plan |
+| --- | --- | --- |
+| `demo.free@vuldetected.local` | `VulDetected-Demo-2026!` | Free |
+| `demo.pro@vuldetected.local` | `VulDetected-Demo-2026!` | Pro |
+| `demo.business@vuldetected.local` | `VulDetected-Demo-2026!` | Business |
+
+Estas cuentas y su contraseña son deliberadamente conocidas y solo funcionan
+en la base local creada por `seed:demo`. No las uses en producción. La
+contraseña real de PostgreSQL y cualquier secreto de `.env` nunca deben
+documentarse, versionarse ni publicarse.
 
 Para validar la autenticación real con correo:
 
@@ -246,15 +257,16 @@ En otra terminal:
 node e2e/fixtures/vulnerable-site/server.mjs
 ```
 
-La fixture escucha en `127.0.0.1:8099` y solo existe para la demo. Es
-intencionalmente vulnerable y no debe desplegarse ni copiarse a la aplicación.
+La fixture escucha en `http://127-0-0-1.nip.io:8099` y solo existe para la
+demo. Es intencionalmente vulnerable y no debe desplegarse ni copiarse a la
+aplicación. Esa es la URL que debes introducir en **Scanner → Nuevo escaneo**.
 El archivo de token se genera localmente y está excluido por
 `.gitignore`.
 
 ### 7.2 Publicar el token de propiedad
 
-Desde la pantalla de nuevo escaneo, copia el token mostrado por la aplicación y
-escríbelo en la fixture:
+Después de introducir `http://127-0-0-1.nip.io:8099`, la pantalla de nuevo
+escaneo muestra el token de propiedad. Cópialo y escríbelo en la fixture:
 
 ```powershell
 node scripts/demo/write-token.mjs <token-local-de-la-interfaz>
@@ -263,7 +275,19 @@ node scripts/demo/write-token.mjs <token-local-de-la-interfaz>
 El script no recibe ni guarda credenciales de PostgreSQL. La fixture vuelve a
 leer el archivo en cada solicitud, por lo que no necesita reiniciarse.
 
-### 7.3 Permitir el objetivo privado solo en demo
+### 7.3 Ejecutar el recorrido en el navegador
+
+1. Abre <http://localhost:3000/login>.
+2. Inicia sesión con `demo.pro@vuldetected.local` y
+   `VulDetected-Demo-2026!`.
+3. Abre <http://localhost:3000/scanner/new>.
+4. Introduce `http://127-0-0-1.nip.io:8099`.
+5. Publica el token con `write-token.mjs`.
+6. Pulsa **Verificar propiedad** y luego **Iniciar escaneo**.
+7. Abre <http://localhost:3000/scans> y entra al escaneo en ejecución.
+8. Espera el 100%, abre un hallazgo y descarga JSON, CSV y PDF.
+
+### 7.4 Permitir el objetivo privado solo en demo
 
 El objetivo de la fixture es loopback. Para esta demostración local, inicia el
 worker en modo desarrollo con `DEMO_ALLOW_PRIVATE_TARGETS=true`. Esta opción
