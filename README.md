@@ -4,7 +4,7 @@ VulDetected es una plataforma web para comprobar la seguridad de objetivos
 autorizados, convertir los resultados en hallazgos comprensibles y entregar
 acciones de remediación. El repositorio contiene la aplicación Next.js, el
 modelo Drizzle/PostgreSQL, los componentes de interfaz y el worker Python que
-ejecuta los análisis.
+ejecuta los análisis
 
 Este README tiene dos objetivos:
 
