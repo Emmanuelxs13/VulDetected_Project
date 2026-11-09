@@ -137,6 +137,7 @@ Copy-Item .env.example apps/web/.env.local
 docker compose -f infra/docker-compose.dev.yml up -d postgres redis mailpit
 docker compose -f infra/docker-compose.dev.yml ps
 pnpm dev:all
+pnpm dev
 ```
 
 Antes de ejecutar migraciones, confirmar qué proceso ocupa `127.0.0.1:5432`.
@@ -147,7 +148,7 @@ al proyecto.
 
 | Servicio           | URL/puerto                          | Estado en esta verificación             |
 | ------------------ | ----------------------------------- | --------------------------------------- |
-| Web                | `http://localhost:3003`             | Página `/dev/sprint-1` y flujo autenticado verificados. |
+| Web                | `http://localhost:3000`             | Página `/dev/sprint-1` y flujo autenticado verificados. |
 | Mailpit            | `http://localhost:8025` / SMTP 1025 | Disponible.                             |
 | Redis              | 6379                                | Disponible.                             |
 | PostgreSQL local aislado | `127.0.0.1:5432`                | Base `vuldetected`, migrada y validada. |
