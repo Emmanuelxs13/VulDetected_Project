@@ -312,6 +312,15 @@
       "findings": {
         "title": "Hallazgos",
         "description": "Cada hallazgo tiene una severidad calculada con una regla documentada. Abra un hallazgo para ver la evidencia y cómo corregirlo."
+      },
+      "trafficLight": {
+        "heading": "Resumen de riesgo",
+        "detail": "Solo cuentan los hallazgos abiertos. Los marcados como resueltos o falso positivo no ti?en el sem?foro.",
+        "cards": {
+          "high": "Alta",
+          "medium": "Media",
+          "low": "Baja"
+        }
       }
     },
     "progress": {

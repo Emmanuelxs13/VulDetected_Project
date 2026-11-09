@@ -21,6 +21,8 @@ import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import type { LookupFunction } from 'node:net';
 
+import { demoAllowsPrivateTargets } from './demo-mode';
+
 /** The only ports this application ever fetches over. */
 export const ALLOWED_PORTS: readonly number[] = [80, 443];
 
@@ -87,6 +89,11 @@ export type RequestFn = (target: PinnedRequest) => Promise<RawResponse>;
 export interface SsrfDeps {
   lookup?: LookupFn;
   request?: RequestFn;
+  /**
+   * Relax the address/port rules for the demo profile. Defaults to
+   * `demoAllowsPrivateTargets()`; tests pass it explicitly.
+   */
+  allowPrivate?: boolean;
 }
 
 /**
@@ -233,7 +240,14 @@ export async function resolvePublicTarget(
   port: number,
   deps: SsrfDeps = {},
 ): Promise<PinnedTarget> {
-  if (!ALLOWED_PORTS.includes(port)) {
+  /**
+   * The demo profile deliberately relaxes the guard so a presenter can scan a
+   * local fixture site. `lib/env.ts` refuses to boot in production with this
+   * flag on, and `demoAllowsPrivateTargets()` repeats the production check.
+   */
+  const allowPrivate = deps.allowPrivate ?? demoAllowsPrivateTargets();
+
+  if (!allowPrivate && !ALLOWED_PORTS.includes(port)) {
     throw new SsrfError('blocked_port', `port ${port} is not allowlisted`);
   }
 
@@ -242,7 +256,7 @@ export async function resolvePublicTarget(
   // A literal needs no resolver: the answer set is the literal itself, so it
   // is validated (and refused) directly, with a precise reason.
   if (isIP(host) !== 0) {
-    if (isBlockedAddress(host)) {
+    if (!allowPrivate && isBlockedAddress(host)) {
       throw new SsrfError('blocked_address', `${host} is not a public address`);
     }
     return { address: host, family: isIP(host) };
@@ -265,7 +279,7 @@ export async function resolvePublicTarget(
     const address = answer.address.trim();
     if (seen.has(address)) continue;
     seen.add(address);
-    if (isBlockedAddress(address)) {
+    if (!allowPrivate && isBlockedAddress(address)) {
       throw new SsrfError('blocked_address', `${address} is not a public address`);
     }
   }
@@ -374,6 +388,7 @@ const defaultRequest: RequestFn = (target) =>
       response.on('aborted', () => failOnce(new SsrfError('network_error', 'response aborted')));
       response.on('error', (error) => failOnce(error));
     });
+    request.end();
   });
 
 function toResponse(raw: RawResponse): Response {
@@ -408,9 +423,10 @@ export async function safeFetch(input: string | URL, deps: SsrfDeps = {}): Promi
     if (current.protocol !== 'http:' && current.protocol !== 'https:') {
       throw new SsrfError('unsupported_scheme', `scheme not allowlisted: ${current.protocol}`);
     }
+    const allowPrivate = deps.allowPrivate ?? demoAllowsPrivateTargets();
     const port =
       current.port === '' ? (current.protocol === 'https:' ? 443 : 80) : Number(current.port);
-    if (!ALLOWED_PORTS.includes(port)) {
+    if (!allowPrivate && !ALLOWED_PORTS.includes(port)) {
       throw new SsrfError('blocked_port', `port ${port} is not allowlisted`);
     }
 

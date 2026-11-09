@@ -1,0 +1,36 @@
+{
+  "site": [
+    {
+      "@name": "http://fixture.test",
+      "alerts": [
+        {
+          "pluginid": "40018",
+          "name": "SQL Injection",
+          "riskcode": "3",
+          "riskdesc": "High (High)",
+          "confidence": "High",
+          "desc": "The parameter is vulnerable to SQL injection.",
+          "instances": [
+            {
+              "uri": "http://fixture.test/item?id=1",
+              "param": "id",
+              "attack": "1'",
+              "evidence": "You have an error in your SQL syntax"
+            }
+          ]
+        },
+        {
+          "pluginid": "0",
+          "name": "Directory Browsing",
+          "riskcode": "1",
+          "riskdesc": "Low (High)",
+          "confidence": "Medium",
+          "desc": "A directory listing is exposed.",
+          "instances": [
+            { "uri": "http://fixture.test/uploads/" }
+          ]
+        }
+      ]
+    }
+  ]
+}

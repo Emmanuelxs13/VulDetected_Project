@@ -39,6 +39,7 @@ venv/
 # Generated artifacts that must never be committed even if a broad glob would
 # otherwise cover them
 packages/ui/dist/
+e2e/fixtures/vulnerable-site/token.txt
 
 # NOTE: packages/db/drizzle/meta/_journal.json IS tracked on purpose.
 # Drizzle Kit's migration journal is required to replay migrations; losing it

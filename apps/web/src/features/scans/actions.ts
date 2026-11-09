@@ -8,13 +8,13 @@ import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
 import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
+import { ownershipProofOrigins, scanRequiresVerifiedDomain } from '@/lib/demo-mode';
 import { checkDomainAllowance } from '@/lib/plan-limits';
 import { consumeRateLimit, RateLimitError } from '@/lib/rate-limit';
 import { requestScanCancellation } from '@/lib/scan-cancellation';
 import { safeFetch } from '@/lib/ssrf';
 
 import { enqueueScanForDomain, type EnqueueScanOutcome } from './enqueue';
-import { requireVerifiedDomain } from './guard';
 import {
   hostnameSchema,
   normalizeHostname,
@@ -309,25 +309,32 @@ async function obtainProof(
     }
   }
 
-  let response: Response;
-  try {
-    // Same hardened egress as scan traffic (D6): this fetch can reach
-    // internal hosts exactly like a scan would, so it goes through the same
-    // gate. `SsrfError` lands in the same catch — a hostname that resolves
-    // internally can never serve a legitimate proof either.
-    response = await safeFetch(`https://${hostname}${WELL_KNOWN_PATH}`);
-  } catch {
-    return {
-      ok: false,
-      error: 'Could not fetch the well-known file for this domain.',
-    };
+  let lastFailure = 'Could not fetch the well-known file for this domain.';
+
+  for (const origin of ownershipProofOrigins(hostname)) {
+    let response: Response;
+    try {
+      // Same hardened egress as scan traffic (D6): this fetch can reach
+      // internal hosts exactly like a scan would, so it goes through the same
+      // gate. `SsrfError` lands in the same catch — a hostname that resolves
+      // internally can never serve a legitimate proof either.
+      response = await safeFetch(`${origin}${WELL_KNOWN_PATH}`);
+    } catch {
+      continue;
+    }
+
+    if (!response.ok) {
+      lastFailure = 'The well-known file is not being served for this domain.';
+      continue;
+    }
+
+    const token = (await response.text()).trim();
+    if (token !== '') {
+      return { ok: true, candidates: [token] };
+    }
   }
 
-  if (!response.ok) {
-    return { ok: false, error: 'The well-known file is not being served for this domain.' };
-  }
-
-  return { ok: true, candidates: [(await response.text()).trim()] };
+  return { ok: false, error: lastFailure };
 }
 
 export async function submitScanAction(input: {
@@ -342,12 +349,17 @@ export async function submitScanAction(input: {
     return { success: false, error: 'Unauthorized' };
   }
 
-  const scanMode = input.mode ?? 'passive';
+  const scanMode = input.mode ?? 'active';
 
   // Rate limiting: 5/h per user for active, 10/h for passive (design D4)
-  const rateLimit = scanMode === 'active' ? { limit: 5, windowSec: 3600 } : { limit: 10, windowSec: 3600 };
+  const rateLimit =
+    scanMode === 'active' ? { limit: 5, windowSec: 3600 } : { limit: 10, windowSec: 3600 };
   try {
-    await consumeRateLimit({ key: `user:${userId}:scan:${scanMode}`, limit: rateLimit.limit, windowSec: rateLimit.windowSec });
+    await consumeRateLimit({
+      key: `user:${userId}:scan:${scanMode}`,
+      limit: rateLimit.limit,
+      windowSec: rateLimit.windowSec,
+    });
   } catch (err) {
     if (err instanceof RateLimitError) {
       return { success: false, error: 'rate_limited' };
@@ -361,57 +373,43 @@ export async function submitScanAction(input: {
 
   const { normalizedHostname, url, baseUrl, port, scheme } = parsed.data;
 
-  // Análisis pasivo: permitido para cualquier URL sin verificación de propiedad
-  // Auditoría activa: requiere dominio verificado
-  if (scanMode === 'active') {
-    try {
-      await requireVerifiedDomain(userId, normalizedHostname);
-    } catch {
-      return { success: false, error: 'Domain not verified' };
-    }
+  /**
+   * HU-03 / CA-03 / CA-04: a scan requires a domain this account has PROVEN.
+   *
+   * `SCAN_REQUIRE_VERIFIED_DOMAIN` defaults to on. Turning it off is a
+   * development escape hatch for the passive mode that existed before Sprint 1,
+   * and `lib/env.ts` refuses to boot in production with it disabled.
+   */
+  const mustVerify = scanRequiresVerifiedDomain() || scanMode === 'active';
 
-    // Get domain
-    const domainRows = await db()
-      .select({ id: domains.id })
-      .from(domains)
-      .where(eq(domains.normalizedHostname, normalizedHostname))
-      .limit(1);
-
-    if (domainRows.length === 0) {
-      return { success: false, error: 'Domain not verified' };
-    }
-
-    const domainId = domainRows[0]!.id;
-
-    // Row first, then publish (SS-1..SS-6), with the sequence owned by
-    // `enqueueScanForDomain` so the scheduler cannot drift from it.
-    const outcome = await enqueueScanForDomain({
-      domainId,
-      target: { url, scheme, host: normalizedHostname, port, baseUrl },
-      actorUserId: userId,
-      source: 'manual',
-    });
-
-    if (!outcome.ok) {
-      return { success: false, error: scanOutcomeError(outcome.error) };
-    }
-
-    return { success: true, data: { scanId: outcome.scanId } };
-  }
-
-  // Análisis pasivo para cualquier URL - requiere crear/buscar dominio temporal o usar lógica diferente
-  // Por ahora, permitir escaneo pasivo sin verificación de propiedad
-  // Crear o buscar dominio para el host (sin verificar propiedad)
   const domainRows = await db()
-    .select({ id: domains.id, verified: domains.verified })
+    .select({ id: domains.id, userId: domains.userId, verified: domains.verified })
     .from(domains)
     .where(eq(domains.normalizedHostname, normalizedHostname))
     .limit(1);
 
+  const existingDomain = domainRows[0];
+
+  /**
+   * A hostname is globally unique in `domains` (design D2), so there is no
+   * "create my own row for a host someone else proved". Attaching a scan to
+   * another account's row would both hide the scan from its requester and show
+   * it to a stranger, so it is refused rather than silently re-pointed.
+   */
+  if (existingDomain !== undefined && existingDomain.userId !== userId) {
+    return { success: false, error: 'Domain not verified' };
+  }
+
+  if (mustVerify && (existingDomain === undefined || !existingDomain.verified)) {
+    return { success: false, error: 'Domain not verified' };
+  }
+
   let domainId: string;
 
-  if (domainRows.length === 0) {
-    // Crear dominio temporal para análisis pasivo (no verificado)
+  if (existingDomain !== undefined) {
+    domainId = existingDomain.id;
+  } else {
+    // Only reachable when `mustVerify` is false (development escape hatch).
     const [newDomain] = await db()
       .insert(domains)
       .values({
@@ -422,13 +420,6 @@ export async function submitScanAction(input: {
       })
       .returning({ id: domains.id });
     domainId = newDomain!.id;
-  } else if (domainRows[0]!.verified) {
-    domainId = domainRows[0]!.id;
-  } else {
-    // Dominio existe pero no verificado por este usuario - usarlo para análisis pasivo
-    // Si pertenece a otro usuario, necesitamos crear uno propio o rechazar
-    // Por simplicidad, permitir análisis pasivo creando referencia
-    domainId = domainRows[0]!.id;
   }
 
   // Row first, then publish (SS-1..SS-6)

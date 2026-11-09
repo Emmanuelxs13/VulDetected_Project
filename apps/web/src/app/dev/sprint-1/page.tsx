@@ -90,8 +90,8 @@ export default async function SprintOneDevPage() {
                 label={t('facts.emailVerified')}
                 value={user?.emailVerified ? t('values.yes') : t('values.no')}
               />
-              <Fact label={t('facts.accountStatus')} value={user?.status ?? null} />
-              <Fact label={t('facts.locale')} value={user?.locale ?? null} />
+              <Fact label={t('facts.accountStatus')} value={null} />
+              <Fact label={t('facts.locale')} value={null} />
               {/* `getSession` returns `{ session, user }`, not a flattened row. */}
               <Fact
                 label={t('facts.sessionExpires')}

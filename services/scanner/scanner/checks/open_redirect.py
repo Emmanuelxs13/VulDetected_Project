@@ -49,7 +49,9 @@ async def run(ctx: Any) -> List[Dict[str, Any]]:
 
     for name in candidates:
         try:
-            response = request(ctx, with_param(base, name, probe_url))
+            # Do NOT follow the redirect: the finding is the `Location` header
+            # itself, and following it would dial the attacker host.
+            response = request(ctx, with_param(base, name, probe_url), follow_redirects=False)
         except Exception:
             continue
 

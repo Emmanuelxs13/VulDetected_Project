@@ -23,6 +23,7 @@ The resolver is injectable so every test is hermetic.
 from __future__ import annotations
 
 import ipaddress
+import os
 import re
 import socket
 from typing import Callable, Literal, NamedTuple
@@ -75,6 +76,19 @@ _IPV4_RE = re.compile(
 )
 _NUMERIC_RE = re.compile(r"[0-9.]+\Z")
 _HEX_RE = re.compile(r"0x[0-9a-f]+\Z")
+
+
+def demo_allows_private() -> bool:
+    """True only when the demo profile is on AND we are not in production.
+
+    Mirrors `apps/web/src/lib/demo-mode.ts`. The web app refuses to boot in
+    production with the flag set, and this repeats the check so a worker started
+    from a stray environment still cannot reach internal addresses in prod.
+    """
+    return (
+        os.environ.get("DEMO_ALLOW_PRIVATE_TARGETS", "false").lower() == "true"
+        and os.environ.get("NODE_ENV", os.environ.get("ENVIRONMENT", "")).lower() != "production"
+    )
 
 
 class SsrfError(Exception):
@@ -191,14 +205,15 @@ def resolve_target(hostname: str, port: int, *, resolver: Resolver | None = None
     is what a rebinding answer looks like from here. A literal needs no
     resolver at all — its "answer set" is itself, so it is validated directly.
     """
-    if port not in ALLOWED_PORTS:
+    if port not in ALLOWED_PORTS and not demo_allows_private():
         raise SsrfError("blocked_port", f"port {port} is not allowlisted")
 
     host = normalize_host(hostname)
+    allow_private = demo_allows_private()
 
     literal_family = _literal_family(host)
     if literal_family is not None:
-        if is_blocked_address(host):
+        if not allow_private and is_blocked_address(host):
             raise SsrfError("blocked_address", f"{host} is not a public address")
         return PinnedTarget(host=host, port=port, address=host, family=literal_family)
 
@@ -217,7 +232,7 @@ def resolve_target(hostname: str, port: int, *, resolver: Resolver | None = None
         if address in seen:
             continue
         seen.add(address)
-        if is_blocked_address(address):
+        if not allow_private and is_blocked_address(address):
             raise SsrfError("blocked_address", f"{address} is not a public address")
 
     first = answers[0].strip()
