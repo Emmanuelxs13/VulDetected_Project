@@ -1,5 +1,16 @@
 ﻿export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info' | 'unclassified';
 
+/**
+ * Version of the deterministic severity rule (HU-14, CA-14).
+ *
+ * The rule below is the product's mapping; this string is how a report states
+ * WHICH rule produced a severity. Changing a mapping is a deliberate act: bump
+ * this value and record the change, rather than silently reclassifying history.
+ * The worker's external-tool mapping carries the same version in
+ * `services/scanner/scanner/severity-mapping.v1.json`.
+ */
+export const SEVERITY_MAPPING_VERSION = '1.0';
+
 export type SeverityRationale =
   | 'noHttps'
   | 'httpsDowngrade'

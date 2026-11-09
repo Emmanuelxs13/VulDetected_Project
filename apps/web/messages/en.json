@@ -312,6 +312,15 @@
       "findings": {
         "title": "Findings",
         "description": "Every finding carries a severity computed by a documented rule. Open a finding to see the evidence and how to fix it."
+      },
+      "trafficLight": {
+        "heading": "Risk summary",
+        "detail": "Only open findings count. Findings marked as resolved or false positive do not colour the light.",
+        "cards": {
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low"
+        }
       }
     },
     "progress": {

@@ -3,6 +3,8 @@
 import { Badge, Spinner } from '@vuldetected/ui';
 import { useTranslations } from 'next-intl';
 
+import { isActiveStatus, isTerminalStatus } from '../scan-status';
+
 /**
  * Scan lifecycle vocabulary (design D9).
  *
@@ -39,15 +41,7 @@ const STATUS_VARIANT: Record<ScanStatus, 'neutral' | 'info' | 'low' | 'critical'
   cancelled: 'unknown',
 };
 
-/** True for the states the scan never leaves on its own. */
-export function isTerminalStatus(status: ScanStatus): boolean {
-  return status === 'completed' || status === 'failed' || status === 'cancelled';
-}
-
-/** True while the scan is still working. */
-export function isActiveStatus(status: ScanStatus): boolean {
-  return status === 'queued' || status === 'running';
-}
+export { isActiveStatus, isTerminalStatus };
 
 export function ScanStatusBadge({ status }: { status: ScanStatus }) {
   const t = useTranslations('scan.status');

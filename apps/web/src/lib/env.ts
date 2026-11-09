@@ -156,6 +156,28 @@ const envSchema = z.object({
   /** Driver for scan events streaming (Sprint 2). */
   SCAN_EVENTS_DRIVER: z.enum(['poll', 'notify']).optional().default('poll'),
 
+  /**
+   * Sprint 1 acceptance (HU-03, CA-03/CA-04): a scan target must have a proven
+   * domain owner.
+   *
+   * Defaults to `true` because the Sprint 1 specification makes ownership a
+   * prerequisite of scanning, not an option. The passive-scanning escape hatch
+   * that existed before is still reachable by setting this to `false`, but only
+   * outside production — see the refinement below.
+   */
+  SCAN_REQUIRE_VERIFIED_DOMAIN: z.enum(['true', 'false']).optional(),
+
+  /**
+   * DEMO ONLY. Lets the egress guard reach loopback/RFC1918 addresses and
+   * non-standard ports so the demo can scan a local fixture site.
+   *
+   * This deliberately weakens the SSRF guard, so production refuses to boot with
+   * it enabled. It exists because a demonstrable Sprint 1 needs a target whose
+   * ownership the presenter can actually prove, and a public domain cannot be
+   * proven from a laptop.
+   */
+  DEMO_ALLOW_PRIVATE_TARGETS: z.enum(['true', 'false']).optional(),
+
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GITHUB_CLIENT_ID: z.string().min(1).optional(),
@@ -202,6 +224,24 @@ const productionRefinement = (value: z.infer<typeof envSchema>, ctx: z.Refinemen
       message:
         'CREDENTIALS_ENCRYPTION_KEY is required in production: it seals the scan credentials ' +
         'the settings page offers. Generate one with: openssl rand -base64 32',
+    });
+  }
+  if (value.DEMO_ALLOW_PRIVATE_TARGETS === 'true') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DEMO_ALLOW_PRIVATE_TARGETS'],
+      message:
+        'DEMO_ALLOW_PRIVATE_TARGETS must not be enabled in production: it disables the SSRF ' +
+        'guard and lets the scanner reach loopback and RFC1918 addresses.',
+    });
+  }
+  if (value.SCAN_REQUIRE_VERIFIED_DOMAIN === 'false') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['SCAN_REQUIRE_VERIFIED_DOMAIN'],
+      message:
+        'SCAN_REQUIRE_VERIFIED_DOMAIN must not be disabled in production: scanning a host ' +
+        'without proving ownership is an abuse vector (HU-03, CA-03/CA-04).',
     });
   }
 };

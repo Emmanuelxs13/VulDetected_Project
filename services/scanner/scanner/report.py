@@ -1,6 +1,5 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import json
 import os
 from typing import Any, Dict, List
 
@@ -22,13 +21,18 @@ class CallbackClient:
             "Content-Type": "application/json",
         }
 
-    def send_event(self, scan_id: str, seq: int, event_type: str, payload: Dict[str, Any] | None = None) -> None:
+    def send_event(
+        self,
+        scan_id: str,
+        seq: int,
+        event_type: str,
+        payload: Dict[str, Any] | None = None,
+    ) -> None:
         url = f"{self.callback_base_url}/api/scans/{scan_id}/events"
         body = {"seq": seq, "type": event_type, "payload": payload or {}}
         resp = httpx.post(url, headers=self._headers(), json=body, timeout=10)
         if resp.status_code >= 500:
             raise CallbackError(f"callback failed: {resp.status_code}")
-        # 4xx other than maybe acceptable? design says retry on 5xx; treat others as best effort? but follow contract
 
     def send_callback(
         self,

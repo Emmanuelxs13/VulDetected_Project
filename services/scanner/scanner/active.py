@@ -98,14 +98,22 @@ def build_finding(
     }
 
 
-def request(ctx: Any, url: str, headers: Optional[Dict[str, str]] = None):
+def request(
+    ctx: Any,
+    url: str,
+    headers: Optional[Dict[str, str]] = None,
+    follow_redirects: bool = True,
+):
     """One GET through the hardened client.
 
     The client owns SSRF resolution, TLS verification, redirect policy, the
     identity headers and the per-scan rate limit. A check must never build its
     own transport: that is how a rate limit gets bypassed.
+
+    `follow_redirects=False` is for the open-redirect check, which needs to read
+    a 3xx `Location` header instead of the page it points to.
     """
-    return ctx.client.get(url, headers=headers)
+    return ctx.client.get(url, headers=headers, follow_redirects=follow_redirects)
 
 
 def header(resp: Any, name: str) -> str:

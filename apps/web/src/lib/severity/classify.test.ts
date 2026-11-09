@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { RULE_SEVERITIES, classifyFinding, getSeverityVariant } from './classify';
+import { RULE_SEVERITIES, SEVERITY_MAPPING_VERSION, classifyFinding, getSeverityVariant } from './classify';
 
 describe('classifyFinding', () => {
   it('treats a missing HTTPS endpoint as high', () => {
@@ -115,6 +115,35 @@ describe('classifyFinding', () => {
     const first = classifyFinding('security_headers', { header: 'content-security-policy' });
     const second = classifyFinding('security_headers', { header: 'content-security-policy' });
     expect(first).toEqual(second);
+  });
+
+  it('CA-14: every finding resolves to exactly one catalog severity through a versioned rule', () => {
+    // The rule carries a version so a report can say which mapping produced a
+    // severity, and it never yields a value outside the catalog.
+    expect(SEVERITY_MAPPING_VERSION).toBe('1.0');
+
+    const catalog = ['critical', 'high', 'medium', 'low', 'info', 'unclassified'];
+    const samples: Array<{ check: string; evidence: Record<string, unknown>; title?: string }> = [
+      { check: 'tls', evidence: {} },
+      { check: 'redirects', evidence: {} },
+      { check: 'security_headers', evidence: { header: 'content-security-policy' } },
+      { check: 'cookies', evidence: {}, title: 'Cookie missing Secure flag' },
+      { check: 'xss', evidence: { parameter: 'q' } },
+      { check: 'sqli', evidence: { parameter: 'id' } },
+      { check: 'open_redirect', evidence: { parameter: 'next' } },
+      { check: 'cors', evidence: { reflected: true, allow_credentials: true } },
+      { check: 'directory_listing', evidence: {} },
+      { check: 'sensitive_files', evidence: { kind: 'env' } },
+      { check: 'unknown_future_check', evidence: {} },
+    ];
+
+    for (const sample of samples) {
+      const { severity } = classifyFinding(sample.check, sample.evidence, sample.title);
+      expect(catalog).toContain(severity);
+      // Exactly one: the function returns a single value, and a second call
+      // proves the rule is not time- or order-dependent.
+      expect(classifyFinding(sample.check, sample.evidence, sample.title).severity).toBe(severity);
+    }
   });
 
   it('never produces a severity outside the declared set for its rule', () => {

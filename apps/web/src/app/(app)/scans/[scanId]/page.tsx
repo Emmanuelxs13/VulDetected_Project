@@ -23,11 +23,15 @@ import { ScanProgressStream } from '@/features/scans/components/scan-progress-st
 import { CancelScanButton } from '@/features/scans/components/cancel-scan-button';
 import { RetryScanButton } from '@/features/scans/components/retry-scan-button';
 import type { ScanStreamEvent } from '@/features/scans/components/scan-progress-stream';
-import { isActiveStatus, ScanStatusBadge } from '@/features/scans/components/scan-status';
+import { ScanStatusBadge } from '@/features/scans/components/scan-status';
 import type { ScanStatus } from '@/features/scans/components/scan-status';
+import { isActiveStatus } from '@/features/scans/scan-status';
 import { getSeverityCounts, listFindingsPage } from '@/features/scans/queries/findings-page';
 import { db } from '@/lib/db';
 import { SEVERITY_ORDER, getSeverityVariant } from '@/lib/severity/classify';
+import { TRAFFIC_LIGHT_LABELS, levelFromCounts } from '@/lib/severity/traffic-light';
+
+import { TrafficLightSummary } from '@/features/scans/components/traffic-light-summary';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('scan');
@@ -151,6 +155,8 @@ export default async function ScanDetailPage({
   const cancellable = isActiveStatus(scan.status as ScanStatus);
   const retryable = scan.status === 'failed' || scan.status === 'cancelled';
 
+  const trafficLevel = levelFromCounts(severityTotals.counts);
+
   return (
     <Container size="default" className="flex flex-col gap-6 py-12">
       <div className="flex flex-col gap-2">
@@ -181,6 +187,21 @@ export default async function ScanDetailPage({
         <div aria-live="polite" aria-atomic="true">
           <Badge variant="critical">{errorMessage}</Badge>
         </div>
+      ) : null}
+
+      {scan.status === 'completed' ? (
+        <TrafficLightSummary
+          level={trafficLevel}
+          label={TRAFFIC_LIGHT_LABELS[trafficLevel]}
+          counts={severityTotals.counts}
+          labels={{
+            high: t('detail.trafficLight.cards.high'),
+            medium: t('detail.trafficLight.cards.medium'),
+            low: t('detail.trafficLight.cards.low'),
+            bannerHeading: t('detail.trafficLight.heading'),
+            bannerDetail: t('detail.trafficLight.detail'),
+          }}
+        />
       ) : null}
 
       <Card>

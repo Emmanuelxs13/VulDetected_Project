@@ -25,7 +25,11 @@ FIXTURES = Path(__file__).parent / "fixtures" / "fingerprints.json"
 
 
 def make_ctx(handler: Callable[..., httpx.Response]) -> Any:
-    def get(url: str, headers: Dict[str, str] | None = None) -> httpx.Response:
+    def get(
+        url: str,
+        headers: Dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> httpx.Response:
         return handler(url, headers or {})
 
     return SimpleNamespace(

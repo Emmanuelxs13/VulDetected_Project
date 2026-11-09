@@ -68,6 +68,25 @@ describe('remediation registry', () => {
     }
   });
 
+  it('CA-15: a Critical/High catalog record without remediation fails the build and names the record', () => {
+    // The assertion is intentionally written so the failure message identifies
+    // the offending rule, which is what the acceptance criterion asks for.
+    const offenders = CRITICAL_HIGH_RULES.filter((ruleKey) => {
+      const entry = remediationRegistry.find((candidate) => candidate.ruleKey === ruleKey);
+      if (!entry) return true;
+      const hasGuide =
+        entry.developerGuide.steps.length > 0 &&
+        entry.sysadminGuide.steps.length > 0 &&
+        entry.businessGuide.steps.length > 0;
+      const hasCode = entry.codeFixes.length > 0;
+      return !hasGuide || !hasCode;
+    });
+
+    expect(offenders, `Critical/High rules missing remediation: ${offenders.join(', ')}`).toEqual(
+      [],
+    );
+  });
+
   /**
    * The classifier and the registry must agree on what a rule can produce.
    *

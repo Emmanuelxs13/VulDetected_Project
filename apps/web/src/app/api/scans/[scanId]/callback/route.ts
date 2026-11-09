@@ -172,7 +172,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
                     discriminator: evidence.header ?? f.title,
                   });
 
-            const { severity } = classifyFinding(checkName, evidence, f.title ?? '');
+            const classification = classifyFinding(checkName, evidence, f.title ?? '');
+            /**
+             * External tools (Nuclei, ZAP) resolve their severity through the
+             * versioned `severity-mapping.v1.json` in the worker and send it in
+             * the payload (CA-14). The built-in checks send no severity and are
+             * classified here. An unknown or malformed value is ignored in favour
+             * of the local classifier, so a bad payload can never invent a level.
+             */
+            const provided = typeof f.severity === 'string' ? f.severity.toLowerCase() : '';
+            const severity =
+              provided === 'critical' ||
+              provided === 'high' ||
+              provided === 'medium' ||
+              provided === 'low' ||
+              provided === 'info' ||
+              provided === 'unclassified'
+                ? provided
+                : classification.severity;
             try {
               // Savepoint per row: without it, a single rejected INSERT marks
               // the surrounding transaction aborted and every later statement

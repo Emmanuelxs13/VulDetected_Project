@@ -52,7 +52,19 @@ class HardenedClient:
             verify=True,
         )
 
-    def get(self, url: str, headers: Optional[dict] = None) -> httpx.Response:
+    def get(
+        self, url: str, headers: Optional[dict] = None, follow_redirects: bool = True
+    ) -> httpx.Response:
+        """One GET through the SSRF guard.
+
+        `follow_redirects=False` returns the first 3xx response untouched instead
+        of walking the chain. Only the open-redirect check needs this: to decide
+        whether a parameter redirects off-site it must READ the `Location`
+        header, and a client that follows the chain would connect to the attacker
+        host and report the final page instead. Every hop is still validated by
+        `resolve_url` before the first socket is opened, and a response we do not
+        follow is never dialled.
+        """
         if self._on_request is not None:
             self._on_request()
 
@@ -63,6 +75,8 @@ class HardenedClient:
 
         while True:
             resp = self._client.get(req_url, headers=merged_headers)
+            if not follow_redirects:
+                return resp
             if resp.is_redirect:
                 location = resp.headers.get("location")
                 if not location:

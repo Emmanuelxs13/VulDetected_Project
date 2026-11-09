@@ -33,14 +33,14 @@ const POST_AUTH_PATH = '/dashboard';
 const REGISTER_IP_LIMIT = 5;
 
 /**
- * Where a successful registration lands.
+ * Where a successful registration lands (CA-01).
  *
- * `/login`, not `/dashboard`: `autoSignIn` is off (see `lib/auth.ts`), so no
- * session cookie exists yet and the dashboard would only bounce back here. A
- * duplicate address no longer shares this path — it returns an inline error
- * (CA-02) and the form stays put.
+ * `/dashboard`: `autoSignIn` is on (see `lib/auth.ts`), so the sign-up response
+ * carries a session cookie and the dashboard renders instead of bouncing back
+ * to `/login`. A duplicate address never reaches this path — it returns the
+ * inline "correo ya en uso" error required by CA-02 and the form stays put.
  */
-const POST_REGISTRATION_PATH = '/login';
+const POST_REGISTRATION_PATH = '/dashboard';
 
 /**
  * Auth server actions.
@@ -217,10 +217,9 @@ export async function registerAction(
     ip,
   );
 
-  // To `/login`, not `/dashboard`. `autoSignIn` is off (see `lib/auth.ts`), so no
-  // cookie was set — and arriving at `/login` is exactly what the duplicate branch
-  // above does. The audit row is written BEFORE the redirect so a navigation
-  // cannot cancel it.
+  // To `/dashboard`, not `/login`: `autoSignIn` is on (see `lib/auth.ts`), so the
+  // sign-up response already set the session cookie. The audit row is written
+  // BEFORE the redirect so a navigation cannot cancel it.
   redirect(POST_REGISTRATION_PATH);
 }
 

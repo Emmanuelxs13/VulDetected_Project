@@ -22,14 +22,14 @@ en dos lugares, gana este archivo.
 | Sprint 1  | Monorepo, sistema de diseño, autenticación con correo y contraseña                         | Completado  |
 | Sprint 2  | Entrada de URL, verificación de propiedad del dominio, worker de escaneo, progreso en vivo | Completado  |
 | Sprint 3  | Clasificación de severidad, panel, remediación por vulnerabilidad                          | Completado  |
-| Sprint 4  | OAuth, exportación PDF ejecutiva y escaneos programados                                    | En curso    |
-| Sprint 5+ | Facturación, multitenancy y endurecimiento operativo                                       | Planificado |
+| Sprint 4  | OAuth, exportación PDF ejecutiva y escaneos programados                                    | Completado  |
+| Sprint 5+ | Facturación, multitenancy y endurecimiento operativo                                       | Aplazado    |
 
 ---
 
 ## Sprint 1 — Fundamentos, sistema de diseño, autenticación
 
-**Estado:** En curso
+**Estado:** Completado
 
 **Objetivo:** un entorno local en funcionamiento, un registro arquitectónico
 defendible y un usuario que pueda registrarse e iniciar sesión.
@@ -81,7 +81,7 @@ defendible y un usuario que pueda registrarse e iniciar sesión.
 
 ## Sprint 2 — Entrada de URL, verificación de propiedad, worker de escaneo y progreso en vivo
 
-**Estado:** Planificado
+**Estado:** Completado
 
 **Objetivo:** el momento en que el producto se vuelve real — un usuario envía
 una URL de su propiedad y observa un escaneo en ejecución.
@@ -129,7 +129,7 @@ una URL de su propiedad y observa un escaneo en ejecución.
 
 ## Sprint 3 — Severidad, panel y remediación con código
 
-**Estado:** Planificado
+**Estado:** Completado
 
 **Objetivo:** convertir una lista cruda de hallazgos en algo sobre lo que cada
 audiencia pueda actuar.
@@ -166,7 +166,9 @@ audiencia pueda actuar.
 
 ---
 
-## Sprint 4 — En curso
+## Sprint 4 — OAuth, exportación PDF ejecutiva y escaneos programados
+
+**Estado:** Completado
 
 - [x] Demo plans and subscription metadata (Free, Pro, Business)
 - [x] Finding workflow states and owner-scoped status changes

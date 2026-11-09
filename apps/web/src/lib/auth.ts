@@ -155,23 +155,18 @@ function buildAuth() {
       maxPasswordLength: 128,
 
       /**
-       * Registration does NOT sign the new account in.
+       * Registration DOES sign the new account in (HU-01, CA-01).
        *
-       * This is a security decision, not a UX preference. With `autoSignIn` on
-       * (the default), a fresh registration arrives at `/dashboard` WITH a session
-       * cookie while a duplicate registration arrives at `/login` WITHOUT one — two
-       * visibly different outcomes for the same submitted form, which turns the
-       * registration page into an account-enumeration oracle.
+       * CA-01 is explicit: after a successful registration the user is sent to
+       * the initial panel. That requires a session cookie, so `autoSignIn` is on.
        *
-       * Turning it off makes both paths cookie-free and therefore identical. The
-       * library independently reaches the same conclusion: with `autoSignIn`
-       * false it sets `shouldReturnGenericDuplicateResponse` and hashes the
-       * password to equalise timing (`sign-up.mjs:155-156`, `200`).
-       *
-       * The cost is one extra form submission. That is the right price for not
-       * handing out a list of registered addresses.
+       * The earlier concern — that a signed-in success and a cookie-free
+       * duplicate would turn this form into an account-enumeration oracle — is
+       * void here: CA-02 requires the duplicate branch to say "correo ya en uso"
+       * in plain words. Enumeration resistance was already traded away on
+       * purpose, and rate limiting (per-IP on this action) is the mitigation.
        */
-      autoSignIn: false,
+      autoSignIn: true,
 
       /**
        * Our argon2id implementation. See `password.ts` for why these parameters
@@ -333,7 +328,7 @@ function buildAuth() {
        * value sitting in Postgres where a uniqueness constraint can enforce it.
        */
       database: {
-        generateId: 'uuid',
+        generateId: () => crypto.randomUUID(),
       },
 
       /**

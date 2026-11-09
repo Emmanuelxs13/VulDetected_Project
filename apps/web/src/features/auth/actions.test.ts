@@ -110,7 +110,7 @@ describe('registerAction', () => {
     dbQueue.push([]);
 
     await expect(registerAction(null, registrationForm('new@example.com'))).rejects.toThrow(
-      'NEXT_REDIRECT:/login',
+      'NEXT_REDIRECT:/dashboard',
     );
 
     expect(consumeRateLimit).toHaveBeenCalledWith({
@@ -120,11 +120,11 @@ describe('registerAction', () => {
     });
   });
 
-  it('creates the account, audits it and sends the user to the login form', async () => {
+  it('CA-01: creates the account, audits it and sends the user to the dashboard', async () => {
     dbQueue.push([]);
 
     await expect(registerAction(null, registrationForm('new@example.com'))).rejects.toThrow(
-      'NEXT_REDIRECT:/login',
+      'NEXT_REDIRECT:/dashboard',
     );
 
     expect(signUpEmail).toHaveBeenCalledTimes(1);

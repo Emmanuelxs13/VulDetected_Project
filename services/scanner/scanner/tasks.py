@@ -247,6 +247,20 @@ def run_scan(
                 client.close()
                 return {"status": "failed"}
 
+        # Optional external engines (Nuclei / OWASP ZAP). Absent configuration is
+        # a no-op; a configured engine that fails is ignored so it cannot fail the
+        # whole scan. Findings are normalised and deduplicated before they leave
+        # the worker (HU-14, CA-14 / CA-16).
+        try:
+            from .external import collect_external_findings
+
+            external = collect_external_findings(target["base_url"], domain_id)
+            if external:
+                all_findings.extend(external)
+                checks_run.append("external_engines")
+        except Exception:
+            pass
+
         _best_effort_event(cb, scan_id, ctx, "scan.completed", {})
         cb.send_callback(
             scan_id,
