@@ -42,7 +42,15 @@ test.describe('Sprint 2 — HU-07', () => {
     // The host is inside a <select>, whose <option> elements are not "visible"
     // to Playwright; assert the option exists instead of trying to see it.
     await expect(page.locator('select option', { hasText: VERIFIED_HOST }).first()).toHaveCount(1);
-    await page.getByRole('button', { name: 'Crear programación' }).click();
+
+    // The form reloads the page on success (`window.location.reload()`), so the
+    // click and the following navigation have to be awaited together. Without
+    // this, the reload lands while the test is already leaving the page and
+    // Playwright reports "navigation interrupted by another navigation".
+    await Promise.all([
+      page.waitForEvent('load'),
+      page.getByRole('button', { name: 'Crear programación' }).click(),
+    ]);
 
     // CA-23: the next run is presented in the product time zone, not raw UTC.
     const nextRunLine = page.getByText(/Próxima ejecución/).first();

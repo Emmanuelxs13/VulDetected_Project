@@ -105,6 +105,46 @@ try {
   domainId = row.domain_id;
   previousNextRunAt = row.next_run_at;
 
+  /**
+   * Wait out an in-flight scan of the same domain first.
+   *
+   * The runner skips a due window while the previous run is still queued or
+   * running (that is the overlap guard, and it is correct). But this script is
+   * driven in front of an audience, and "skipped" would look like a broken
+   * scheduler. Waiting here keeps the step deterministic without weakening the
+   * guard: we simply stop competing with a run that is already on its way.
+   */
+  const waitStartedAt = Date.now();
+  const WAIT_LIMIT_MS = 180_000;
+  for (;;) {
+    const inFlight = await sql`
+      select id, status
+      from scans
+      where domain_id = ${domainId}
+        and status in ('queued', 'running')
+      order by created_at desc
+      limit 1
+    `;
+
+    if (inFlight.length === 0) break;
+
+    if (Date.now() - waitStartedAt > WAIT_LIMIT_MS) {
+      console.error(
+        `[${SCRIPT}] A scan for ${hostname} is still ${inFlight[0].status} after ` +
+          `${Math.round(WAIT_LIMIT_MS / 1000)} s (${inFlight[0].id}).\n` +
+          `  The overlap guard would skip this window. Open that scan, or cancel it,\n` +
+          `  then re-run this script.`,
+      );
+      process.exit(1);
+    }
+
+    console.log(
+      `  waiting             ${inFlight[0].id} is ${inFlight[0].status}; ` +
+        `the overlap guard would skip this window`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+
   // One second in the past, not `now()`: `lte(next_run_at, now)` is evaluated in
   // the database, and a value that is exactly "now" from the client can land a
   // few milliseconds in the future once the clock skew of two processes is
