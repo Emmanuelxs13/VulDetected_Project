@@ -18,6 +18,7 @@ import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { computeFindingKey } from '@/lib/findings/newness';
 import { notifyScanCompleted } from '@/lib/mail/notify';
+import { isPartialScan } from '@/lib/scans/partial';
 import { classifyFinding } from '@/lib/severity/classify';
 import { owaspCategoryCodeFor } from '@/lib/severity/owasp';
 
@@ -70,7 +71,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    if (scan.status === 'completed' || scan.status === 'failed' || scan.status === 'cancelled') {
+    /**
+     * `completed` and `failed` are final: a replayed terminal callback must not
+     * re-ingest findings or move the row again.
+     *
+     * `cancelled` is deliberately NOT in this list. The user's cancel action
+     * writes `cancelled` first (the durable truth), and the worker's
+     * confirmation arrives afterwards carrying the findings it had already
+     * collected. Dropping that callback would throw away the partial results
+     * the spec requires us to keep (CA-22); the transaction below re-reads the
+     * status and refuses to move a cancelled row while still ingesting what the
+     * worker sent.
+     */
+    if (scan.status === 'completed' || scan.status === 'failed') {
       return NextResponse.json({ ok: true, already_applied: true });
     }
 
@@ -116,7 +129,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
           .from(scans)
           .where(eq(scans.id, scanId))
           .limit(1);
-        if (current[0]?.status === 'cancelled') return;
+        const alreadyCancelled = current[0]?.status === 'cancelled';
+
+        /**
+         * Was this run incomplete?
+         *
+         * Comparability is the whole point of the flag (CA-22, CA-29): a scan
+         * that ran three of ten checks has a real but partial picture, and
+         * charting it next to a complete scan would show a drop that never
+         * happened. The worker reports which checks it actually finished, so the
+         * comparison is data, not a guess. A cancelled run is partial by
+         * definition even if the last check happened to finish.
+         */
+        const requestedChecks = Array.isArray(scan.checks) ? scan.checks : [];
+        const ranChecks = Array.isArray(body.checks_run)
+          ? body.checks_run.filter((name: unknown): name is string => typeof name === 'string')
+          : [];
+        const partial = isPartialScan({
+          status,
+          requestedChecks,
+          ranChecks,
+          alreadyCancelled,
+        });
 
         /**
          * The previous completed scan of this domain, newest first.
@@ -124,7 +158,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
          * "New" is a comparison, so it needs the baseline at ingest time: the
          * next scan will compare against THIS one, and recomputing later would
          * rewrite history. A first scan has no baseline and therefore marks
-         * every finding new.
+         * every finding new. Partial scans are never a baseline: their findings
+         * set is incomplete, so treating it as "everything else is new" would
+         * flood the next scan with false new-vulnerability claims.
          */
         const previousScanRows = await tx
           .select({ id: scans.id })
@@ -134,6 +170,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
               eq(scans.domainId, scan.domainId),
               ne(scans.id, scanId),
               eq(scans.status, 'completed'),
+              eq(scans.partial, false),
             ),
           )
           .orderBy(desc(scans.createdAt))
@@ -221,17 +258,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
           }
         }
 
-        const update: Record<string, unknown> = {
-          status,
-          finishedAt: new Date(),
-        };
-        if (body.error) {
-          (update as { error?: unknown }).error = body.error;
+        const update: Record<string, unknown> = { partial };
+        if (!alreadyCancelled) {
+          update.status = status;
+          update.finishedAt = new Date();
+          if (body.error) {
+            (update as { error?: unknown }).error = body.error;
+          }
         }
         await tx
           .update(scans)
-          .set(update as unknown as Record<string, Date | string>)
-          .where(and(eq(scans.id, scanId), ne(scans.status, 'cancelled')));
+          .set(update as unknown as Record<string, Date | string | boolean>)
+          .where(eq(scans.id, scanId));
       });
 
       if (status === 'completed') {

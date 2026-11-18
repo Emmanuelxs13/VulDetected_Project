@@ -152,6 +152,31 @@ export async function readSeverityCounts(scanId: string): Promise<SeverityCounts
 }
 
 /**
+ * The user cancelled a scan: confirm it by mail.
+ *
+ * Deliberately sent from the cancel action rather than from the worker's
+ * callback. The action is the only place a scan becomes `cancelled`, so the
+ * message is deterministic and cannot be lost when the worker never started
+ * (a queued scan has no callback at all). It also cannot be sent twice for the
+ * same cancellation.
+ */
+export async function notifyScanCancelled(scanId: string): Promise<void> {
+  const context = await loadScanMailContext(scanId);
+  if (context === null) {
+    return;
+  }
+
+  await queue(
+    'scan_cancelled',
+    { to: context.userEmail, locale: context.locale },
+    {
+      hostname: context.hostname,
+      scanUrl: `${appUrl()}/scans/${scanId}`,
+    },
+  );
+}
+
+/**
  * After a scan reaches a terminal state: the summary email, plus a dedicated
  * alert when the run found something critical.
  *

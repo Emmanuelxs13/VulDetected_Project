@@ -56,6 +56,26 @@ export const scans = pgTable(
     status: scanStatusEnum('status').notNull().default('queued'),
 
     /**
+     * True when the scan finished without completing its whole check set and the
+     * partial results were KEPT (Sprint 2, cancellation).
+     *
+     * ## Why this is a column and not a sixth status
+     *
+     * A cancelled scan is `cancelled`; that is its lifecycle state, and the enum
+     * already says it. What the history needs to know is different: whether the
+     * findings it produced may be compared with a complete scan's. A cancelled
+     * scan whose worker was stopped after three checks has a real but incomplete
+     * picture, and charting it next to complete scans would show a drop that
+     * never happened.
+     *
+     * So the row keeps its status and carries `partial = true`, which every
+     * comparison query filters out. Folding this into the status enum would force
+     * `cancelled` and `partial` to compete for one slot, and they are not the same
+     * question.
+     */
+    partial: boolean('partial').notNull().default(false),
+
+    /**
      * The checks to run, as a JSON array.
      *
      * Defaults to the full check set (four passive checks plus six active ones).

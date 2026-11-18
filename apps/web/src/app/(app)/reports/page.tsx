@@ -79,7 +79,16 @@ export default async function ReportsPage() {
       })
       .from(scans)
       .innerJoin(domains, eq(scans.domainId, domains.id))
-      .where(and(eq(domains.userId, userId), eq(scans.status, 'completed')))
+      .where(
+        and(
+          eq(domains.userId, userId),
+          eq(scans.status, 'completed'),
+          // A completed-but-partial run has an incomplete picture; listing it
+          // beside complete scans would imply comparability it does not have
+          // (CA-22 / CA-29).
+          eq(scans.partial, false),
+        ),
+      )
       .orderBy(desc(scans.createdAt))
       .limit(20),
   ]);

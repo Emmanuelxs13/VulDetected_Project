@@ -301,6 +301,10 @@
       "verifiedDomainLabel": "Verified domain:",
       "checksLabel": "Checks:",
       "errorLabel": "Error:",
+      "partial": {
+        "title": "Partial results",
+        "description": "This scan did not finish every check, so its findings are kept but do not count toward the comparative history or the traffic light."
+      },
       "sessionRequired": {
         "title": "No active session",
         "description": "Sign in to see the progress of your scans."

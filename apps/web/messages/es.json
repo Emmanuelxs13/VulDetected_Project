@@ -301,6 +301,10 @@
       "verifiedDomainLabel": "Dominio verificado:",
       "checksLabel": "Comprobaciones:",
       "errorLabel": "Error:",
+      "partial": {
+        "title": "Resultados parciales",
+        "description": "Este escaneo no completó todas sus comprobaciones, así que sus hallazgos se conservan pero no cuentan para el historial comparativo ni para el semáforo."
+      },
       "sessionRequired": {
         "title": "Sesión no activa",
         "description": "Inicia sesión para ver el progreso de tus escaneos."

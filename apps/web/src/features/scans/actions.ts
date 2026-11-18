@@ -8,6 +8,7 @@ import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
 import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
+import { notifyScanCancelled } from '@/lib/mail/notify';
 import { ownershipProofOrigins, scanRequiresVerifiedDomain } from '@/lib/demo-mode';
 import { checkDomainAllowance } from '@/lib/plan-limits';
 import { consumeRateLimit, RateLimitError } from '@/lib/rate-limit';
@@ -500,6 +501,17 @@ export async function cancelScanAction(scanId: string): Promise<ActionResult<nul
     targetId: scanId,
     metadata: { workerSignalled: signalled },
   });
+
+  /**
+   * The confirmation mail. Wrapped because a mail problem must not fail the
+   * cancellation the user already got: the row is cancelled, and the outbox
+   * write is retried on its own schedule if it fails here.
+   */
+  try {
+    await notifyScanCancelled(scanId);
+  } catch (error) {
+    console.error('[mail] could not queue the cancellation notification', error);
+  }
 
   return { success: true, data: null };
 }

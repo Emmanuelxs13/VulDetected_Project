@@ -200,7 +200,14 @@ export async function getDomainPostureTrends(ownerUserId: string): Promise<Postu
     })
     .from(scans)
     .innerJoin(domains, eq(scans.domainId, domains.id))
-    .where(and(eq(domains.userId, ownerUserId), eq(scans.status, 'completed')))
+    .where(
+      and(
+        eq(domains.userId, ownerUserId),
+        eq(scans.status, 'completed'),
+        // Comparability (CA-22/CA-29): a partial run is not a data point.
+        eq(scans.partial, false),
+      ),
+    )
     .orderBy(desc(scans.createdAt))
     .limit(40);
 

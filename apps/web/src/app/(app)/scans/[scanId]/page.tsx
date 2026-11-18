@@ -88,6 +88,7 @@ export default async function ScanDetailPage({
       targetUrl: scans.targetUrl,
       status: scans.status,
       checks: scans.checks,
+      partial: scans.partial,
       error: scans.error,
       createdAt: scans.createdAt,
       startedAt: scans.startedAt,
@@ -181,6 +182,12 @@ export default async function ScanDetailPage({
             {t('detail.checksLabel')} <span className="font-mono">{checks.join(', ')}</span>
           </p>
         ) : null}
+        {scan.partial ? (
+          <div className="flex flex-col gap-1 rounded-md border border-border bg-surface-raised p-3">
+            <Badge variant="neutral">{t('detail.partial.title')}</Badge>
+            <p className="text-xs text-text-muted">{t('detail.partial.description')}</p>
+          </div>
+        ) : null}
       </div>
 
       {errorMessage ? (
@@ -189,7 +196,7 @@ export default async function ScanDetailPage({
         </div>
       ) : null}
 
-      {scan.status === 'completed' ? (
+      {scan.status === 'completed' && !scan.partial ? (
         <TrafficLightSummary
           level={trafficLevel}
           label={TRAFFIC_LIGHT_LABELS[trafficLevel]}
