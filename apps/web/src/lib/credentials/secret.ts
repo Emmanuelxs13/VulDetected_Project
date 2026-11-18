@@ -21,7 +21,7 @@ import { z } from 'zod';
  * name is a token and the value rejects CR and LF explicitly.
  */
 
-export const CREDENTIAL_KINDS = ['basic', 'bearer', 'header'] as const;
+export const CREDENTIAL_KINDS = ['basic', 'bearer', 'header', 'form'] as const;
 
 export type CredentialKind = (typeof CREDENTIAL_KINDS)[number];
 
@@ -68,6 +68,38 @@ const headerValueSchema = z
     message: 'Header value must not contain line breaks.',
   });
 
+/**
+ * A form-login field name.
+ *
+ * HTML form field names are not header tokens: `user[name]`, `login[email]` and
+ * `password-confirm` are all ordinary, and a pattern stricter than the ones
+ * browsers accept would reject a working login. CR and LF are still refused,
+ * because the name ends up in a urlencoded body and a newline there is a
+ * parameter-injection attempt.
+ */
+const formFieldNameSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .refine((name) => !/[\r\n]/.test(name), {
+    message: 'Form field names must not contain line breaks.',
+  });
+
+/** A root-relative path: the login page of the scanned site. */
+const formPathSchema = z
+  .string()
+  .min(1)
+  .max(2048)
+  .refine((value) => value.startsWith('/'), {
+    message: 'The login path must start with "/".',
+  })
+  .refine((value) => !value.startsWith('//'), {
+    message: 'The login path must be a path, not a protocol-relative URL.',
+  })
+  .refine((value) => !/[\r\n]/.test(value), {
+    message: 'The login path must not contain line breaks.',
+  });
+
 export const credentialSecretSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('basic'),
@@ -82,6 +114,24 @@ export const credentialSecretSchema = z.discriminatedUnion('kind', [
     kind: z.literal('header'),
     headerName: headerNameSchema,
     headerValue: headerValueSchema,
+  }),
+  /**
+   * A form login (HU-04, CA-25 to CA-27, ADR 0020).
+   *
+   * `successMarker` is required, not optional. A login that answers 200 is not
+   * a login that worked — many applications answer 200 with "invalid
+   * credentials" — so the worker needs a string that only appears when the
+   * session is real. Without it, "authenticated scan" would be an unverified
+   * claim.
+   */
+  z.strictObject({
+    kind: z.literal('form'),
+    loginPath: formPathSchema,
+    usernameField: formFieldNameSchema,
+    passwordField: formFieldNameSchema,
+    username: z.string().min(1).max(256),
+    password: z.string().min(1).max(1024),
+    successMarker: z.string().trim().min(1).max(200),
   }),
 ]);
 

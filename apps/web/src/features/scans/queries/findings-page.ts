@@ -175,6 +175,7 @@ export async function getSeverityCounts(
 }
 
 export interface PostureTrend {
+  domainId: string;
   hostname: string;
   latestScanId: string;
   latestAt: Date;
@@ -200,7 +201,14 @@ export async function getDomainPostureTrends(ownerUserId: string): Promise<Postu
     })
     .from(scans)
     .innerJoin(domains, eq(scans.domainId, domains.id))
-    .where(and(eq(domains.userId, ownerUserId), eq(scans.status, 'completed')))
+    .where(
+      and(
+        eq(domains.userId, ownerUserId),
+        eq(scans.status, 'completed'),
+        // Comparability (CA-10): a partial run is not a data point.
+        eq(scans.partial, false),
+      ),
+    )
     .orderBy(desc(scans.createdAt))
     .limit(40);
 
@@ -246,6 +254,7 @@ export async function getDomainPostureTrends(ownerUserId: string): Promise<Postu
     const previousRisky = previous ? (riskyByScan.get(previous.id) ?? 0) : null;
 
     trends.push({
+      domainId: latest.domainId,
       hostname: latest.hostname,
       latestScanId: latest.id,
       latestAt: latest.createdAt,

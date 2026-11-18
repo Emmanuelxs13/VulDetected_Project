@@ -129,7 +129,19 @@
       "continueGoogle": "Continuar con Google",
       "continueGithub": "Continuar con GitHub",
       "signUpGoogle": "Registrarse con Google",
-      "signUpGithub": "Registrarse con GitHub"
+      "signUpGithub": "Registrarse con GitHub",
+      "simulated": "Proveedor de identidad simulado: este inicio de sesión no contacta con Google ni con GitHub. Se usa porque la demo no dispone de credenciales reales.",
+      "errors": {
+        "accountNotLinked": "Ya existe una cuenta con ese correo y todavía no está vinculada a este proveedor. Inicia sesión con tu contraseña y vincula el proveedor desde ajustes, o verifica tu correo y vuelve a intentarlo.",
+        "emailNotVerified": "El proveedor no confirma que ese correo esté verificado, así que no se inició sesión. Verifica tu correo y vuelve a intentarlo.",
+        "emailDoesNotMatch": "El correo del proveedor no coincide con el de tu cuenta. Inicia sesión con tu contraseña.",
+        "alreadyLinkedToAnotherUser": "Ese proveedor ya está vinculado a otra cuenta.",
+        "unableToLink": "No se pudo vincular el proveedor a tu cuenta. Inténtalo de nuevo.",
+        "unableToGetProfile": "No se pudo obtener tu perfil del proveedor. Inténtalo de nuevo.",
+        "signupDisabled": "El registro con proveedores externos está deshabilitado.",
+        "authorizationExpired": "La autorización expiró o no es válida. Inténtalo de nuevo.",
+        "generic": "No se pudo completar el inicio de sesión con el proveedor. Inténtalo de nuevo o usa tu contraseña."
+      }
     }
   },
   "dashboard": {
@@ -301,6 +313,25 @@
       "verifiedDomainLabel": "Dominio verificado:",
       "checksLabel": "Comprobaciones:",
       "errorLabel": "Error:",
+    "authenticated": {
+      "title": "Escaneo autenticado",
+      "description": "El escáner inició sesión con la credencial guardada y también revisó las páginas que están detrás del login."
+    },
+    "loginFailed": {
+      "title": "No se pudo iniciar sesión",
+      "description": "El escaneo se detuvo para no presentar un resultado anónimo como si hubiera cubierto las páginas privadas.",
+      "reasons": {
+        "invalid_credentials": "El sitio rechazó el usuario o la contraseña guardados.",
+        "marker_missing": "La respuesta no contenía el texto que confirma la sesión. Revisa la credencial.",
+        "cross_origin_login": "La ruta del formulario de acceso apunta fuera del dominio escaneado.",
+        "cross_origin_redirect": "El formulario de acceso redirigió fuera del dominio escaneado.",
+        "transport_error": "No se pudo completar el envío del formulario de acceso."
+      }
+    },
+      "partial": {
+        "title": "Resultados parciales",
+        "description": "Este escaneo no completó todas sus comprobaciones, así que sus hallazgos se conservan pero no cuentan para el historial comparativo ni para el semáforo."
+      },
       "sessionRequired": {
         "title": "Sesión no activa",
         "description": "Inicia sesión para ver el progreso de tus escaneos."
@@ -523,6 +554,15 @@
     "token": "Token",
     "headerName": "Nombre de la cabecera",
     "headerValue": "Valor de la cabecera",
+    "loginPath": "Ruta del formulario de acceso",
+    "loginPathPlaceholder": "/login",
+    "usernameField": "Campo del usuario",
+    "usernameFieldPlaceholder": "email",
+    "passwordField": "Campo de la contraseña",
+    "passwordFieldPlaceholder": "password",
+    "successMarker": "Texto que confirma la sesión",
+    "successMarkerPlaceholder": "Cerrar sesión",
+    "successMarkerHint": "Una cadena que solo aparece con la sesión iniciada. Sin ella el escaneo no da la autenticación por buena.",
     "save": "Guardar credencial",
     "saving": "Guardando…",
     "saved": "Credencial guardada. Se usará en el próximo escaneo.",
@@ -535,7 +575,8 @@
     "kinds": {
       "basic": "Usuario y contraseña",
       "bearer": "Token Bearer",
-      "header": "Cabecera personalizada"
+      "header": "Cabecera personalizada",
+      "form": "Formulario de acceso"
     },
     "errors": {
       "codes": {
@@ -604,6 +645,55 @@
         "exports": "Exportar"
       }
     },
+    "history": {
+      "title": "Historial comparativo",
+      "subtitle": "Instantáneas de {host}, de la más reciente a la más antigua.",
+      "back": "Volver a informes",
+      "sessionRequired": {
+        "title": "Sesión no activa",
+        "description": "Inicia sesión para ver el historial de tus dominios."
+      },
+      "howToRead": {
+        "title": "Cómo leer este historial",
+        "description": "Cada fila es una foto de un escaneo, no una nota única.",
+        "snapshots": "Las columnas muestran cuántos hallazgos abiertos había por severidad en ese momento. No hay una nota compuesta porque escondería qué severidad cambió.",
+        "comparability": "Un escaneo se compara solo con el anterior completo y comparable. Si el modo de escaneo o el catálogo de severidad cambió, el cambio no se muestra: la diferencia sería nuestra, no del sitio."
+      },
+      "noComparablePair": "Todavía no hay dos escaneos comparables en este dominio, así que no hay un cambio que mostrar.",
+      "empty": {
+        "title": "Todavía no hay escaneos de este dominio",
+        "description": "Cuando termine el primer escaneo, aparecerá aquí con sus cifras."
+      },
+      "table": {
+        "title": "Escaneos",
+        "description": "Del más reciente al más antiguo. Cada fila enlaza al detalle y a su reporte ejecutivo.",
+        "date": "Fecha",
+        "status": "Estado",
+        "mode": "Modo",
+        "total": "Total",
+        "risky": "Críticos/altos",
+        "delta": "Cambio de riesgo",
+        "report": "Reporte"
+      },
+      "mode": {
+        "passive": "Pasivo",
+        "active": "Activo"
+      },
+      "badge": {
+        "demo": "Datos demo",
+        "partial": "Parcial",
+        "notCompleted": "No terminó",
+        "partialNotComparable": "Parcial: no comparable",
+        "notComparable": "No comparable",
+        "first": "Primer escaneo comparable",
+        "modeChanged": "Cambió el modo",
+        "catalogChanged": "Cambió el catálogo",
+        "demoMixed": "Mezcla demo y real",
+        "improved": "Mejoró",
+        "worsened": "Empeoró",
+        "unchanged": "Sin cambios"
+      }
+    },
     "pdf": {
       "title": "Reporte ejecutivo de seguridad",
       "subtitle": "Resultado del escaneo de {host}",
@@ -613,6 +703,8 @@
       "findingsHint": "Ordenados de mayor a menor severidad. Se incluyen todos los hallazgos registrados por el escaneo.",
       "noFindings": "Este escaneo no registró hallazgos. Un escaneo completado sin hallazgos es un resultado válido, no un error.",
       "remediation": "Cómo corregirlo",
+      "partialNotice": "Resultados parciales: este escaneo no completó todas sus comprobaciones. Las cifras describen solo lo que se alcanzó a revisar, así que no son comparables con el historial ni con el semáforo.",
+      "demoNotice": "Datos de demostración: este informe se generó con hallazgos de ejemplo. No corresponde a un escaneo real de un dominio en producción.",
       "page": "Página {current} de {total}",
       "severityCount": "{severity}: {count}",
       "fields": {
@@ -675,6 +767,111 @@
       "empty": {
         "title": "Todavía no hay dominios verificados",
         "description": "Verifica un dominio desde la página de escaneos para poder escanearlo."
+      }
+    },
+    "billing": {
+      "title": "Facturación",
+      "description": "Tu plan, su estado y lo que incluye.",
+      "hint": "Los planes pagos se gestionan desde la pantalla de facturación.",
+      "action": "Ver facturación"
+    }
+  },
+  "billing": {
+    "pageTitle": "Facturación y plan",
+    "pageDescription": "Revisa tu plan, su estado y el uso que estás haciendo de él. Los cambios de plan se confirman por webhook, igual que con una pasarela real.",
+    "demoBadge": "Modo demostración",
+    "demoNoticeTitle": "Modo demostración: no se realiza ningún cobro",
+    "demoNoticeDescription": "Los pagos se procesan con un proveedor simulado. Ninguna tarjeta se cobra y ninguna suscripción genera una obligación de pago.",
+    "notConfiguredTitle": "Facturación no configurada",
+    "notConfiguredDescription": "No hay proveedor de pagos activo en este entorno. Los planes se muestran en modo lectura.",
+    "current": {
+      "title": "Suscripción actual",
+      "description": "Estado que el proveedor confirmó por última vez.",
+      "plan": "Plan",
+      "status": "Estado",
+      "periodEnd": "Fin del período",
+      "lastCheckout": "Último intento de pago",
+      "noCheckout": "Sin intentos de pago",
+      "checkoutSummary": "{plan} · {status}",
+      "cancellationScheduledTitle": "Cancelación programada",
+      "cancellationScheduledDescription": "El plan sigue activo hasta el fin del período pagado. Volver a pagar cancela la baja.",
+      "appliedEvents": "Eventos del proveedor aplicados a esta cuenta: {count}"
+    },
+    "usage": {
+      "title": "Uso del plan",
+      "description": "Lo que estás consumiendo de los límites del plan actual.",
+      "domains": "Dominios",
+      "scansThisMonth": "Escaneos este mes",
+      "activeScans": "Escaneos activos",
+      "schedules": "Programaciones",
+      "unlimited": "sin límite"
+    },
+    "plans": {
+      "currentBadge": "Plan actual",
+      "pricePending": "[COMPLETAR: precios definitivos]",
+      "freePrice": "Gratis",
+      "domains": "{count} dominios",
+      "scans": "{count} escaneos al mes",
+      "unlimitedScans": "Escaneos sin límite",
+      "concurrent": "{count} escaneos simultáneos",
+      "schedules": "{count} programaciones",
+      "changeTo": "Cambiar a {plan}",
+      "freeHint": "El plan Free es donde empieza toda cuenta y no se compra."
+    },
+    "status": {
+      "trialing": "En prueba",
+      "active": "Activo",
+      "past_due": "Pago pendiente",
+      "cancelled": "Cancelado"
+    },
+    "checkoutStatus": {
+      "pending": "Pendiente",
+      "paid": "Pagado",
+      "declined": "Rechazado"
+    },
+    "cancelButton": "Cancelar renovación",
+    "cancelErrorTitle": "No se pudo solicitar la cancelación",
+    "checkoutErrorTitle": "No se pudo iniciar el pago",
+    "planLabel": "Plan",
+    "priceLabel": "Precio",
+    "pricePending": "[COMPLETAR: precio definitivo]",
+    "checkoutStatusLabel": "Estado del checkout",
+    "errors": {
+      "invalidPlan": "Ese plan no se puede comprar.",
+      "providerNotConfigured": "La facturación no está configurada en este entorno.",
+      "checkoutFailed": "No se pudo crear el checkout. Inténtalo de nuevo.",
+      "cancelFailed": "No se pudo solicitar la cancelación."
+    },
+    "demoCheckout": {
+      "pageTitle": "Pasarela de pago simulada",
+      "pageDescription": "Esta página sustituye a la pasarela real. Al pagar se envía un webhook firmado a VulDetected; la suscripción cambia solo cuando ese webhook se aplica.",
+      "payTitle": "Pagar el plan {plan}",
+      "cardLegend": "Elige una tarjeta de prueba",
+      "approvedLabel": "Pago aprobado",
+      "approvedHint": "El webhook confirma el pago y activa el plan.",
+      "declinedLabel": "Pago rechazado",
+      "declinedHint": "El webhook registra el rechazo y no cambia el plan.",
+      "payButton": "Pagar",
+      "paying": "Enviando webhook...",
+      "resultTitle": "Respuesta del webhook",
+      "errorTitle": "El webhook no aceptó el evento",
+      "resilienceTitle": "Pruebas de robustez del webhook",
+      "resilienceDescription": "Dos casos que una pasarela real produce todo el tiempo: reintentos y eventos fuera de orden.",
+      "replayButton": "Reenviar el mismo evento",
+      "outOfOrderButton": "Enviar un rechazo con hora anterior",
+      "outcome": {
+        "applied": "Aplicado: el estado de la suscripción cambió.",
+        "declined": "Rechazado: el intento de pago quedó registrado y el plan no cambió.",
+        "duplicate": "Duplicado: el evento ya estaba registrado y no se aplicó dos veces.",
+        "stale": "Descartado por antigüedad: es más viejo que el último evento aplicado.",
+        "ignored": "Ignorado: no corresponde a esta cuenta."
+      },
+      "error": {
+        "provider_off": "El proveedor simulado no está activo (DEMO_MODE).",
+        "checkout_missing": "El checkout no existe.",
+        "card_unknown": "Tarjeta no reconocida por el simulador.",
+        "webhook_failed": "El webhook respondió {status}. Una pasarela real reintentaría.",
+        "unknown_intent": "Acción no reconocida."
       }
     }
   }

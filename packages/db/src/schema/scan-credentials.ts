@@ -69,9 +69,13 @@ export const scanCredentials = pgTable(
 
     /**
      * Authentication scheme the worker should apply. `text` + CHECK instead of an
-     * enum for the same reason `domains.verification_method` is: a three-value
+     * enum for the same reason `domains.verification_method` is: a small
      * vocabulary does not deserve a database type, but it does deserve rejection
      * at the boundary.
+     *
+     * `form` (HU-04) is a state change rather than a header: the worker POSTs the
+     * login form once and every later request rides the session cookie it gets
+     * back. See `docs/adr/0020-intranet-hoja-de-ruta-fixture.md`.
      */
     kind: text('kind').notNull().default('basic'),
 
@@ -106,10 +110,10 @@ export const scanCredentials = pgTable(
     /** "Everything I stored for my account". */
     userIdx: index('scan_credentials_user_idx').on(table.userId),
 
-    /** Only the three schemes the worker knows how to apply. */
+    /** Only the schemes the worker knows how to apply. */
     kindCheck: check(
       'scan_credentials_kind_check',
-      sql`${table.kind} IN ('basic', 'bearer', 'header')`,
+      sql`${table.kind} IN ('basic', 'bearer', 'header', 'form')`,
     ),
   }),
 );

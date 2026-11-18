@@ -4,6 +4,8 @@ import { Button } from '@vuldetected/ui';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { formatProductDateTime } from '@/lib/format/datetime';
+
 import { deleteScheduleAction, updateScheduleAction } from '../schedule-actions';
 
 export function SchedulesList({
@@ -71,7 +73,7 @@ export function SchedulesList({
             </span>
             <span className="text-xs text-text-muted">
               {t('schedules.nextRun')}:{' '}
-              {schedule.nextRunAt ? schedule.nextRunAt.replace('T', ' ').slice(0, 16) : '—'}
+              {schedule.nextRunAt ? formatProductDateTime(schedule.nextRunAt) : '—'}
             </span>
           </div>
           <div className="flex items-center gap-2">

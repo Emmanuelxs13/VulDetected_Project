@@ -65,6 +65,40 @@ class HardenedClient:
         `resolve_url` before the first socket is opened, and a response we do not
         follow is never dialled.
         """
+        return self._request("GET", url, headers=headers, follow_redirects=follow_redirects)
+
+    def post(
+        self,
+        url: str,
+        data: Optional[Dict[str, str]] = None,
+        headers: Optional[dict] = None,
+        follow_redirects: bool = True,
+    ) -> httpx.Response:
+        """One form-encoded POST through the same guard as `get`.
+
+        The login form is the only POST this worker sends (HU-04). It has to
+        share the GET path's SSRF resolution, rate limit and cancellation
+        checkpoints — a second transport would be a second place to forget one —
+        and it must keep the cookie jar, which is how the session survives into
+        the authenticated GETs.
+        """
+        return self._request(
+            "POST",
+            url,
+            headers=headers,
+            follow_redirects=follow_redirects,
+            data=data or {},
+        )
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: Optional[dict] = None,
+        follow_redirects: bool = True,
+        **kwargs,
+    ) -> httpx.Response:
         if self._on_request is not None:
             self._on_request()
 
@@ -72,9 +106,10 @@ class HardenedClient:
         hops_followed = 0
         req_url = current.url
         merged_headers = {**self._default_headers, **(headers or {})}
+        body = dict(kwargs)
 
         while True:
-            resp = self._client.get(req_url, headers=merged_headers)
+            resp = self._client.request(method, req_url, headers=merged_headers, **body)
             if not follow_redirects:
                 return resp
             if resp.is_redirect:
@@ -89,6 +124,12 @@ class HardenedClient:
                 current = ssrf.resolve_redirect(current, location, hops_followed=hops_followed)
                 req_url = current.url
                 hops_followed += 1
+                # A 303, and the 301/302 that browsers also treat this way, turn
+                # the request into a GET. Keeping the form body on the next hop
+                # would re-submit the password to a page that never asked for it.
+                if method != "GET":
+                    method = "GET"
+                    body = {}
                 # Each hop is a new request and therefore a new rate-limit and
                 # cancellation checkpoint.
                 if self._on_request is not None:

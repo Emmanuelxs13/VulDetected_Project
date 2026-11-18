@@ -129,7 +129,19 @@
       "continueGoogle": "Continue with Google",
       "continueGithub": "Continue with GitHub",
       "signUpGoogle": "Sign up with Google",
-      "signUpGithub": "Sign up with GitHub"
+      "signUpGithub": "Sign up with GitHub",
+      "simulated": "Simulated identity provider: this sign-in does not contact Google or GitHub. It is used because the demo has no real credentials.",
+      "errors": {
+        "accountNotLinked": "An account with that address already exists and is not linked to this provider yet. Sign in with your password and link the provider from settings, or verify your email and try again.",
+        "emailNotVerified": "The provider does not assert that this address is verified, so no session was started. Verify your email and try again.",
+        "emailDoesNotMatch": "The provider's address does not match your account. Sign in with your password.",
+        "alreadyLinkedToAnotherUser": "That provider is already linked to another account.",
+        "unableToLink": "The provider could not be linked to your account. Try again.",
+        "unableToGetProfile": "Your profile could not be read from the provider. Try again.",
+        "signupDisabled": "Sign-up with external providers is disabled.",
+        "authorizationExpired": "The authorization expired or is not valid. Try again.",
+        "generic": "Social sign-in could not be completed. Try again or use your password."
+      }
     }
   },
   "dashboard": {
@@ -301,6 +313,25 @@
       "verifiedDomainLabel": "Verified domain:",
       "checksLabel": "Checks:",
       "errorLabel": "Error:",
+    "authenticated": {
+      "title": "Authenticated scan",
+      "description": "The scanner signed in with the stored credential and also checked the pages behind the login."
+    },
+    "loginFailed": {
+      "title": "Sign-in failed",
+      "description": "The scan stopped so an anonymous result is never presented as if it had covered the private pages.",
+      "reasons": {
+        "invalid_credentials": "The site rejected the stored username or password.",
+        "marker_missing": "The response did not contain the text that confirms the session. Check the credential.",
+        "cross_origin_login": "The login form path points outside the scanned domain.",
+        "cross_origin_redirect": "The login form redirected outside the scanned domain.",
+        "transport_error": "The login form could not be submitted."
+      }
+    },
+      "partial": {
+        "title": "Partial results",
+        "description": "This scan did not finish every check, so its findings are kept but do not count toward the comparative history or the traffic light."
+      },
       "sessionRequired": {
         "title": "No active session",
         "description": "Sign in to see the progress of your scans."
@@ -523,6 +554,15 @@
     "token": "Token",
     "headerName": "Header name",
     "headerValue": "Header value",
+    "loginPath": "Login form path",
+    "loginPathPlaceholder": "/login",
+    "usernameField": "Username field",
+    "usernameFieldPlaceholder": "email",
+    "passwordField": "Password field",
+    "passwordFieldPlaceholder": "password",
+    "successMarker": "Text that confirms the session",
+    "successMarkerPlaceholder": "Sign out",
+    "successMarkerHint": "A string that only appears once the session is signed in. Without it the scan does not accept the login as successful.",
     "save": "Save credential",
     "saving": "Saving…",
     "saved": "Credential saved. It will be used on the next scan.",
@@ -535,7 +575,8 @@
     "kinds": {
       "basic": "Username and password",
       "bearer": "Bearer token",
-      "header": "Custom header"
+      "header": "Custom header",
+      "form": "Login form"
     },
     "errors": {
       "codes": {
@@ -604,6 +645,55 @@
         "exports": "Export"
       }
     },
+    "history": {
+      "title": "Comparative history",
+      "subtitle": "Snapshots of {host}, newest first.",
+      "back": "Back to reports",
+      "sessionRequired": {
+        "title": "No active session",
+        "description": "Sign in to see the history of your domains."
+      },
+      "howToRead": {
+        "title": "How to read this history",
+        "description": "Each row is one scan's snapshot, not a single score.",
+        "snapshots": "The columns show how many open findings of each severity existed at that moment. There is no composite score because it would hide which severity moved.",
+        "comparability": "A scan is compared only with the previous complete, comparable one. When the scan mode or the severity catalogue changed, the change is not shown: the difference would be ours, not the site's."
+      },
+      "noComparablePair": "This domain does not have two comparable scans yet, so there is no change to show.",
+      "empty": {
+        "title": "No scans for this domain yet",
+        "description": "When the first scan finishes, it will appear here with its numbers."
+      },
+      "table": {
+        "title": "Scans",
+        "description": "Newest first. Each row links to the scan detail and its executive report.",
+        "date": "Date",
+        "status": "Status",
+        "mode": "Mode",
+        "total": "Total",
+        "risky": "Critical/high",
+        "delta": "Risk change",
+        "report": "Report"
+      },
+      "mode": {
+        "passive": "Passive",
+        "active": "Active"
+      },
+      "badge": {
+        "demo": "Demo data",
+        "partial": "Partial",
+        "notCompleted": "Did not finish",
+        "partialNotComparable": "Partial: not comparable",
+        "notComparable": "Not comparable",
+        "first": "First comparable scan",
+        "modeChanged": "Scan mode changed",
+        "catalogChanged": "Catalogue changed",
+        "demoMixed": "Demo and real mixed",
+        "improved": "Improved",
+        "worsened": "Worsened",
+        "unchanged": "Unchanged"
+      }
+    },
     "pdf": {
       "title": "Executive security report",
       "subtitle": "Scan result for {host}",
@@ -613,6 +703,8 @@
       "findingsHint": "Ordered from highest to lowest severity. Every finding recorded by the scan is included.",
       "noFindings": "This scan recorded no findings. A completed scan with no findings is a valid result, not an error.",
       "remediation": "How to fix it",
+      "partialNotice": "Partial results: this scan did not complete every check. The numbers describe only what was reached, so they are not comparable with the history or with the traffic light.",
+      "demoNotice": "Demo data: this report was generated from sample findings. It does not describe a real scan of a production domain.",
       "page": "Page {current} of {total}",
       "severityCount": "{severity}: {count}",
       "fields": {
@@ -675,6 +767,111 @@
       "empty": {
         "title": "No verified domains yet",
         "description": "Verify a domain from the scans page before scanning it."
+      }
+    },
+    "billing": {
+      "title": "Billing",
+      "description": "Your plan, its state and what it includes.",
+      "hint": "Paid plans are managed from the billing screen.",
+      "action": "View billing"
+    }
+  },
+  "billing": {
+    "pageTitle": "Billing and plan",
+    "pageDescription": "Review your plan, its state and how much of it you are using. Plan changes are confirmed by webhook, exactly as with a real gateway.",
+    "demoBadge": "Demo mode",
+    "demoNoticeTitle": "Demo mode: no charge is made",
+    "demoNoticeDescription": "Payments run through a simulated provider. No card is charged and no subscription creates a payment obligation.",
+    "notConfiguredTitle": "Billing is not configured",
+    "notConfiguredDescription": "No payment provider is active in this environment. Plans are shown read-only.",
+    "current": {
+      "title": "Current subscription",
+      "description": "The state the provider confirmed most recently.",
+      "plan": "Plan",
+      "status": "Status",
+      "periodEnd": "Period end",
+      "lastCheckout": "Last payment attempt",
+      "noCheckout": "No payment attempts",
+      "checkoutSummary": "{plan} · {status}",
+      "cancellationScheduledTitle": "Cancellation scheduled",
+      "cancellationScheduledDescription": "The plan stays active until the paid period ends. Paying again clears the cancellation.",
+      "appliedEvents": "Provider events applied to this account: {count}"
+    },
+    "usage": {
+      "title": "Plan usage",
+      "description": "What you are consuming from the current plan limits.",
+      "domains": "Domains",
+      "scansThisMonth": "Scans this month",
+      "activeScans": "Active scans",
+      "schedules": "Schedules",
+      "unlimited": "unlimited"
+    },
+    "plans": {
+      "currentBadge": "Current plan",
+      "pricePending": "[TODO: final prices]",
+      "freePrice": "Free",
+      "domains": "{count} domains",
+      "scans": "{count} scans per month",
+      "unlimitedScans": "Unlimited scans",
+      "concurrent": "{count} concurrent scans",
+      "schedules": "{count} schedules",
+      "changeTo": "Switch to {plan}",
+      "freeHint": "Free is where every account starts and it is never purchased."
+    },
+    "status": {
+      "trialing": "Trialing",
+      "active": "Active",
+      "past_due": "Past due",
+      "cancelled": "Cancelled"
+    },
+    "checkoutStatus": {
+      "pending": "Pending",
+      "paid": "Paid",
+      "declined": "Declined"
+    },
+    "cancelButton": "Cancel renewal",
+    "cancelErrorTitle": "Could not request the cancellation",
+    "checkoutErrorTitle": "Could not start the payment",
+    "planLabel": "Plan",
+    "priceLabel": "Price",
+    "pricePending": "[TODO: final price]",
+    "checkoutStatusLabel": "Checkout status",
+    "errors": {
+      "invalidPlan": "That plan cannot be purchased.",
+      "providerNotConfigured": "Billing is not configured in this environment.",
+      "checkoutFailed": "The checkout could not be created. Try again.",
+      "cancelFailed": "The cancellation could not be requested."
+    },
+    "demoCheckout": {
+      "pageTitle": "Simulated payment gateway",
+      "pageDescription": "This page stands in for the real gateway. Paying sends a signed webhook to VulDetected; the subscription changes only when that webhook is applied.",
+      "payTitle": "Pay for the {plan} plan",
+      "cardLegend": "Pick a test card",
+      "approvedLabel": "Approved payment",
+      "approvedHint": "The webhook confirms the payment and activates the plan.",
+      "declinedLabel": "Declined payment",
+      "declinedHint": "The webhook records the decline and leaves the plan unchanged.",
+      "payButton": "Pay",
+      "paying": "Sending webhook...",
+      "resultTitle": "Webhook response",
+      "errorTitle": "The webhook rejected the event",
+      "resilienceTitle": "Webhook resilience checks",
+      "resilienceDescription": "Two cases a real gateway produces all the time: retries and out-of-order events.",
+      "replayButton": "Resend the same event",
+      "outOfOrderButton": "Send a decline stamped earlier",
+      "outcome": {
+        "applied": "Applied: the subscription state changed.",
+        "declined": "Declined: the payment attempt was recorded and the plan did not change.",
+        "duplicate": "Duplicate: the event was already recorded and was not applied twice.",
+        "stale": "Discarded as stale: it is older than the last applied event.",
+        "ignored": "Ignored: it does not belong to this account."
+      },
+      "error": {
+        "provider_off": "The simulated provider is not armed (DEMO_MODE).",
+        "checkout_missing": "The checkout does not exist.",
+        "card_unknown": "The simulator does not recognise that card.",
+        "webhook_failed": "The webhook answered {status}. A real gateway would retry.",
+        "unknown_intent": "Unrecognised action."
       }
     }
   }

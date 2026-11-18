@@ -50,6 +50,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
       id: scans.id,
       targetUrl: scans.targetUrl,
       status: scans.status,
+      partial: scans.partial,
+      isDemo: scans.isDemo,
       createdAt: scans.createdAt,
       hostname: domains.normalizedHostname,
     })
@@ -124,6 +126,28 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
     unclassified: tScan('findings.severity.unclassified'),
   };
 
+  /**
+   * Three of these strings are TEMPLATES, not sentences: they carry `{host}`,
+   * `{current}`/`{total}` and `{severity}`/`{count}`, and the renderer fills them
+   * with `formatTemplate`.
+   *
+   * ## Why `.raw()` and not `t()`
+   *
+   * `t()` formats ICU messages. Called without values on a message that has
+   * placeholders it raises `FORMATTING_ERROR`, and next-intl then returns its
+   * fallback — the joined key, `reports.pdf.subtitle`. The PDF would print that
+   * literal text on the cover, and the same on every page footer and severity
+   * row. It never threw a 500, so only a careful read of the document caught it.
+   *
+   * `t.raw()` is the documented API for "give me the message, I will format it
+   * myself", which is exactly this case.
+   */
+  const templates = {
+    subtitle: tPdf.raw('subtitle'),
+    page: tPdf.raw('page'),
+    severityCount: tPdf.raw('severityCount'),
+  };
+
   const input: ReportInput = {
     hostname: scan.hostname,
     targetUrl: scan.targetUrl,
@@ -132,17 +156,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
     createdAt: scan.createdAt,
     generatedAt: new Date(),
     findings: reportFindings,
+    partial: scan.partial,
+    isDemo: scan.isDemo,
     copy: {
       title: tPdf('title'),
-      subtitle: tPdf('subtitle'),
+      subtitle: templates.subtitle,
       summary: tPdf('summary'),
       breakdown: tPdf('breakdown'),
       findings: tPdf('findings'),
       findingsHint: tPdf('findingsHint'),
       noFindings: tPdf('noFindings'),
       remediation: tPdf('remediation'),
-      page: tPdf('page'),
-      severityCount: tPdf('severityCount'),
+      partialNotice: tPdf('partialNotice'),
+      demoNotice: tPdf('demoNotice'),
+      page: templates.page,
+      severityCount: templates.severityCount,
       fields: {
         domain: tPdf('fields.domain'),
         target: tPdf('fields.target'),

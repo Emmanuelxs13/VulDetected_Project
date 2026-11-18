@@ -1,6 +1,6 @@
-import { and, asc, domains, eq, isNull, lte, or, scanSchedules } from '@vuldetected/db';
+import { and, asc, domains, eq, inArray, isNull, lte, or, scanSchedules, scans, sql } from '@vuldetected/db';
 
-import { enqueueScanForDomain, scheduleTarget } from '@/features/scans/enqueue';
+import { enqueueScanForDomain, scheduleTargetFor } from '@/features/scans/enqueue';
 import { computeNextRunAt, isDue } from '@/features/scans/schedule-schema';
 import { db } from '@/lib/db';
 
@@ -62,6 +62,7 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedu
       interval: scanSchedules.interval,
       enabled: scanSchedules.enabled,
       nextRunAt: scanSchedules.nextRunAt,
+      targetUrl: scanSchedules.targetUrl,
       hostname: domains.normalizedHostname,
       verified: domains.verified,
     })
@@ -94,7 +95,17 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedu
           eq(scanSchedules.id, row.id),
           previous === null
             ? isNull(scanSchedules.nextRunAt)
-            : eq(scanSchedules.nextRunAt, previous),
+            : /**
+               * Truncated to milliseconds on purpose.
+               *
+               * `next_run_at` is a `timestamptz`, which stores microseconds, and
+               * the driver hands it back as a JS `Date`, which only holds
+               * milliseconds. A plain equality would therefore never match a
+               * value written by SQL (`now()`, a column default, the demo
+               * accelerator) and the schedule would silently never fire — the
+               * runner would report it as skipped on every tick, forever.
+               */
+              sql`date_trunc('milliseconds', ${scanSchedules.nextRunAt}) = ${previous.toISOString()}::timestamptz`,
         ),
       )
       .returning({ id: scanSchedules.id });
@@ -109,9 +120,31 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedu
       continue;
     }
 
+    /**
+     * Overlap is skipped, not queued (Sprint 2, CA-23).
+     *
+     * If the previous run of this domain is still queued or running, firing
+     * another scan would put two workers on the same target and double the load
+     * on someone else's server. The window is consumed — `next_run_at` already
+     * advanced in the claim above — because replaying it after the overlap
+     * clears would just create the burst the skip exists to prevent.
+     */
+    const active = await db()
+      .select({ id: scans.id })
+      .from(scans)
+      .where(
+        and(eq(scans.domainId, row.domainId), inArray(scans.status, ['queued', 'running'])),
+      )
+      .limit(1);
+
+    if (active.length > 0) {
+      result.skipped += 1;
+      continue;
+    }
+
     const outcome = await enqueueScanForDomain({
       domainId: row.domainId,
-      target: scheduleTarget(row.hostname),
+      target: scheduleTargetFor(row.hostname, row.targetUrl),
       actorUserId: row.userId,
       source: 'schedule',
     });

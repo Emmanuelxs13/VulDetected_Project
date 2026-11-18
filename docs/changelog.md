@@ -10,6 +10,72 @@ a partir de `0.1.0`.
 
 ## [Sin publicar]
 
+### Sprint 2 — verificación oficial, demo y monetización
+
+La especificación oficial del Sprint 2 —«Operación continua, reportes y
+monetización»— reúne siete historias y 50 SP sobre SCRUM-19, SCRUM-25, SCRUM-26,
+SCRUM-27, SCRUM-28, SCRUM-29 y SCRUM-30. Los criterios oficiales mandan sobre los
+que el repositorio había escrito antes (ADR 0015), y eso reencuadra como Sprint 2
+capacidades que este archivo ya listaba bajo «Sprint 4»: programaciones,
+autenticación social y PDF ejecutivo. El acta completa, criterio por criterio, está
+en [`PRUEBA_SPRINT_2.md`](../PRUEBA_SPRINT_2.md).
+
+- **Cancelación de escaneo con resultados parciales (HU-06).** Cancelar conserva
+  los hallazgos ya encontrados y los marca `partial`; el estado del escaneo no
+  cambia a un sexto valor. El worker consulta la bandera de cancelación entre
+  comprobaciones y el correo de cancelación se encola una sola vez desde la acción,
+  no desde el callback del worker. Medido: detención en 2.654 ms con 7 hallazgos
+  conservados (ADR 0024).
+- **Programaciones y alertas de vulnerabilidad nueva (HU-07).** La hora se guarda
+  como instante y se muestra en `America/Bogota`; el reclamo es compare-and-set
+  sobre `next_run_at`; `alert_on_new_critical` permite silenciar una programación.
+  Una alerta sale solo si el hallazgo es nuevo **y** su severidad alcanza el umbral.
+  Medido: 5.535 ms desde el cierre del escaneo hasta el correo disponible (ADR 0023).
+- **Informe ejecutivo en PDF (HU-09).** Un escaneo parcial no imprime veredicto de
+  riesgo y dice por qué; los datos de demostración llevan la banda de aviso dentro
+  del documento, no solo en la aplicación (ADR 0021, ADR 0024).
+- **Historial comparativo (HU-10).** La comparabilidad es un módulo puro que
+  excluye lo no comparable y retiene el delta explicando el motivo. **No existe un
+  puntaje compuesto**: el tipo de retorno no tiene un campo donde ponerlo (ADR 0022).
+- **Inicio de sesión social (HU-02a).** OAuth 2.0 con PKCE contra un proveedor
+  simulado local que imita a Google y GitHub y se niega a arrancar sin
+  `DEMO_MODE=true`. La vinculación a una cuenta local con contraseña exige prueba de
+  control del buzón: vincular por coincidencia de correo sería una toma de cuenta
+  (ADR 0016). Se reporta como **Cumple en modo simulado**: no hay credenciales
+  reales (ADR 0017, pendiente de aprobación).
+- **Suscripciones simuladas (HU-02b).** `PaymentProvider` con un simulador detrás;
+  el plan cambia **solo** por webhook firmado con HMAC, deduplicado por
+  `(provider, event_id)` e insensible al desorden. La pantalla dice «Modo
+  demostración: no se realiza ningún cobro» (ADR 0019).
+- **Escaneo detrás de un login (HU-04).** Credencial de formulario cifrada en
+  reposo, login antes de las comprobaciones y dos pasadas (pública y autenticada).
+  Un login fallido falla el escaneo con motivo y **no** degrada a anónimo. El guard
+  SSRF no se desactiva ni para la demo: el objetivo es un fixture local (ADR 0020).
+  Medido: 33 hallazgos anónimos frente a 40 autenticados, 7 detrás del login.
+- **Modo demostración como interruptor único.** `DEMO_MODE` se rechaza con
+  `NODE_ENV=production`, y `DEMO_PAYMENT_WEBHOOK_SECRET` también. Cada negativa
+  tiene su prueba en `lib/env.test.ts`. Los aceleradores (`demo:reset`,
+  `demo:seed-history`, `demo:run-schedule-now`, `demo:reset-social`,
+  `demo:reset-billing`) son idempotentes y exigen el interruptor.
+- **Datos de demostración marcados donde se ven.** `scans.is_demo`,
+  `findings.is_demo`, insignia en pantalla, banda dentro del PDF y exclusión de la
+  comparación entre datos demo y reales (ADR 0021).
+- **Migración `0015`**: extiende el CHECK de credenciales para admitir el tipo
+  `form`.
+- **Corregido:** el tiempo de espera de `send_event` del worker pasó de 10 a 30
+  segundos, igual que `send_callback` contra el mismo host. Un `ReadTimeout` de 10
+  segundos hacía que un escaneo que **ya había autenticado y recogido hallazgos** se
+  reportara como fallido.
+- **Corregido:** `demo:reset-social` borra explícitamente, cuenta y reporta las
+  filas de auditoría de las tres identidades simuladas. Antes se negaba a correr en
+  la segunda ejecución y el reset dejaba de ser un reset.
+- **Documentación:** doce registros de arquitectura nuevos (ADR 0015 a 0026), dos de
+  ellos marcados como **Propuesta — requiere aprobación del equipo**.
+- **Pendiente y documentado:** la barrera de correo verificado del ADR 0014 está
+  escrita y no implementada; un escaneo sin callback queda colgado y bloquea su
+  dominio; ningún usuario se puede borrar por el trigger de solo-append a nivel de
+  sentencia. Ver [`PRUEBA_SPRINT_2.md`](../PRUEBA_SPRINT_2.md) §9.
+
 ### Sprint 4
 
 - Añadida la gestión de escaneos programados: crear, pausar, reanudar y

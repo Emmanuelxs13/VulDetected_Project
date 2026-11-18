@@ -50,6 +50,13 @@ const MIGRATION_FILES = [
   '0008_amazing_wonder_man.sql',
   '0009_foamy_mathemanic.sql',
   '0010_absurd_frank_castle.sql',
+  // Sprint 2 adds the columns the pipeline now writes: `is_demo`, `scan_mode`,
+  // `severity_catalog_version` (0011), `target_url` on schedules (0012) and
+  // `partial` (0013). Leaving them out made this harness drift from production:
+  // every insert named a column the test database never had.
+  '0011_perfect_the_liberteens.sql',
+  '0012_clammy_songbird.sql',
+  '0013_aromatic_dreaming_celestial.sql',
 ].map((file) => path.resolve(dirname, '../../../packages/db/drizzle', file));
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -263,7 +270,15 @@ async function startScan(scanId: string): Promise<void> {
   expect(response.status).toBe(200);
 }
 
-/** Posts a terminal callback with one finding. */
+/**
+ * Posts a terminal callback with one finding.
+ *
+ * `checks_run` covers the full default set on purpose. The real worker always
+ * reports what it finished, and the ingest treats a missing list as "ran
+ * nothing", which marks the run `partial` and excludes it from being the next
+ * scan's baseline. A fixture that omits it would therefore test a shape the
+ * worker never produces.
+ */
 async function completeScan(scanId: string): Promise<void> {
   const response = await postScanCallback(
     callbackRequest(scanId, {
@@ -271,6 +286,7 @@ async function completeScan(scanId: string): Promise<void> {
       task_id: 'task-e2e',
       status: 'completed',
       error: null,
+      checks_run: [...DEFAULT_CHECKS],
       base_url: 'https://example.com',
       events: [{ seq: 2, type: 'scan.completed', payload: {} }],
       findings: [

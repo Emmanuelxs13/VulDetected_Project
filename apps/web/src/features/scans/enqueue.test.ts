@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { dbCalls, dbQueue, resetDbMock } from '@test/db-mock';
 
-import { enqueueScanForDomain } from './enqueue';
+import { enqueueScanForDomain, scheduleTarget, scheduleTargetFor } from './enqueue';
 
 vi.mock('@/lib/db', async () => {
   const { createDbMock } = await import('@test/db-mock');
@@ -115,6 +115,19 @@ describe('enqueueScanForDomain', () => {
     expect(payload && 'credentials' in payload).toBe(false);
   });
 
+  it('records the origin it was asked for instead of the column default', async () => {
+    dbQueue.push([DOMAIN]);
+    dbQueue.push([{ id: 'scan-scheduled' }]);
+
+    const outcome = await enqueueScanForDomain({ ...INPUT, source: 'schedule' });
+
+    expect(outcome).toEqual({ ok: true, scanId: 'scan-scheduled' });
+
+    const values = dbCalls.find((call) => call.method === 'values')?.args[0] as
+      Record<string, unknown> | undefined;
+    expect(values?.source).toBe('schedule');
+  });
+
   it('attaches a resolved credential to the row and the published job', async () => {
     const { activeCredentialForScan, markCredentialUsed } = await import('@/lib/credentials/store');
     vi.mocked(activeCredentialForScan).mockResolvedValueOnce({
@@ -181,5 +194,30 @@ describe('enqueueScanForDomain', () => {
     const set = dbCalls.find((call) => call.method === 'set')?.args[0] as
       Record<string, unknown> | undefined;
     expect(set).toEqual({ status: 'failed', error: 'enqueue_failed' });
+  });
+});
+describe('scheduleTargetFor', () => {
+  it('uses the HTTPS default when the schedule recorded no target', () => {
+    expect(scheduleTargetFor('example.com', null)).toEqual(scheduleTarget('example.com'));
+  });
+
+  it('scans the recorded target when one exists', () => {
+    const target = scheduleTargetFor('example.com', 'http://example.com:8099');
+
+    expect(target).toEqual({
+      url: 'http://example.com:8099',
+      scheme: 'http',
+      host: 'example.com',
+      port: 8099,
+      baseUrl: 'http://example.com:8099',
+    });
+  });
+
+  it('falls back to the default when the recorded value is not a valid http(s) URL', () => {
+    // The stored value reaches the worker, so a malformed one must degrade to a
+    // safe default instead of being forwarded.
+    expect(scheduleTargetFor('example.com', 'ftp://example.com')).toEqual(
+      scheduleTarget('example.com'),
+    );
   });
 });

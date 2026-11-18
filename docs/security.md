@@ -391,13 +391,29 @@ comprueba contra la fila de `domains`, no contra el conocimiento del UUID.
 
 | Control                                                      | Estado                    | Notas                                                                                                                            |
 | ------------------------------------------------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Rastro de auditoría para eventos de seguridad (OWASP A09)    | `Done` (esquema)          | `audit_logs` es solo-append; se puebla durante los flujos de autenticación del Sprint 1.                                         |
+| Rastro de auditoría para eventos de seguridad (OWASP A09)    | `Done` (esquema)          | `audit_logs` es solo-append; se puebla durante los flujos de autenticación del Sprint 1 y de facturación del Sprint 2.            |
 | Autorización impuesta en la capa de datos                    | `Done (Sprint 2)`         | Cada ruta valida la sesión y el SSE filtra por dueño del dominio; no se confía en el middleware.                                 |
 | La severidad nunca se comunica solo con color (WCAG 1.4.1)   | `Done` (diseño)           | Color + icono + texto en cada insignia de severidad; ver [ADR 0003](./adr/0003-design-tokens-and-color-budget.md).               |
 | Prueba automatizada de contraste para la paleta de severidad | `Open (planned Sprint 1)` | Define lo que significa "contraste garantizado"; una violación hace fallar la compilación.                                       |
 | La tabla de hallazgos no contiene credenciales               | `Open (planned Sprint 2)` | La salida de la herramienta puede incluir cabeceras de autenticación o tokens del objetivo; debe depurarse antes de almacenarla. |
 | XSS almacenado en el contenido de remediación                | `Open (planned Sprint 3)` | La remediación incluye ejemplos de código renderizados; la ruta de renderizado no debe inyectar HTML.                            |
 | Comprobaciones de secuestro de dominio                       | `Open (planned Sprint 3)` | Advertencia: los registros DNS colgantes en dominios verificados se convierten en un vector de escaneo e informe.                |
+
+### Superficie nueva del Sprint 2
+
+| Control                                                       | Estado      | Notas                                                                                                                                                          |
+| ------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secretos de credenciales cifrados en reposo                   | `Done`      | `CREDENTIALS_ENCRYPTION_KEY` + versión de clave. En producción `lib/env.ts` la exige; en desarrollo es opcional (brecha §9.6 de `PRUEBA_SPRINT_2.md`).          |
+| El guard SSRF se mantiene con escaneo autenticado             | `Done`      | `HardenedClient.post` comparte la guarda de `get` mediante `_request`; una redirección degrada POST a GET y descarta el cuerpo. No se desactiva ni para la demo. |
+| Revalidación del destino de login en el worker                | `Done`      | `login_with_form` vuelve a validar que `loginPath` empiece por `/` y no por `//`, sin confiar en la validación de la web.                                        |
+| Un login fallido falla el escaneo y no degrada a anónimo       | `Done`      | `login_failed: <motivo>`; degradar en silencio haría creer al usuario que escaneó su intranet cuando escaneó la portada.                                        |
+| Vinculación social con prueba de control del buzón            | `Done`      | Una cuenta local con contraseña no se vincula a una identidad social hasta verificar el correo (ADR 0016).                                                     |
+| Webhook de pago firmado, deduplicado y tolerante al desorden   | `Done`      | HMAC con `DEMO_PAYMENT_WEBHOOK_SECRET`, unicidad por `(provider, event_id)`, evento anterior al último aplicado se descarta como `stale`.                       |
+| El plan solo cambia por webhook                               | `Done`      | Ninguna ruta de la aplicación escribe el plan; solo `applyPaymentEvent` lo hace, dentro de una transacción.                                                     |
+| `DEMO_MODE` y sus atajos se rechazan en producción             | `Done`      | `lib/env.ts` se niega a arrancar con `DEMO_MODE`, `DEMO_ALLOW_PRIVATE_TARGETS`, `DEMO_PAYMENT_WEBHOOK_SECRET` o la desactivación de la verificación de propiedad. Una prueba por cada negativa. |
+| `getClientIp` confía en `X-Forwarded-For`                     | `Open`      | Sin un proxy propio, un cliente puede falsear la cabecera y compartir el cubo `unknown`. Brecha §9.4 de `PRUEBA_SPRINT_2.md`.                                  |
+| El login por formulario no soporta CSRF ni varios pasos       | `Open`      | Falla explícitamente con `marker_missing`; no hay degradación silenciosa. Brecha §9.5 de `PRUEBA_SPRINT_2.md`.                                                  |
+
 
 ## Deliberadamente fuera del alcance del MVP
 

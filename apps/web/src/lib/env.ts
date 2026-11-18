@@ -168,6 +168,24 @@ const envSchema = z.object({
   SCAN_REQUIRE_VERIFIED_DOMAIN: z.enum(['true', 'false']).optional(),
 
   /**
+   * DEMO ONLY. The single switch that arms every demo accelerator:
+   * `pnpm demo:reset`, `pnpm demo:seed-history`, `pnpm demo:run-schedule-now`,
+   * the fixture site and the simulated payment provider.
+   *
+   * ## Why one switch instead of one per accelerator
+   *
+   * Four independent flags can be half-set, and the failure mode of a
+   * half-armed demo is the worst one available: a seeded history with no badge,
+   * or a simulated payment presented as a real charge. One flag means the
+   * accelerators are either all on and all labelled, or all off.
+   *
+   * Production refuses to boot with it enabled, exactly like
+   * `DEMO_ALLOW_PRIVATE_TARGETS`: an accelerator that can run in production is
+   * not an accelerator, it is a backdoor.
+   */
+  DEMO_MODE: z.enum(['true', 'false']).optional(),
+
+  /**
    * DEMO ONLY. Lets the egress guard reach loopback/RFC1918 addresses and
    * non-standard ports so the demo can scan a local fixture site.
    *
@@ -182,6 +200,58 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GITHUB_CLIENT_ID: z.string().min(1).optional(),
   GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+
+  /**
+   * DEMO ONLY. The simulated OAuth provider that stands in for Google and GitHub
+   * when no real credentials exist (HU-02a, CA-30/31/32).
+   *
+   * ## Why a simulated provider instead of "it would work with credentials"
+   *
+   * The criterion is "a user can create an account and sign in with Google". A
+   * manual that says the code would do it if it had a client id is not evidence,
+   * and a live Google project cannot be replayed by a reviewer. The simulator
+   * implements the same authorization-code + PKCE contract, so the flow, the
+   * callbacks, the linking rules and the session are all exercised for real —
+   * only the identity provider is a stand-in, and it says so on every screen.
+   *
+   * ## Why four variables and a base URL
+   *
+   * The base URL alone does not arm anything: `DEMO_MODE` must also be true, and
+   * `lib/auth/social.ts` refuses to build a partial configuration rather than
+   * silently dropping one provider. Production rejects every one of these — a
+   * simulated identity provider reachable in production is an authentication
+   * bypass, not a demo aid.
+   */
+  OAUTH_DEMO_BASE_URL: z.string().url('OAUTH_DEMO_BASE_URL must be an absolute URL').optional(),
+  OAUTH_DEMO_GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  OAUTH_DEMO_GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  OAUTH_DEMO_GITHUB_CLIENT_ID: z.string().min(1).optional(),
+  OAUTH_DEMO_GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+
+  /**
+   * DEMO ONLY. The shared secret the simulated payment provider uses to sign the
+   * webhook it delivers (HU-02b, ADR 0019).
+   *
+   * ## Why a secret at all, if nothing is charged
+   *
+   * The signature is the part of the design that has to survive contact with a
+   * real gateway, and it is the part that is easiest to get wrong: an endpoint
+   * that trusts an unauthenticated POST lets anyone set their own plan. Keeping
+   * the HMAC in the simulator means the webhook route is written, tested and
+   * exercised exactly as it will be in production; only the party holding the
+   * key changes.
+   *
+   * ## Why production rejects it
+   *
+   * A production deployment that accepts events signed with a demo secret has a
+   * free-upgrade endpoint. `DEMO_MODE` must also be true for the simulator to
+   * arm, but the secret is refused on its own so a half-configured environment
+   * cannot boot with a known key.
+   */
+  DEMO_PAYMENT_WEBHOOK_SECRET: z
+    .string()
+    .min(16, 'DEMO_PAYMENT_WEBHOOK_SECRET must be at least 16 characters')
+    .optional(),
 
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 });
@@ -226,6 +296,15 @@ const productionRefinement = (value: z.infer<typeof envSchema>, ctx: z.Refinemen
         'the settings page offers. Generate one with: openssl rand -base64 32',
     });
   }
+  if (value.DEMO_MODE === 'true') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DEMO_MODE'],
+      message:
+        'DEMO_MODE must not be enabled in production: it arms the demo accelerators ' +
+        '(reset, seeded history, simulated payments, schedule fast-forward).',
+    });
+  }
   if (value.DEMO_ALLOW_PRIVATE_TARGETS === 'true') {
     ctx.addIssue({
       code: 'custom',
@@ -235,6 +314,32 @@ const productionRefinement = (value: z.infer<typeof envSchema>, ctx: z.Refinemen
         'guard and lets the scanner reach loopback and RFC1918 addresses.',
     });
   }
+  /**
+   * The simulated OAuth provider is a demo-only identity source. In production it
+   * would let anyone holding its client credentials mint a session for any address
+   * the simulator is told to assert — the exact thing a real provider exists to
+   * prevent. Refusing to boot is the only acceptable failure mode, and it names
+   * every offending variable rather than the first one.
+   */
+  const demoOauthVariables = [
+    'OAUTH_DEMO_BASE_URL',
+    'OAUTH_DEMO_GOOGLE_CLIENT_ID',
+    'OAUTH_DEMO_GOOGLE_CLIENT_SECRET',
+    'OAUTH_DEMO_GITHUB_CLIENT_ID',
+    'OAUTH_DEMO_GITHUB_CLIENT_SECRET',
+  ] as const;
+  for (const name of demoOauthVariables) {
+    if (value[name]) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [name],
+        message:
+          `${name} must not be set in production: the simulated OAuth provider is a demo ` +
+          'component, and a simulated identity provider reachable in production is an ' +
+          'authentication bypass.',
+      });
+    }
+  }
   if (value.SCAN_REQUIRE_VERIFIED_DOMAIN === 'false') {
     ctx.addIssue({
       code: 'custom',
@@ -242,6 +347,20 @@ const productionRefinement = (value: z.infer<typeof envSchema>, ctx: z.Refinemen
       message:
         'SCAN_REQUIRE_VERIFIED_DOMAIN must not be disabled in production: scanning a host ' +
         'without proving ownership is an abuse vector (HU-03, CA-03/CA-04).',
+    });
+  }
+  /**
+   * The simulated payment provider signs webhooks with a secret that lives in the
+   * repository's demo documentation. In production that secret is a free-upgrade
+   * endpoint, so it is refused on its own — not only when `DEMO_MODE` is set.
+   */
+  if (value.DEMO_PAYMENT_WEBHOOK_SECRET) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DEMO_PAYMENT_WEBHOOK_SECRET'],
+      message:
+        'DEMO_PAYMENT_WEBHOOK_SECRET must not be set in production: a webhook signed with a ' +
+        'demo secret lets anyone activate a paid plan.',
     });
   }
 };

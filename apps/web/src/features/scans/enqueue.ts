@@ -12,6 +12,9 @@ import {
 import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { checkScanAllowance, type PlanLimitCode } from '@/lib/plan-limits';
+import { SEVERITY_MAPPING_VERSION } from '@/lib/severity/classify';
+
+import { targetUrlSchema } from './schema';
 
 /**
  * The default check set, kept in one place so a manually submitted scan and a
@@ -36,6 +39,25 @@ export const DEFAULT_CHECKS = [
   'directory_listing',
   'sensitive_files',
 ] as const;
+
+/**
+ * The subset of checks that send no crafted requests.
+ *
+ * Used to record the scan's mode on the row (CA-10). A scan whose check list is
+ * entirely passive is not comparable with one that fired SQLi and XSS payloads,
+ * and the history has to be able to say so instead of charting the two together.
+ */
+const PASSIVE_CHECKS: ReadonlySet<string> = new Set([
+  'security_headers',
+  'tls',
+  'cookies',
+  'redirects',
+]);
+
+/** `passive` when every requested check is non-invasive, `active` otherwise. */
+export function scanModeForChecks(checks: readonly string[]): 'passive' | 'active' {
+  return checks.every((check) => PASSIVE_CHECKS.has(check)) ? 'passive' : 'active';
+}
 
 /** The normalized target a scan is pointed at (SS-1). */
 export interface ScanTarget {
@@ -138,7 +160,21 @@ export async function enqueueScanForDomain(input: {
       domainId: input.domainId,
       targetUrl: input.target.url,
       status: 'queued',
+      /**
+       * Recorded, not defaulted.
+       *
+       * `scans.source` defaults to `'manual'` at the database boundary. Relying on
+       * that default meant a scheduled run was indistinguishable from one the user
+       * clicked, so the scan list, the audit trail and the "should this run alert?"
+       * decision (`alertsEnabledForScan`) all read the wrong origin for exactly the
+       * scans that HU-07 is about.
+       */
+      source: input.source,
       checks: [...DEFAULT_CHECKS],
+      // Recorded on the row so the history can refuse to compare a passive run
+      // with an active one (CA-10).
+      scanMode: scanModeForChecks(DEFAULT_CHECKS),
+      severityCatalogVersion: SEVERITY_MAPPING_VERSION,
       // Answers "which secret produced this report" after a rotation, because the
       // credential row is revoked rather than deleted.
       credentialId: credential?.credentialId ?? null,
@@ -206,8 +242,31 @@ export async function enqueueScanForDomain(input: {
   return { ok: true, scanId };
 }
 
-/** The target a scheduled scan always uses: the domain over HTTPS on 443. */
+/** The target a scheduled scan uses when the schedule recorded none. */
 export function scheduleTarget(hostname: string): ScanTarget {
   const url = `https://${hostname}`;
   return { url, scheme: 'https', host: hostname, port: 443, baseUrl: url };
+}
+
+/**
+ * The target a schedule should scan.
+ *
+ * A schedule that recorded a target scans exactly that; one that did not falls
+ * back to the HTTPS default. The stored value is re-validated here rather than
+ * trusted: it is user-influenced data that reaches the worker, and a malformed
+ * or non-http(s) value must degrade to the default instead of being sent.
+ */
+export function scheduleTargetFor(hostname: string, storedTargetUrl: string | null): ScanTarget {
+  if (storedTargetUrl === null) return scheduleTarget(hostname);
+
+  const parsed = targetUrlSchema.safeParse(storedTargetUrl);
+  if (!parsed.success) return scheduleTarget(hostname);
+
+  return {
+    url: parsed.data.url,
+    scheme: parsed.data.scheme,
+    host: parsed.data.hostname,
+    port: parsed.data.port,
+    baseUrl: parsed.data.baseUrl,
+  };
 }

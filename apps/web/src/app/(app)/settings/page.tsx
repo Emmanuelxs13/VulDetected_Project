@@ -11,6 +11,7 @@ import {
   EmptyState,
 } from '@vuldetected/ui';
 import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 
 import { requireUser } from '@/features/auth/session';
 import { CredentialsSection } from '@/features/credentials/components/credentials-section';
@@ -121,6 +122,22 @@ export default async function SettingsPage() {
       </Card>
 
       <CredentialsSection verifiedDomains={verifiedDomains} credentials={credentials} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('billing.title')}</CardTitle>
+          <CardDescription>{t('billing.description')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-text-muted">{t('billing.hint')}</p>
+          <Link
+            href="/settings/billing"
+            className="focus-ring inline-flex h-9 items-center rounded-md border border-border-strong bg-surface-raised px-3 text-sm hover:bg-surface"
+          >
+            {t('billing.action')}
+          </Link>
+        </CardContent>
+      </Card>
     </Container>
   );
 }

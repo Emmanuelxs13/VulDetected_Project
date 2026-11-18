@@ -4,6 +4,15 @@
 **Fecha:** 2026-10-28  
 **Objetivo:** Llevar VulDetected a producción completa, verificando HU/CA, RD-01..06 y OBJ-1..3, implementando lo faltante sin pedir confirmación. Única parte simulada permitida: suscripciones/pagos.
 
+> **Sobre la numeración `CA-XX` de esta matriz.** Los identificadores `CA-01`…`CA-13`
+> de esta tabla son el conjunto **interno** de criterios que el repositorio escribió
+> antes de la especificación oficial del Sprint 2. Esa especificación usa los mismos
+> números con otro contenido, así que por el ADR 0015 el conjunto interno pasa a
+> llamarse `CA-P01`, `CA-P02`, … y **no** debe citarse como `CA-XX` en un acta del
+> Sprint 2. La verificación con la numeración oficial está en
+> [`PRUEBA_SPRINT_2.md`](../PRUEBA_SPRINT_2.md) §2.2 y §6. Esta matriz se conserva
+> porque documenta el estado de puesta a producción, no el acta del sprint.
+
 ## Leyenda de estados
 | Estado | Significado |
 |---|---|

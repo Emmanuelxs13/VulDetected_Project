@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 import { domains } from './domains';
 import { scanStatusEnum } from './enums';
@@ -56,6 +56,26 @@ export const scans = pgTable(
     status: scanStatusEnum('status').notNull().default('queued'),
 
     /**
+     * True when the scan finished without completing its whole check set and the
+     * partial results were KEPT (Sprint 2, cancellation).
+     *
+     * ## Why this is a column and not a sixth status
+     *
+     * A cancelled scan is `cancelled`; that is its lifecycle state, and the enum
+     * already says it. What the history needs to know is different: whether the
+     * findings it produced may be compared with a complete scan's. A cancelled
+     * scan whose worker was stopped after three checks has a real but incomplete
+     * picture, and charting it next to complete scans would show a drop that
+     * never happened.
+     *
+     * So the row keeps its status and carries `partial = true`, which every
+     * comparison query filters out. Folding this into the status enum would force
+     * `cancelled` and `partial` to compete for one slot, and they are not the same
+     * question.
+     */
+    partial: boolean('partial').notNull().default(false),
+
+    /**
      * The checks to run, as a JSON array.
      *
      * Defaults to the full check set (four passive checks plus six active ones).
@@ -78,6 +98,39 @@ export const scans = pgTable(
 
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+
+    /**
+     * DEMO ONLY. Marks rows produced by `pnpm demo:seed-history` (CA-29).
+     *
+     * The history chart must never mix invented data with real data without
+     * saying so. A boolean on the row is the only version of that which cannot
+     * be forgotten by a query: every surface that aggregates scans can filter or
+     * label on it, and the UI badge reads from the same column.
+     */
+    isDemo: boolean('is_demo').notNull().default(false),
+
+    /**
+     * Which check set this scan actually ran: `passive` (headers, TLS, cookies,
+     * redirects) or `active` (the above plus crafted-request checks).
+     *
+     * Stored rather than derived from `checks` at read time because the meaning
+     * of "comparable" depends on it: a passive scan and an active scan of the
+     * same domain do not produce comparable finding counts, so the history must
+     * be able to say so (CA-29). Deriving it later would let a change to the
+     * default check list silently rewrite what past scans meant.
+     */
+    scanMode: text('scan_mode').notNull().default('active'),
+
+    /**
+     * Version of the severity catalog used when this scan's findings were
+     * classified (CA-29).
+     *
+     * Severity is a judgement made by a rule set, and rule sets change. Without
+     * this column a chart could compare a scan scored by one catalog against a
+     * scan scored by another and present the difference as a trend in the
+     * website's security rather than a change in our own rules.
+     */
+    severityCatalogVersion: text('severity_catalog_version').notNull().default('1.0'),
 
     /** Machine-readable failure reason (e.g. `enqueue_failed`), never a stack trace. */
     error: text('error'),
@@ -105,6 +158,9 @@ export const scans = pgTable(
 
     /** `source` is a two-value CHECK, kept at the database boundary. */
     sourceCheck: check('scans_source_check', sql`${table.source} IN ('manual', 'schedule')`),
+
+    /** `scan_mode` is a two-value CHECK for the same reason. */
+    scanModeCheck: check('scans_scan_mode_check', sql`${table.scanMode} IN ('passive', 'active')`),
   }),
 );
 

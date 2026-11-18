@@ -4,12 +4,14 @@ import { accounts, sessions, users, verificationTokens } from '@vuldetected/db';
 import { APIError, betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';
+import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 
 import { db } from './db';
 import { getEnv } from './env';
 import { getLogger } from './logger';
 import { queuePasswordResetEmail, queueVerificationEmail } from './mail/notify';
 import { hashPassword, verifyPassword } from './password';
+import { resolveSocialSetupFromEnv, ACCOUNT_LINKING_POLICY } from './auth/social';
 
 /**
  * Better Auth server instance.
@@ -59,19 +61,15 @@ let instance: ReturnType<typeof buildAuth> | null = null;
 /** Builds the instance. Split out so its type is inferred rather than annotated. */
 function buildAuth() {
   const env = getEnv();
-  const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {};
-  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
-    socialProviders.google = {
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-    };
-  }
-  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
-    socialProviders.github = {
-      clientId: env.GITHUB_CLIENT_ID,
-      clientSecret: env.GITHUB_CLIENT_SECRET,
-    };
-  }
+
+  /**
+   * Social providers are resolved once, as a value.
+   *
+   * The same value feeds the login and registration screens (through
+   * `getSocialSetup()`), so the button and the registered provider cannot
+   * disagree. See `lib/auth/social.ts` for the demo/live/disabled rules.
+   */
+  const social = resolveSocialSetupFromEnv(env);
 
   return betterAuth({
     appName: 'VulDetected',
@@ -224,7 +222,38 @@ function buildAuth() {
       },
     },
 
-    socialProviders,
+    socialProviders: social.socialProviders,
+
+    /**
+     * Account linking (ADR 0016, CA-31/CA-33).
+     *
+     * ## Every value here is the library default, written down on purpose
+     *
+     * Verified in `dist/oauth2/link-account.mjs:169-171`, the implicit-link gate
+     * is:
+     *
+     * ```js
+     * requireLocalEmailVerified = accountLinking?.requireLocalEmailVerified ?? true;
+     * if (!isTrustedProvider && !userInfo.emailVerified
+     *     || requireLocalEmailVerified && !dbUser.user.emailVerified
+     *     || accountLinking?.enabled === false ...) -> "account not linked"
+     * ```
+     *
+     * So the default already refuses to attach a provider to an existing local
+     * account unless BOTH (a) the provider asserts the address is verified and
+     * (b) the local account proved control of that mailbox by verifying our own
+     * link. That is exactly ADR 0016.
+     *
+     * The danger is not the default, it is a future edit made to smooth over a
+     * demo: setting `requireLocalEmailVerified: false` turns the whole ADR off
+     * and still compiles, and `enabled: false` would break every sign-in from a
+     * provider that is not already linked. Stating all three keeps the decision
+     * visible exactly where someone would change it, and `trustedProviders: []`
+     * means no provider is exempt from the `emailVerified` check.
+     */
+    account: {
+      accountLinking: ACCOUNT_LINKING_POLICY,
+    },
 
     user: {
       /**
@@ -511,8 +540,18 @@ function buildAuth() {
      *
      * That is the worst possible bug shape: no exception, no log line, and a
      * report that says "login is broken" with nothing to grep for.
+     *
+     * ## Why `genericOAuth` sits next to it
+     *
+     * Only in demo mode, where it registers the simulated provider under the same
+     * `google`/`github` ids the buttons use. In live mode the built-in providers
+     * are used instead, because they already encode each provider's quirks — the
+     * two are mutually exclusive by construction (`lib/auth/social.ts`).
      */
-    plugins: [nextCookies()],
+    plugins:
+      social.mode === 'demo'
+        ? [nextCookies(), genericOAuth({ config: social.genericConfigs })]
+        : [nextCookies()],
   });
 }
 

@@ -79,7 +79,16 @@ export default async function ReportsPage() {
       })
       .from(scans)
       .innerJoin(domains, eq(scans.domainId, domains.id))
-      .where(and(eq(domains.userId, userId), eq(scans.status, 'completed')))
+      .where(
+        and(
+          eq(domains.userId, userId),
+          eq(scans.status, 'completed'),
+          // A completed-but-partial run has an incomplete picture; listing it
+          // beside complete scans would imply comparability it does not have
+          // (CA-10).
+          eq(scans.partial, false),
+        ),
+      )
       .orderBy(desc(scans.createdAt))
       .limit(20),
   ]);
@@ -132,7 +141,12 @@ export default async function ReportsPage() {
                 {trends.map((trend) => (
                   <TableRow key={trend.latestScanId}>
                     <TableCell>
-                      <span className="font-mono text-xs">{trend.hostname}</span>
+                      <Link
+                        href={`/reports/domains/${trend.domainId}`}
+                        className="font-mono text-xs text-primary hover:underline"
+                      >
+                        {trend.hostname}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-2">

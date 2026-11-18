@@ -59,6 +59,10 @@ export interface MailTemplateData {
     scanUrl: string;
     findings: CriticalFindingSummary[];
   };
+  scan_cancelled: {
+    hostname: string;
+    scanUrl: string;
+  };
 }
 
 export type MailTemplate = keyof MailTemplateData;
@@ -177,6 +181,11 @@ interface Copy {
   criticalBody: (hostname: string, count: number) => string;
   criticalCta: string;
 
+  cancelledSubject: (hostname: string) => string;
+  cancelledTitle: string;
+  cancelledBody: (hostname: string) => string;
+  cancelledCta: string;
+
   fallbackLink: string;
 }
 
@@ -220,6 +229,12 @@ const COPY: Record<MailLocale, Copy> = {
         : `El último escaneo de ${hostname} encontró ${count} hallazgos críticos que conviene atender cuanto antes.`,
     criticalCta: 'Revisar los hallazgos',
 
+    cancelledSubject: (hostname) => `Escaneo cancelado: ${hostname}`,
+    cancelledTitle: 'Escaneo cancelado',
+    cancelledBody: (hostname) =>
+      `Cancelaste el escaneo de ${hostname}. Los resultados que se alcanzaron a recoger antes de detenerlo quedan disponibles en el detalle y están marcados como parciales, así que no se usan en el historial comparativo ni en el semáforo.`,
+    cancelledCta: 'Ver el escaneo',
+
     fallbackLink: 'Si el botón no funciona, copia este enlace en tu navegador:',
   },
   en: {
@@ -259,6 +274,12 @@ const COPY: Record<MailLocale, Copy> = {
         ? `The latest scan of ${hostname} found a critical finding that should be addressed soon.`
         : `The latest scan of ${hostname} found ${count} critical findings that should be addressed soon.`,
     criticalCta: 'Review the findings',
+
+    cancelledSubject: (hostname) => `Scan cancelled: ${hostname}`,
+    cancelledTitle: 'Scan cancelled',
+    cancelledBody: (hostname) =>
+      `You cancelled the scan of ${hostname}. The results collected before it stopped are still available on the scan page and are marked as partial, so they are not used in the comparative history or the traffic light.`,
+    cancelledCta: 'Open the scan',
 
     fallbackLink: 'If the button does not work, paste this link into your browser:',
   },
@@ -344,6 +365,17 @@ export function renderMail<T extends MailTemplate>(
         fallbackLinkLabel: copy.fallbackLink,
       });
       return { subject: copy.criticalSubject(payload.hostname), ...shell };
+    }
+
+    case 'scan_cancelled': {
+      const payload = data as MailTemplateData['scan_cancelled'];
+      const shell = renderShell({
+        title: copy.cancelledTitle,
+        paragraphs: [copy.cancelledBody(payload.hostname)],
+        cta: { label: copy.cancelledCta, url: payload.scanUrl },
+        fallbackLinkLabel: copy.fallbackLink,
+      });
+      return { subject: copy.cancelledSubject(payload.hostname), ...shell };
     }
 
     default: {

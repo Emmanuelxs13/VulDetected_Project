@@ -76,6 +76,10 @@ export interface ReportCopy {
   findingsHint: string;
   noFindings: string;
   remediation: string;
+  /** Drawn instead of the risk verdict when the scan did not finish. */
+  partialNotice: string;
+  /** Drawn when the rows come from demo data (ADR 0021). */
+  demoNotice: string;
   /** Template with `{current}` and `{total}`. */
   page: string;
   /** Template with `{severity}` and `{count}`. */
@@ -106,6 +110,13 @@ export interface ReportInput {
   createdAt: Date;
   generatedAt: Date;
   findings: readonly ReportFindingInput[];
+  /**
+   * The scan did not finish every check. A partial run cannot support a risk
+   * verdict, so the document says so instead of printing one (ADR 0024).
+   */
+  partial: boolean;
+  /** The rows belong to a demo dataset and must be labelled as such (ADR 0021). */
+  isDemo: boolean;
   copy: ReportCopy;
 }
 
@@ -122,6 +133,11 @@ export type ReportBlock =
       height: number;
     }
   | { kind: 'gap'; height: number }
+  | {
+      kind: 'notice';
+      lines: readonly string[];
+      height: number;
+    }
   | {
       kind: 'risk';
       level: TrafficLightLevel;
@@ -359,6 +375,19 @@ export async function buildReportLayout(input: ReportInput): Promise<ReportPage[
     paginator.push({ kind: 'gap', height });
   };
 
+  /**
+   * A framed warning. Used for the two facts a reader must not miss before
+   * trusting the numbers: the run was partial, or the data is demo data.
+   */
+  const notice = (value: string): void => {
+    const lines = wrapText(value, 9, false, CONTENT_WIDTH - 24, measurer);
+    paginator.push({
+      kind: 'notice',
+      lines,
+      height: 10 + Math.max(1, lines.length) * 13 + 10,
+    });
+  };
+
   /** A heading never sits alone at the bottom of a page. */
   const heading = (value: string, size = 13): void => {
     paginator.ensure(size * LINE_FACTOR * 4);
@@ -375,22 +404,34 @@ export async function buildReportLayout(input: ReportInput): Promise<ReportPage[
   text(formatTemplate(copy.subtitle, { host: input.hostname }), 11, { tone: 'muted' });
   gap(14);
 
-  const hintLines = wrapText(
-    copy.risk.hint[trafficLight.level],
-    9,
-    false,
-    CONTENT_WIDTH - 24,
-    measurer,
-  );
-  const bandHeight = 12 + 20 + 6 + Math.max(1, hintLines.length) * 13 + 12;
-  paginator.push({
-    kind: 'risk',
-    level: trafficLight.level,
-    label: copy.risk.level[trafficLight.level],
-    hintLines,
-    height: bandHeight,
-  });
-  gap(16);
+  if (input.isDemo) {
+    notice(copy.demoNotice);
+    gap(10);
+  }
+
+  if (input.partial) {
+    // No verdict: the counts below are what the checks that ran could see, and
+    // printing "Riesgo Alto/Bajo" from them would be a claim the run cannot back.
+    notice(copy.partialNotice);
+    gap(10);
+  } else {
+    const hintLines = wrapText(
+      copy.risk.hint[trafficLight.level],
+      9,
+      false,
+      CONTENT_WIDTH - 24,
+      measurer,
+    );
+    const bandHeight = 12 + 20 + 6 + Math.max(1, hintLines.length) * 13 + 12;
+    paginator.push({
+      kind: 'risk',
+      level: trafficLight.level,
+      label: copy.risk.level[trafficLight.level],
+      hintLines,
+      height: bandHeight,
+    });
+    gap(16);
+  }
 
   heading(copy.summary);
   text(`${copy.fields.domain}: ${input.hostname}`, 9.5);
@@ -558,6 +599,30 @@ export async function generateScanReportPdf(input: ReportInput): Promise<Uint8Ar
               size: 9,
               font: regular,
               color: TONE_COLORS.muted,
+            });
+          });
+          cursor -= block.height;
+          break;
+        }
+
+        case 'notice': {
+          const top = cursor;
+          page.drawRectangle({
+            x: MARGIN,
+            y: top - block.height,
+            width: CONTENT_WIDTH,
+            height: block.height,
+            color: rgb(0.99, 0.96, 0.87),
+            borderColor: TONE_COLORS['risk-medium'],
+            borderWidth: 1,
+          });
+          block.lines.forEach((line, index) => {
+            page.drawText(line, {
+              x: MARGIN + 12,
+              y: top - 10 - 9 - index * 13,
+              size: 9,
+              font: regular,
+              color: TONE_COLORS.ink,
             });
           });
           cursor -= block.height;
