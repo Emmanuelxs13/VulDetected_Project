@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { and, count, domains, eq, findings, notifications, scans, users } from '@vuldetected/db';
+import { and, count, domains, eq, findings, inArray, notifications, scans, users } from '@vuldetected/db';
 
 import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
+import { DEFAULT_ALERT_SEVERITY, severitiesAtOrAbove } from '@/lib/severity/alert-threshold';
 
 import { enqueueMail } from './outbox';
 import {
@@ -205,22 +206,33 @@ export async function notifyScanCompleted(scanId: string): Promise<void> {
     },
   );
 
-  if (counts.critical === 0) {
-    return;
-  }
-
-  const critical = await db()
+  /**
+   * Only findings that are NEW in this scan and at or above the alert threshold
+   * (Sprint 2, CA-25).
+   *
+   * Before this change the alert fired for any critical finding in the scan, so
+   * a target with one unfixed critical sent the same email on every run and
+   * trained the reader to ignore it. `is_new` is computed at ingest against the
+   * previous comparable scan's open findings, so a reappearance after a resolved
+   * mark is new again.
+   */
+  const alertable = await db()
     .select({ title: findings.title, affectedUrl: findings.affectedUrl })
     .from(findings)
     .where(
       and(
         eq(findings.scanId, scanId),
-        eq(findings.severity, 'critical'),
         eq(findings.status, 'open'),
+        eq(findings.isNew, true),
+        inArray(findings.severity, severitiesAtOrAbove(DEFAULT_ALERT_SEVERITY)),
       ),
     )
     .orderBy(findings.checkName)
     .limit(10);
+
+  if (alertable.length === 0) {
+    return;
+  }
 
   await queue(
     'new_critical_finding',
@@ -228,7 +240,7 @@ export async function notifyScanCompleted(scanId: string): Promise<void> {
     {
       hostname: context.hostname,
       scanUrl,
-      findings: critical.map((row) => ({
+      findings: alertable.map((row) => ({
         title: row.title,
         affectedUrl: row.affectedUrl,
       })),
@@ -254,7 +266,7 @@ export async function notifyScanCompleted(scanId: string): Promise<void> {
         userId,
         scanId,
         type: 'critical_finding',
-        message: 'A completed scan contains a critical finding.',
+        message: 'A completed scan found a new critical finding.',
       })
       .onConflictDoNothing();
   }

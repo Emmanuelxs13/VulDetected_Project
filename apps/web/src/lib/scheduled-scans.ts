@@ -1,4 +1,4 @@
-import { and, asc, domains, eq, isNull, lte, or, scanSchedules } from '@vuldetected/db';
+import { and, asc, domains, eq, inArray, isNull, lte, or, scanSchedules, scans } from '@vuldetected/db';
 
 import { enqueueScanForDomain, scheduleTargetFor } from '@/features/scans/enqueue';
 import { computeNextRunAt, isDue } from '@/features/scans/schedule-schema';
@@ -106,6 +106,28 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedu
     }
 
     if (!row.verified) {
+      result.skipped += 1;
+      continue;
+    }
+
+    /**
+     * Overlap is skipped, not queued (Sprint 2, CA-23).
+     *
+     * If the previous run of this domain is still queued or running, firing
+     * another scan would put two workers on the same target and double the load
+     * on someone else's server. The window is consumed — `next_run_at` already
+     * advanced in the claim above — because replaying it after the overlap
+     * clears would just create the burst the skip exists to prevent.
+     */
+    const active = await db()
+      .select({ id: scans.id })
+      .from(scans)
+      .where(
+        and(eq(scans.domainId, row.domainId), inArray(scans.status, ['queued', 'running'])),
+      )
+      .limit(1);
+
+    if (active.length > 0) {
       result.skipped += 1;
       continue;
     }

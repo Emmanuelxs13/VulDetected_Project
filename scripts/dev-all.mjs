@@ -319,6 +319,22 @@ function ensureScheduler() {
   return true;
 }
 
+function ensureMailDispatcher() {
+  if (!process.env.MAIL_DISPATCH_SECRET) {
+    console.error('[dev:all] Mail dispatcher: MAIL_DISPATCH_SECRET is not set; skipping.');
+    return false;
+  }
+
+  console.log('[dev:all] Mail dispatcher: starting apps/web/scripts/run-mail-dispatcher.mjs');
+  startChild(
+    'mail-dispatch',
+    process.execPath,
+    [join(ROOT, 'apps', 'web', 'scripts', 'run-mail-dispatcher.mjs')],
+    { env: { MAIL_DISPATCH_INTERVAL_MS: process.env.MAIL_DISPATCH_INTERVAL_MS ?? '5000' } },
+  );
+  return true;
+}
+
 function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -350,6 +366,7 @@ async function main() {
 
   ensureScannerWorker();
   ensureScheduler();
+  ensureMailDispatcher();
 
   console.log('[dev:all] Starting the web app (Ctrl+C stops everything this script started).');
   const web = startChild('web', 'pnpm', ['run', 'dev'], { shell: process.platform === 'win32' });

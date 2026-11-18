@@ -181,7 +181,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
           const previousFindings = await tx
             .select({ findingKey: findings.findingKey })
             .from(findings)
-            .where(eq(findings.scanId, previousScanRows[0].id));
+            .where(
+              and(
+                eq(findings.scanId, previousScanRows[0].id),
+                /**
+                 * Active findings only (Sprint 2, CA-25).
+                 *
+                 * "New" means "not present in the previous comparable scan's
+                 * OPEN findings". A finding the user marked resolved in that
+                 * scan is not active, so if it comes back it is a reappearance
+                 * and must raise a new-vulnerability alert. Comparing against
+                 * every row ever written would silently swallow exactly the
+                 * regression the product exists to catch.
+                 */
+                eq(findings.status, 'open'),
+              ),
+            );
           for (const row of previousFindings) previousKeys.add(row.findingKey);
         }
 

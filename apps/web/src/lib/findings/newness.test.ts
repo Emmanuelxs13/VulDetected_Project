@@ -135,3 +135,28 @@ describe('computeNewFindingKeys', () => {
     expect(computeNewFindingKeys(['a', 'a'], new Set()).size).toBe(1);
   });
 });
+
+describe('Sprint 2 · HU-07 · CA-25 — new vulnerability is a comparison, not a count', () => {
+  it('CA-25: a finding already open in the previous comparable scan is not new', () => {
+    const fresh = computeNewFindingKeys(['sqli-key'], new Set(['sqli-key']));
+    expect(fresh.size).toBe(0);
+  });
+
+  it('CA-25: a fingerprint absent from the previous active set is new', () => {
+    const fresh = computeNewFindingKeys(['sqli-key', 'xss-key'], new Set(['sqli-key']));
+    expect([...fresh]).toEqual(['xss-key']);
+  });
+
+  it('CA-25: a reappearance after the finding was resolved counts as new', () => {
+    // The callback compares against the previous scan's ACTIVE set. A finding
+    // marked resolved is not in it, so the same key coming back is new.
+    const previousActive = new Set<string>();
+    const fresh = computeNewFindingKeys(['sqli-key'], previousActive);
+    expect(fresh.has('sqli-key')).toBe(true);
+  });
+
+  it('CA-25: a first scan marks everything new, because there is no baseline', () => {
+    const fresh = computeNewFindingKeys(['a', 'b'], new Set());
+    expect(fresh.size).toBe(2);
+  });
+});
