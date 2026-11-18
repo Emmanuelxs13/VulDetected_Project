@@ -1,6 +1,17 @@
 import 'server-only';
 
-import { and, count, domains, eq, findings, inArray, notifications, scans, users } from '@vuldetected/db';
+import {
+  and,
+  count,
+  domains,
+  eq,
+  findings,
+  inArray,
+  notifications,
+  scanSchedules,
+  scans,
+  users,
+} from '@vuldetected/db';
 
 import { db } from '@/lib/db';
 import { getEnv } from '@/lib/env';
@@ -86,8 +97,10 @@ export async function queuePasswordResetEmail(
  */
 export { RESET_TTL_MINUTES, VERIFICATION_TTL_HOURS } from './templates';
 
-interface ScanMailContext {
+export interface ScanMailContext {
   scanId: string;
+  domainId: string;
+  source: string;
   targetUrl: string;
   hostname: string;
   userEmail: string;
@@ -98,6 +111,8 @@ async function loadScanMailContext(scanId: string): Promise<ScanMailContext | nu
   const rows = await db()
     .select({
       scanId: scans.id,
+      domainId: scans.domainId,
+      source: scans.source,
       targetUrl: scans.targetUrl,
       hostname: domains.normalizedHostname,
       userEmail: users.email,
@@ -110,6 +125,32 @@ async function loadScanMailContext(scanId: string): Promise<ScanMailContext | nu
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+/**
+ * Whether this scan's owner asked to be alerted on new criticals.
+ *
+ * ## Why the schedule owns the switch
+ *
+ * A manual scan is a scan the user just started: they are looking at the screen,
+ * so an email about it is redundant but harmless. A scheduled scan runs while
+ * nobody is watching, which is the whole point of the alert — and it is also the
+ * one the user may want to mute without pausing the schedule. `alert_on_new_
+ * critical` is that preference. It defaults to true, so the column existing
+ * without a UI toggle means "alert", never "stay silent".
+ */
+export async function alertsEnabledForScan(context: ScanMailContext): Promise<boolean> {
+  if (context.source !== 'schedule') {
+    return true;
+  }
+
+  const rows = await db()
+    .select({ alertOnNewCritical: scanSchedules.alertOnNewCritical })
+    .from(scanSchedules)
+    .where(eq(scanSchedules.domainId, context.domainId))
+    .limit(1);
+
+  return rows[0]?.alertOnNewCritical ?? true;
 }
 
 /**
@@ -216,6 +257,10 @@ export async function notifyScanCompleted(scanId: string): Promise<void> {
    * previous comparable scan's open findings, so a reappearance after a resolved
    * mark is new again.
    */
+  if (!(await alertsEnabledForScan(context))) {
+    return;
+  }
+
   const alertable = await db()
     .select({ title: findings.title, affectedUrl: findings.affectedUrl })
     .from(findings)
