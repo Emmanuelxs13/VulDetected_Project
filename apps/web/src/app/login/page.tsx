@@ -5,6 +5,8 @@ import Link from 'next/link';
 
 import { LoginForm } from '@/features/auth/login-form';
 import { getServerSession } from '@/features/auth/session';
+import { getSocialSetup } from '@/lib/auth/social-setup';
+import { socialErrorMessageKey } from '@/lib/auth/social-errors';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('auth');
@@ -12,13 +14,27 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('login.title') };
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
   const t = await getTranslations('auth');
 
   const session = await getServerSession();
   if (session?.user) {
     redirect('/dashboard');
   }
+
+  /**
+   * The `error` query parameter is what an OAuth callback appends when it
+   * refuses. It is mapped through a whitelist before it reaches the page — see
+   * `lib/auth/social-errors.ts` for why echoing it would be wrong.
+   */
+  const params = await searchParams;
+  const errorCode = Array.isArray(params.error) ? params.error[0] : params.error;
+  const socialErrorKey = socialErrorMessageKey(errorCode);
+  const social = getSocialSetup();
 
   return (
     <div className="min-h-screen bg-bg">
@@ -59,7 +75,11 @@ export default async function LoginPage() {
               <p className="text-text-muted">{t('login.description')}</p>
             </div>
             <div className="rounded-lg border border-border bg-surface p-6 shadow-lg shadow-black/20">
-              <LoginForm />
+              <LoginForm
+                socialProviders={social.providers}
+                socialSimulated={social.mode === 'demo'}
+                socialErrorKey={socialErrorKey}
+              />
             </div>
             <p className="text-center text-sm text-text-muted">
               ¿No tienes cuenta?{' '}

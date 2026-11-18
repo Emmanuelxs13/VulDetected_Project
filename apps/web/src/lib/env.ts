@@ -201,6 +201,33 @@ const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().min(1).optional(),
   GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
 
+  /**
+   * DEMO ONLY. The simulated OAuth provider that stands in for Google and GitHub
+   * when no real credentials exist (HU-02a, CA-30/31/32).
+   *
+   * ## Why a simulated provider instead of "it would work with credentials"
+   *
+   * The criterion is "a user can create an account and sign in with Google". A
+   * manual that says the code would do it if it had a client id is not evidence,
+   * and a live Google project cannot be replayed by a reviewer. The simulator
+   * implements the same authorization-code + PKCE contract, so the flow, the
+   * callbacks, the linking rules and the session are all exercised for real —
+   * only the identity provider is a stand-in, and it says so on every screen.
+   *
+   * ## Why four variables and a base URL
+   *
+   * The base URL alone does not arm anything: `DEMO_MODE` must also be true, and
+   * `lib/auth/social.ts` refuses to build a partial configuration rather than
+   * silently dropping one provider. Production rejects every one of these — a
+   * simulated identity provider reachable in production is an authentication
+   * bypass, not a demo aid.
+   */
+  OAUTH_DEMO_BASE_URL: z.string().url('OAUTH_DEMO_BASE_URL must be an absolute URL').optional(),
+  OAUTH_DEMO_GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  OAUTH_DEMO_GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  OAUTH_DEMO_GITHUB_CLIENT_ID: z.string().min(1).optional(),
+  OAUTH_DEMO_GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 });
 
@@ -261,6 +288,32 @@ const productionRefinement = (value: z.infer<typeof envSchema>, ctx: z.Refinemen
         'DEMO_ALLOW_PRIVATE_TARGETS must not be enabled in production: it disables the SSRF ' +
         'guard and lets the scanner reach loopback and RFC1918 addresses.',
     });
+  }
+  /**
+   * The simulated OAuth provider is a demo-only identity source. In production it
+   * would let anyone holding its client credentials mint a session for any address
+   * the simulator is told to assert — the exact thing a real provider exists to
+   * prevent. Refusing to boot is the only acceptable failure mode, and it names
+   * every offending variable rather than the first one.
+   */
+  const demoOauthVariables = [
+    'OAUTH_DEMO_BASE_URL',
+    'OAUTH_DEMO_GOOGLE_CLIENT_ID',
+    'OAUTH_DEMO_GOOGLE_CLIENT_SECRET',
+    'OAUTH_DEMO_GITHUB_CLIENT_ID',
+    'OAUTH_DEMO_GITHUB_CLIENT_SECRET',
+  ] as const;
+  for (const name of demoOauthVariables) {
+    if (value[name]) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [name],
+        message:
+          `${name} must not be set in production: the simulated OAuth provider is a demo ` +
+          'component, and a simulated identity provider reachable in production is an ' +
+          'authentication bypass.',
+      });
+    }
   }
   if (value.SCAN_REQUIRE_VERIFIED_DOMAIN === 'false') {
     ctx.addIssue({

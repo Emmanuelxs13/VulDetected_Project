@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { RegisterForm } from '@/features/auth/register-form';
 import { getServerSession } from '@/features/auth/session';
+import { getSocialSetup } from '@/lib/auth/social-setup';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('auth');
@@ -19,6 +20,8 @@ export default async function RegisterPage() {
   if (session?.user) {
     redirect('/dashboard');
   }
+
+  const social = getSocialSetup();
 
   return (
     <div className="min-h-screen bg-bg">
@@ -59,7 +62,10 @@ export default async function RegisterPage() {
               <p className="text-text-muted">{t('register.description')}</p>
             </div>
             <div className="rounded-lg border border-border bg-surface p-6 shadow-lg shadow-black/20">
-              <RegisterForm />
+              <RegisterForm
+                socialProviders={social.providers}
+                socialSimulated={social.mode === 'demo'}
+              />
             </div>
             <p className="text-center text-sm text-text-muted">
               ¿Ya tienes cuenta?{' '}

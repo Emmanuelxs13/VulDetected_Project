@@ -276,6 +276,63 @@ async function ensureFixture() {
 }
 
 /**
+ * Starts the simulated OAuth provider (HU-02a).
+ *
+ * ## Why it is conditional
+ *
+ * Only runs when the demo profile asks for it: `DEMO_MODE=true` AND
+ * `OAUTH_DEMO_BASE_URL` set. A developer with real Google/GitHub credentials gets
+ * the real providers and no extra process, which is the same rule the auth
+ * instance follows — the two must not disagree, or the login screen would offer a
+ * button backed by nothing.
+ *
+ * ## Why it is a hard dependency when armed
+ *
+ * `lib/auth/social.ts` refuses to build a partial demo configuration, so if the
+ * credentials are missing the web app will throw on the first request. Failing
+ * here instead names the missing variables once, before anything else starts.
+ */
+async function ensureOAuthProvider() {
+  const baseUrl = process.env.OAUTH_DEMO_BASE_URL;
+  if (process.env.DEMO_MODE !== 'true' || !baseUrl) {
+    console.log('[dev:all] OAuth provider: skipped (demo profile is off)');
+    return true;
+  }
+
+  const url = new URL(baseUrl);
+  const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
+
+  if (await checkHttp(`${url.origin}/health`)) {
+    console.log(`[dev:all] OAuth provider (${port}): OK (existing server)`);
+    return true;
+  }
+
+  const missing = [
+    'OAUTH_DEMO_GOOGLE_CLIENT_ID',
+    'OAUTH_DEMO_GOOGLE_CLIENT_SECRET',
+    'OAUTH_DEMO_GITHUB_CLIENT_ID',
+    'OAUTH_DEMO_GITHUB_CLIENT_SECRET',
+  ].filter((name) => !process.env[name]);
+
+  if (missing.length > 0) {
+    console.error(
+      `[dev:all] OAuth provider: OAUTH_DEMO_BASE_URL is set but these are missing: ${missing.join(', ')}`,
+    );
+    return false;
+  }
+
+  console.log(`[dev:all] OAuth provider (${port}): starting the simulated provider`);
+  startChild(
+    'oauth-provider',
+    process.execPath,
+    [join(ROOT, 'apps', 'web', 'scripts', 'demo', 'oauth-provider.mjs')],
+    { env: { OAUTH_DEMO_PORT: String(port) } },
+  );
+
+  return waitFor(`OAuth provider (${port})`, () => checkHttp(`${url.origin}/health`));
+}
+
+/**
  * Starts the Python worker.
  *
  * ## Why demo mode forces the LOCAL worker
@@ -385,7 +442,8 @@ async function main() {
     (await ensurePostgres()) &&
     (await ensureRedis()) &&
     (await ensureMailpit()) &&
-    (await ensureFixture());
+    (await ensureFixture()) &&
+    (await ensureOAuthProvider());
 
   if (!ready) {
     console.error('[dev:all] A required dependency is not available. Aborting.');

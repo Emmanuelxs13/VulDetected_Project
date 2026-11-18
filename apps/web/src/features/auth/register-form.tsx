@@ -10,6 +10,7 @@ import { useFormStatus } from 'react-dom';
 
 import { registerAction } from './actions';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './schema';
+import type { SocialProviderId } from '@/lib/auth/social';
 
 const SocialButtons = dynamic(() => import('./social-buttons').then((m) => m.SocialButtons), {
   ssr: false,
@@ -41,7 +42,13 @@ const SocialButtons = dynamic(() => import('./social-buttons').then((m) => m.Soc
  * this form translates them, so validation and auth failures follow the language
  * switch like every other string on the page.
  */
-export function RegisterForm() {
+export function RegisterForm({
+  socialProviders = [],
+  socialSimulated = false,
+}: {
+  socialProviders?: readonly SocialProviderId[];
+  socialSimulated?: boolean;
+}) {
   const t = useTranslations('auth');
   const [state, formAction] = useActionState(registerAction, null);
 
@@ -119,7 +126,11 @@ export function RegisterForm() {
 
       <SubmitButton />
 
-      <SocialButtons mode="register" />
+      <SocialButtons
+        mode="register"
+        providers={socialProviders}
+        simulated={socialSimulated}
+      />
 
       <p className="text-xs text-text-muted">
         {t('register.haveAccount')}{' '}

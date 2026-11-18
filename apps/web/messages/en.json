@@ -129,7 +129,19 @@
       "continueGoogle": "Continue with Google",
       "continueGithub": "Continue with GitHub",
       "signUpGoogle": "Sign up with Google",
-      "signUpGithub": "Sign up with GitHub"
+      "signUpGithub": "Sign up with GitHub",
+      "simulated": "Simulated identity provider: this sign-in does not contact Google or GitHub. It is used because the demo has no real credentials.",
+      "errors": {
+        "accountNotLinked": "An account with that address already exists and is not linked to this provider yet. Sign in with your password and link the provider from settings, or verify your email and try again.",
+        "emailNotVerified": "The provider does not assert that this address is verified, so no session was started. Verify your email and try again.",
+        "emailDoesNotMatch": "The provider's address does not match your account. Sign in with your password.",
+        "alreadyLinkedToAnotherUser": "That provider is already linked to another account.",
+        "unableToLink": "The provider could not be linked to your account. Try again.",
+        "unableToGetProfile": "Your profile could not be read from the provider. Try again.",
+        "signupDisabled": "Sign-up with external providers is disabled.",
+        "authorizationExpired": "The authorization expired or is not valid. Try again.",
+        "generic": "Social sign-in could not be completed. Try again or use your password."
+      }
     }
   },
   "dashboard": {

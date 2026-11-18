@@ -28,9 +28,29 @@ if (!process.env.DATABASE_URL) {
 const sql = postgres(process.env.DATABASE_URL);
 const password = 'VulDetected-Demo-2026!';
 const users = [
-  { email: 'demo.free@vuldetected.local', name: 'Demo Free', plan: 'free' },
-  { email: 'demo.pro@vuldetected.local', name: 'Demo Pro', plan: 'pro' },
-  { email: 'demo.business@vuldetected.local', name: 'Demo Business', plan: 'business' },
+  { email: 'demo.free@vuldetected.local', name: 'Demo Free', plan: 'free', emailVerified: true },
+  { email: 'demo.pro@vuldetected.local', name: 'Demo Pro', plan: 'pro', emailVerified: true },
+  {
+    email: 'demo.business@vuldetected.local',
+    name: 'Demo Business',
+    plan: 'business',
+    emailVerified: true,
+  },
+  /**
+   * The ADR 0016 negative case.
+   *
+   * A local account that never verified its mailbox. Signing in with a provider
+   * that asserts the same address must NOT attach to this account and must not
+   * issue a session: the address is proven by the provider, but this account
+   * never proved it controls that mailbox. Without a row in this state the rule
+   * cannot be demonstrated, only described.
+   */
+  {
+    email: 'demo.sinverificar@vuldetected.local',
+    name: 'Demo Sin Verificar',
+    plan: 'free',
+    emailVerified: false,
+  },
 ];
 
 try {
@@ -51,11 +71,11 @@ try {
           subscription_plan, subscription_status
         )
         VALUES (
-          ${userId}, ${demo.email}, true, ${demo.name}, 'active', 'es',
+          ${userId}, ${demo.email}, ${demo.emailVerified}, ${demo.name}, 'active', 'es',
           ${demo.plan}, 'active'
         )
         ON CONFLICT (email) DO UPDATE SET
-          email_verified = true,
+          email_verified = EXCLUDED.email_verified,
           name = EXCLUDED.name,
           status = 'active',
           subscription_plan = EXCLUDED.subscription_plan,
@@ -76,3 +96,4 @@ try {
 }
 
 console.log('Demo users seeded. Shared local password:', password);
+console.log('  demo.sinverificar@vuldetected.local is intentionally email-unverified (ADR 0016).');

@@ -10,12 +10,25 @@ import { useFormStatus } from 'react-dom';
 
 import { loginAction } from './actions';
 import { MAX_PASSWORD_LENGTH } from './schema';
+import type { SocialProviderId } from '@/lib/auth/social';
 
 const SocialButtons = dynamic(() => import('./social-buttons').then((m) => m.SocialButtons), {
   ssr: false,
 });
 
-export function LoginForm() {
+export function LoginForm({
+  socialProviders = [],
+  socialSimulated = false,
+  socialErrorKey,
+}: {
+  socialProviders?: readonly SocialProviderId[];
+  socialSimulated?: boolean;
+  /**
+   * Translation key for a social sign-in failure, already mapped from the
+   * `?error=` code Better Auth appends on the redirect back to this page.
+   */
+  socialErrorKey?: string;
+}) {
   const t = useTranslations('auth');
   const [state, formAction] = useActionState(loginAction, null);
 
@@ -24,7 +37,8 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-4" noValidate>
-      <div aria-live="polite" aria-atomic="true">
+      <div aria-live="polite" aria-atomic="true" className="flex flex-col gap-2">
+        {socialErrorKey ? <Alert variant="critical" title={translate(socialErrorKey)} /> : null}
         {state && !state.success ? (
           <Alert variant="critical" title={translate(state.error)} />
         ) : null}
@@ -74,7 +88,7 @@ export function LoginForm() {
 
       <SubmitButton />
 
-      <SocialButtons mode="login" />
+      <SocialButtons mode="login" providers={socialProviders} simulated={socialSimulated} />
 
       <p className="text-xs text-text-muted">
         {t('login.noAccount')}{' '}
