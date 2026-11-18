@@ -46,6 +46,16 @@ const TABLES = [
   'scan_credentials',
   'domains',
   'sessions',
+  /**
+   * `accounts` is cleared too, and this is not cosmetic.
+   *
+   * It holds both the `credential` rows (the password) and every linked social
+   * provider. A leftover Google link turns CA-31's "link this provider to my
+   * existing account" into an ordinary sign-in, so the criterion silently stops
+   * being exercised on the second run. The seeder below recreates the credential
+   * rows, so nothing is lost.
+   */
+  'accounts',
   'verification_tokens',
 ];
 
@@ -108,4 +118,5 @@ if (process.env.REDIS_URL) {
 
 console.log(`\n[${SCRIPT}] Demo reset complete.`);
 console.log('  Demo users: demo.free@ / demo.pro@ / demo.business@vuldetected.local');
+console.log('  Unverified: demo.sinverificar@vuldetected.local (ADR 0016 negative case)');
 console.log('  Password:   VulDetected-Demo-2026!');
