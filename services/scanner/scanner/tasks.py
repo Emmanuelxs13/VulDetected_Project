@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, List, Optional
 from celery import Celery
 
 from . import ssrf
+from .auth import LoginError, login_with_form
 from .egress import HardenedClient
 from .report import CallbackClient
 
@@ -40,6 +41,20 @@ DEFAULT_CHECKS = [
     "cors",
     "directory_listing",
     "sensitive_files",
+]
+
+#: Checks that are meaningful against a page reached only through a session.
+#:
+#: The rest describe the host, not the page: `tls` is a property of the
+#: connection, and `sensitive_files`/`directory_listing` probe paths from the
+#: site root, so running them under `/private` would report artifacts of the
+#: path prefix instead of anything the login exposed. The four below inspect the
+#: response the authenticated request actually got.
+AUTHENTICATED_CHECKS = [
+    "security_headers",
+    "cookies",
+    "xss",
+    "sqli",
 ]
 
 CANCEL_KEY = "vuldetected:scan:cancel:{scan_id}"
@@ -202,50 +217,113 @@ def run_scan(
         all_findings: List[Dict[str, Any]] = []
         checks_run: List[str] = []
 
-        for check_name in checks_list:
+        # Authenticated scan (HU-04, CA-25 to CA-27, ADR 0020).
+        #
+        # The login happens BEFORE the first check, and a login that does not
+        # produce a session fails the scan. Continuing anonymously would produce
+        # a report that looks complete and says nothing about the pages the user
+        # configured a credential for.
+        authenticated_url: Optional[str] = None
+        if credentials and str(credentials.get("kind", "")).lower() == "form":
             try:
-                cb.send_event(scan_id, ctx.next_seq(), "check.started", {"check": check_name})
-                module = importlib.import_module(f"scanner.checks.{check_name}")
-                result = await module.run(ctx)
-                if result:
-                    all_findings.extend(result)
-                checks_run.append(check_name)
-                cb.send_event(scan_id, ctx.next_seq(), "check.completed", {"check": check_name})
-            except ScanCancelled:
-                _best_effort_event(cb, scan_id, ctx, "scan.cancelled", {"reason": "user"})
-                cb.send_callback(
-                    scan_id,
-                    task_id,
-                    "cancelled",
-                    findings=all_findings,
-                    checks_run=checks_run,
-                    error="cancelled_by_user",
+                authenticated_url = login_with_form(client, target["base_url"], credentials)
+            except LoginError as e:
+                _best_effort_event(
+                    cb, scan_id, ctx, "scan.login_failed", {"reason": e.reason}
                 )
-                client.close()
-                return {"status": "cancelled"}
-            except ScanBudgetExceeded as e:
+                # The stream expects a terminal event, and `scan.login_failed`
+                # alone is not one: the page would sit on "Escaneando" forever.
+                _best_effort_event(
+                    cb, scan_id, ctx, "scan.failed", {"error": f"login_failed: {e.reason}"}
+                )
                 cb.send_callback(
                     scan_id,
                     task_id,
                     "failed",
-                    findings=all_findings,
-                    checks_run=checks_run,
-                    error=f"scan_budget_exceeded: {e}",
+                    findings=[],
+                    checks_run=[],
+                    error=f"login_failed: {e.reason}",
                 )
                 client.close()
                 return {"status": "failed"}
-            except Exception as e:
-                _best_effort_event(cb, scan_id, ctx, "scan.failed", {"error": str(e)})
-                cb.send_callback(
-                    scan_id,
-                    task_id,
-                    "failed",
-                    findings=all_findings,
-                    checks_run=checks_run,
-                    error=str(e),
+
+            _best_effort_event(
+                cb, scan_id, ctx, "scan.authenticated", {"url": authenticated_url}
+            )
+
+        # Two passes, one context. The cookie jar lives on the client, so the
+        # authenticated pass sees exactly the session the login created.
+        passes = [("public", target["base_url"], list(checks_list))]
+        if authenticated_url is not None:
+            passes.append(
+                (
+                    "authenticated",
+                    authenticated_url,
+                    [name for name in checks_list if name in AUTHENTICATED_CHECKS],
                 )
-                client.close()
-                return {"status": "failed"}
+            )
+
+        try:
+            for scope, base_url, scope_checks in passes:
+                ctx.target = {**ctx.target, "base_url": base_url}
+                for check_name in scope_checks:
+                    cb.send_event(
+                        scan_id,
+                        ctx.next_seq(),
+                        "check.started",
+                        {"check": check_name, "scope": scope},
+                    )
+                    module = importlib.import_module(f"scanner.checks.{check_name}")
+                    result = await module.run(ctx)
+                    if result:
+                        all_findings.extend(result)
+                    # `checks_run` is the set of requested checks that finished,
+                    # not the number of passes: the authenticated pass re-runs a
+                    # subset of the same checks and must not make the scan look
+                    # longer than it was.
+                    if scope == "public":
+                        checks_run.append(check_name)
+                    cb.send_event(
+                        scan_id,
+                        ctx.next_seq(),
+                        "check.completed",
+                        {"check": check_name, "scope": scope},
+                    )
+        except ScanCancelled:
+            _best_effort_event(cb, scan_id, ctx, "scan.cancelled", {"reason": "user"})
+            cb.send_callback(
+                scan_id,
+                task_id,
+                "cancelled",
+                findings=all_findings,
+                checks_run=checks_run,
+                error="cancelled_by_user",
+            )
+            client.close()
+            return {"status": "cancelled"}
+        except ScanBudgetExceeded as e:
+            cb.send_callback(
+                scan_id,
+                task_id,
+                "failed",
+                findings=all_findings,
+                checks_run=checks_run,
+                error=f"scan_budget_exceeded: {e}",
+            )
+            client.close()
+            return {"status": "failed"}
+        except Exception as e:
+            _best_effort_event(cb, scan_id, ctx, "scan.failed", {"error": str(e)})
+            cb.send_callback(
+                scan_id,
+                task_id,
+                "failed",
+                findings=all_findings,
+                checks_run=checks_run,
+                error=str(e),
+            )
+            client.close()
+            return {"status": "failed"}
 
         # Optional external engines (Nuclei / OWASP ZAP). Absent configuration is
         # a no-op; a configured engine that fails is ignored so it cannot fail the
