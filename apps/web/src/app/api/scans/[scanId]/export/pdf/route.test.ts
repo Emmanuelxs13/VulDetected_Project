@@ -34,7 +34,18 @@ vi.mock('@/features/auth/session', () => ({
 vi.mock('next-intl/server', () => ({
   getTranslations: async (namespace: string) => {
     const translate = (key: string) => `${namespace}.${key}`;
-    return Object.assign(translate, { has: () => false });
+
+    /**
+     * `raw` is not a convenience here: `t()` throws when a message contains ICU
+     * placeholders and no values are supplied, and next-intl then returns the
+     * joined key. The route reads its templated strings (`subtitle`, `page`,
+     * `severityCount`) through `raw` for exactly that reason, so the stub has to
+     * expose it or the test would be exercising an API the route never uses.
+     */
+    return Object.assign(translate, {
+      has: () => false,
+      raw: (key: string) => `${namespace}.${key}`,
+    });
   },
 }));
 

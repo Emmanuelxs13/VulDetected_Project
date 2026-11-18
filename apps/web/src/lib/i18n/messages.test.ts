@@ -34,15 +34,17 @@ function flatten(tree: Tree, prefix = ''): string[] {
   return keys;
 }
 
+function get(tree: Tree, path: string): unknown {
+  return path.split('.').reduce<unknown>((node, part) => {
+    if (node && typeof node === 'object') {
+      return (node as Tree)[part];
+    }
+    return undefined;
+  }, tree);
+}
+
 function has(tree: Tree, path: string): boolean {
-  return (
-    path.split('.').reduce<unknown>((node, part) => {
-      if (node && typeof node === 'object') {
-        return (node as Tree)[part];
-      }
-      return undefined;
-    }, tree) !== undefined
-  );
+  return get(tree, path) !== undefined;
 }
 
 function sourceFiles(dir: string): string[] {
@@ -94,5 +96,59 @@ describe('i18n messages', () => {
     // into a no-op that always passes.
     expect(checked).toBeGreaterThan(50);
     expect(missing).toEqual([]);
+  });
+
+  it('never formats a placeholder message with t(), only with t.raw()', () => {
+    /**
+     * `t('subtitle')` on `"Resultado del escaneo de {host}"` does not return the
+     * template: ICU formatting fails for the missing value and next-intl hands
+     * back its fallback, the joined key. The caller then prints
+     * `reports.pdf.subtitle` on the page, with no exception and a 200 response.
+     *
+     * That is how the executive PDF shipped with its subtitle, page footer and
+     * severity counts replaced by key names: the unit test fed the renderer the
+     * template directly, so it never went through the translator.
+     *
+     * A single-argument call is the whole trigger — a call that passes values is
+     * fine. Anything that carries `{...}` must be read with `t.raw()`.
+     */
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    const offenders: string[] = [];
+    let checked = 0;
+
+    for (const file of sourceFiles(root)) {
+      const source = readFileSync(file, 'utf8');
+      const namespaces = [
+        ...[...source.matchAll(/getTranslations\(\s*'([^']+)'/g)].map((m) => m[1]),
+        ...[...source.matchAll(/useTranslations\(\s*'([^']+)'/g)].map((m) => m[1]),
+      ];
+      if (namespaces.length === 0) {
+        continue;
+      }
+
+      // `t(...)`, `tScan(...)`, `tPdf(...)`, `credentialsT(...)` — but not
+      // `trim(...)` and not `t.has(...)`. The call must be closed immediately,
+      // which is what distinguishes it from a call that supplies values.
+      for (const match of source.matchAll(
+        /(?<![\w.])(t(?:[A-Z][A-Za-z]*)?|credentialsT)\(\s*'([^']+)'\s*\)/g,
+      )) {
+        const key = match[2];
+        const message = namespaces
+          .map((namespace) => get(en as Tree, `${namespace}.${key}`))
+          .find((value) => typeof value === 'string');
+
+        if (typeof message !== 'string') {
+          continue; // The missing-key test above already reports this one.
+        }
+
+        checked += 1;
+        if (message.includes('{')) {
+          offenders.push(`${file}: ${match[1]}('${key}') -> ${JSON.stringify(message)}`);
+        }
+      }
+    }
+
+    expect(checked).toBeGreaterThan(5);
+    expect(offenders).toEqual([]);
   });
 });
