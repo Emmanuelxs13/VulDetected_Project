@@ -1,4 +1,4 @@
-import { and, asc, domains, eq, inArray, isNull, lte, or, scanSchedules, scans } from '@vuldetected/db';
+import { and, asc, domains, eq, inArray, isNull, lte, or, scanSchedules, scans, sql } from '@vuldetected/db';
 
 import { enqueueScanForDomain, scheduleTargetFor } from '@/features/scans/enqueue';
 import { computeNextRunAt, isDue } from '@/features/scans/schedule-schema';
@@ -95,7 +95,17 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedu
           eq(scanSchedules.id, row.id),
           previous === null
             ? isNull(scanSchedules.nextRunAt)
-            : eq(scanSchedules.nextRunAt, previous),
+            : /**
+               * Truncated to milliseconds on purpose.
+               *
+               * `next_run_at` is a `timestamptz`, which stores microseconds, and
+               * the driver hands it back as a JS `Date`, which only holds
+               * milliseconds. A plain equality would therefore never match a
+               * value written by SQL (`now()`, a column default, the demo
+               * accelerator) and the schedule would silently never fire — the
+               * runner would report it as skipped on every tick, forever.
+               */
+              sql`date_trunc('milliseconds', ${scanSchedules.nextRunAt}) = ${previous.toISOString()}::timestamptz`,
         ),
       )
       .returning({ id: scanSchedules.id });
