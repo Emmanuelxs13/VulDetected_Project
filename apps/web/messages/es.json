@@ -743,6 +743,111 @@
         "title": "Todavía no hay dominios verificados",
         "description": "Verifica un dominio desde la página de escaneos para poder escanearlo."
       }
+    },
+    "billing": {
+      "title": "Facturación",
+      "description": "Tu plan, su estado y lo que incluye.",
+      "hint": "Los planes pagos se gestionan desde la pantalla de facturación.",
+      "action": "Ver facturación"
+    }
+  },
+  "billing": {
+    "pageTitle": "Facturación y plan",
+    "pageDescription": "Revisa tu plan, su estado y el uso que estás haciendo de él. Los cambios de plan se confirman por webhook, igual que con una pasarela real.",
+    "demoBadge": "Modo demostración",
+    "demoNoticeTitle": "Modo demostración: no se realiza ningún cobro",
+    "demoNoticeDescription": "Los pagos se procesan con un proveedor simulado. Ninguna tarjeta se cobra y ninguna suscripción genera una obligación de pago.",
+    "notConfiguredTitle": "Facturación no configurada",
+    "notConfiguredDescription": "No hay proveedor de pagos activo en este entorno. Los planes se muestran en modo lectura.",
+    "current": {
+      "title": "Suscripción actual",
+      "description": "Estado que el proveedor confirmó por última vez.",
+      "plan": "Plan",
+      "status": "Estado",
+      "periodEnd": "Fin del período",
+      "lastCheckout": "Último intento de pago",
+      "noCheckout": "Sin intentos de pago",
+      "checkoutSummary": "{plan} · {status}",
+      "cancellationScheduledTitle": "Cancelación programada",
+      "cancellationScheduledDescription": "El plan sigue activo hasta el fin del período pagado. Volver a pagar cancela la baja.",
+      "appliedEvents": "Eventos del proveedor aplicados a esta cuenta: {count}"
+    },
+    "usage": {
+      "title": "Uso del plan",
+      "description": "Lo que estás consumiendo de los límites del plan actual.",
+      "domains": "Dominios",
+      "scansThisMonth": "Escaneos este mes",
+      "activeScans": "Escaneos activos",
+      "schedules": "Programaciones",
+      "unlimited": "sin límite"
+    },
+    "plans": {
+      "currentBadge": "Plan actual",
+      "pricePending": "[COMPLETAR: precios definitivos]",
+      "freePrice": "Gratis",
+      "domains": "{count} dominios",
+      "scans": "{count} escaneos al mes",
+      "unlimitedScans": "Escaneos sin límite",
+      "concurrent": "{count} escaneos simultáneos",
+      "schedules": "{count} programaciones",
+      "changeTo": "Cambiar a {plan}",
+      "freeHint": "El plan Free es donde empieza toda cuenta y no se compra."
+    },
+    "status": {
+      "trialing": "En prueba",
+      "active": "Activo",
+      "past_due": "Pago pendiente",
+      "cancelled": "Cancelado"
+    },
+    "checkoutStatus": {
+      "pending": "Pendiente",
+      "paid": "Pagado",
+      "declined": "Rechazado"
+    },
+    "cancelButton": "Cancelar renovación",
+    "cancelErrorTitle": "No se pudo solicitar la cancelación",
+    "checkoutErrorTitle": "No se pudo iniciar el pago",
+    "planLabel": "Plan",
+    "priceLabel": "Precio",
+    "pricePending": "[COMPLETAR: precio definitivo]",
+    "checkoutStatusLabel": "Estado del checkout",
+    "errors": {
+      "invalidPlan": "Ese plan no se puede comprar.",
+      "providerNotConfigured": "La facturación no está configurada en este entorno.",
+      "checkoutFailed": "No se pudo crear el checkout. Inténtalo de nuevo.",
+      "cancelFailed": "No se pudo solicitar la cancelación."
+    },
+    "demoCheckout": {
+      "pageTitle": "Pasarela de pago simulada",
+      "pageDescription": "Esta página sustituye a la pasarela real. Al pagar se envía un webhook firmado a VulDetected; la suscripción cambia solo cuando ese webhook se aplica.",
+      "payTitle": "Pagar el plan {plan}",
+      "cardLegend": "Elige una tarjeta de prueba",
+      "approvedLabel": "Pago aprobado",
+      "approvedHint": "El webhook confirma el pago y activa el plan.",
+      "declinedLabel": "Pago rechazado",
+      "declinedHint": "El webhook registra el rechazo y no cambia el plan.",
+      "payButton": "Pagar",
+      "paying": "Enviando webhook...",
+      "resultTitle": "Respuesta del webhook",
+      "errorTitle": "El webhook no aceptó el evento",
+      "resilienceTitle": "Pruebas de robustez del webhook",
+      "resilienceDescription": "Dos casos que una pasarela real produce todo el tiempo: reintentos y eventos fuera de orden.",
+      "replayButton": "Reenviar el mismo evento",
+      "outOfOrderButton": "Enviar un rechazo con hora anterior",
+      "outcome": {
+        "applied": "Aplicado: el estado de la suscripción cambió.",
+        "declined": "Rechazado: el intento de pago quedó registrado y el plan no cambió.",
+        "duplicate": "Duplicado: el evento ya estaba registrado y no se aplicó dos veces.",
+        "stale": "Descartado por antigüedad: es más viejo que el último evento aplicado.",
+        "ignored": "Ignorado: no corresponde a esta cuenta."
+      },
+      "error": {
+        "provider_off": "El proveedor simulado no está activo (DEMO_MODE).",
+        "checkout_missing": "El checkout no existe.",
+        "card_unknown": "Tarjeta no reconocida por el simulador.",
+        "webhook_failed": "El webhook respondió {status}. Una pasarela real reintentaría.",
+        "unknown_intent": "Acción no reconocida."
+      }
     }
   }
 }
