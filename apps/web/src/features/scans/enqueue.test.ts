@@ -115,6 +115,19 @@ describe('enqueueScanForDomain', () => {
     expect(payload && 'credentials' in payload).toBe(false);
   });
 
+  it('records the origin it was asked for instead of the column default', async () => {
+    dbQueue.push([DOMAIN]);
+    dbQueue.push([{ id: 'scan-scheduled' }]);
+
+    const outcome = await enqueueScanForDomain({ ...INPUT, source: 'schedule' });
+
+    expect(outcome).toEqual({ ok: true, scanId: 'scan-scheduled' });
+
+    const values = dbCalls.find((call) => call.method === 'values')?.args[0] as
+      Record<string, unknown> | undefined;
+    expect(values?.source).toBe('schedule');
+  });
+
   it('attaches a resolved credential to the row and the published job', async () => {
     const { activeCredentialForScan, markCredentialUsed } = await import('@/lib/credentials/store');
     vi.mocked(activeCredentialForScan).mockResolvedValueOnce({

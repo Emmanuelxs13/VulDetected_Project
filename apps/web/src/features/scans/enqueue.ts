@@ -160,6 +160,16 @@ export async function enqueueScanForDomain(input: {
       domainId: input.domainId,
       targetUrl: input.target.url,
       status: 'queued',
+      /**
+       * Recorded, not defaulted.
+       *
+       * `scans.source` defaults to `'manual'` at the database boundary. Relying on
+       * that default meant a scheduled run was indistinguishable from one the user
+       * clicked, so the scan list, the audit trail and the "should this run alert?"
+       * decision (`alertsEnabledForScan`) all read the wrong origin for exactly the
+       * scans that HU-07 is about.
+       */
+      source: input.source,
       checks: [...DEFAULT_CHECKS],
       // Recorded on the row so the history can refuse to compare a passive run
       // with an active one (CA-29).
