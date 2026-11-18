@@ -28,6 +28,7 @@ import type { ScanStatus } from '@/features/scans/components/scan-status';
 import { isActiveStatus } from '@/features/scans/scan-status';
 import { getSeverityCounts, listFindingsPage } from '@/features/scans/queries/findings-page';
 import { db } from '@/lib/db';
+import { loginFailureReason } from '@/lib/scans/login-failure';
 import { SEVERITY_ORDER, getSeverityVariant } from '@/lib/severity/classify';
 import { TRAFFIC_LIGHT_LABELS, levelFromCounts } from '@/lib/severity/traffic-light';
 
@@ -139,6 +140,21 @@ export default async function ScanDetailPage({
 
   const checks = Array.isArray(scan.checks) ? (scan.checks as string[]) : [];
 
+  // HU-04 (CA-25 to CA-27): a scan that ran with a credential must say so. The
+  // report is not comparable to an anonymous one, and a reader who does not know
+  // the login was used cannot tell why the private pages have findings.
+  //
+  // The badge follows the worker's own `scan.authenticated` event instead of the
+  // mere presence of a credential: a scan whose login failed was configured with
+  // one too, and labelling that run "authenticated" would claim pages it never
+  // opened (CA-27 forbids exactly that).
+  const authenticated = eventRows.some((event) => event.type === 'scan.authenticated');
+
+  const loginFailedReason = loginFailureReason(scan.error);
+  const loginFailedMessage = loginFailedReason
+    ? t(`detail.loginFailed.reasons.${loginFailedReason}` as 'detail.loginFailed.reasons.invalid_credentials')
+    : null;
+
   // The stored value is a machine code (`enqueue_failed`, the worker's own
   // reason string, …). It is never rendered: the reader gets a translated
   // message and the raw value stays in the database for diagnostics.
@@ -150,7 +166,9 @@ export default async function ScanDetailPage({
     scan.error && scan.error !== 'cancelled_by_user'
       ? scan.error === 'enqueue_failed'
         ? t('errors.submitFailed')
-        : t('status.failed')
+        : loginFailedReason
+          ? t('detail.loginFailed.title')
+          : t('status.failed')
       : null;
 
   const cancellable = isActiveStatus(scan.status as ScanStatus);
@@ -182,6 +200,12 @@ export default async function ScanDetailPage({
             {t('detail.checksLabel')} <span className="font-mono">{checks.join(', ')}</span>
           </p>
         ) : null}
+        {authenticated ? (
+          <div className="flex flex-col gap-1 rounded-md border border-border bg-surface-raised p-3">
+            <Badge variant="info">{t('detail.authenticated.title')}</Badge>
+            <p className="text-xs text-text-muted">{t('detail.authenticated.description')}</p>
+          </div>
+        ) : null}
         {scan.partial ? (
           <div className="flex flex-col gap-1 rounded-md border border-border bg-surface-raised p-3">
             <Badge variant="neutral">{t('detail.partial.title')}</Badge>
@@ -191,8 +215,14 @@ export default async function ScanDetailPage({
       </div>
 
       {errorMessage ? (
-        <div aria-live="polite" aria-atomic="true">
+        <div aria-live="polite" aria-atomic="true" className="flex flex-col gap-1">
           <Badge variant="critical">{errorMessage}</Badge>
+          {loginFailedMessage ? (
+            <>
+              <p className="text-xs text-text-muted">{t('detail.loginFailed.description')}</p>
+              <p className="text-xs text-text-muted">{loginFailedMessage}</p>
+            </>
+          ) : null}
         </div>
       ) : null}
 
