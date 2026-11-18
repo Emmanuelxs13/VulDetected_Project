@@ -275,8 +275,35 @@ async function ensureFixture() {
   return waitFor(`Fixture site (${port})`, () => checkTcp('127.0.0.1', port));
 }
 
+/**
+ * Starts the Python worker.
+ *
+ * ## Why demo mode forces the LOCAL worker
+ *
+ * The demo target is the fixture on the host (`127.0.0.1:8099`) and the worker
+ * has to POST its result back to the web app (`localhost:3000`). A container has
+ * its own network namespace: `localhost` is the container, and a loopback target
+ * is refused by the SSRF guard. A containerized worker therefore consumes the
+ * job, rejects the target, and then fails to deliver the callback — the scan
+ * stays `queued` forever and blocks the next scheduled run through the overlap
+ * guard. That is not a demo detail; it is a worker that cannot do its job.
+ *
+ * So when the demo profile is on, the local worker is the supported path and a
+ * running container is reported as a conflict instead of being preferred.
+ */
 function ensureScannerWorker() {
-  if (dockerContainerRunning('vuldetected-scanner')) {
+  const demoPrivateTargets =
+    process.env.DEMO_ALLOW_PRIVATE_TARGETS === 'true' || process.env.DEMO_MODE === 'true';
+
+  if (demoPrivateTargets && dockerContainerRunning('vuldetected-scanner')) {
+    console.warn(
+      '[dev:all] Scanner worker: the vuldetected-scanner container is running and will\n' +
+        '  compete for jobs it cannot complete (no host fixture, no host callback).\n' +
+        '  Stop it before recording the demo:  docker stop vuldetected-scanner',
+    );
+  }
+
+  if (!demoPrivateTargets && dockerContainerRunning('vuldetected-scanner')) {
     console.log('[dev:all] Scanner worker: OK (docker container vuldetected-scanner)');
     return true;
   }
@@ -300,6 +327,7 @@ function ensureScannerWorker() {
       env: {
         CELERY_BROKER_URL: process.env.CELERY_BROKER_URL ?? 'redis://localhost:6379/0',
         SCANNER_CALLBACK_BASE_URL: process.env.SCANNER_CALLBACK_BASE_URL ?? 'http://localhost:3000',
+        ...(demoPrivateTargets ? { DEMO_ALLOW_PRIVATE_TARGETS: 'true' } : {}),
       },
     },
   );
