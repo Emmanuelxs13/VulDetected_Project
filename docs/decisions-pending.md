@@ -146,6 +146,62 @@ eliminación y sus cascadas deben existir desde el inicio.
 
 ---
 
+## 6. Precio definitivo de los planes — Sprint 2
+
+**Estado:** Sin resolver. Bloquea cerrar HU-02b como «Listo».
+
+La aplicación muestra `[COMPLETAR: precios definitivos]` en el plan Pro. El
+simulador de pagos acepta cualquier importe porque no cobra; el precio real es una
+decisión de negocio, no de ingeniería.
+
+- **Qué falta:** el importe de Pro (y de Business, si se vende), la moneda y si el
+  cobro es mensual, anual o ambos.
+- **Dónde se pone:** `apps/web/src/lib/plans.ts`. Cambiar el precio no toca el
+  flujo de suscripción: el plan cambia por webhook, no por importe.
+- **Qué desbloquea:** quitar el `[COMPLETAR]`, que es el único motivo por el que
+  HU-02b se reporta como **Cumple en modo simulado** además de por la pasarela.
+
+Ver [`PRUEBA_SPRINT_2.md`](../PRUEBA_SPRINT_2.md) §2.3 y §9.7.
+
+---
+
+## 7. Credenciales reales de Google y GitHub — Sprint 2
+
+**Estado:** Sin resolver. Bloquea cerrar HU-02a como «Listo».
+
+El inicio de sesión social se verifica contra un proveedor OAuth 2.0 simulado que
+imita a Google y a GitHub. Funciona de extremo a extremo —PKCE, códigos de un solo
+uso, vinculación de cuentas, verificación de correo— pero no es Google.
+
+- **Qué falta:** un proyecto de OAuth en Google Cloud Console y una OAuth App de
+  GitHub, con sus `client_id` y `client_secret` en el entorno.
+- **Qué cambia:** nada en el código de negocio. `resolveSocialSetup` ya lee las
+  credenciales reales cuando existen; en modo demo prefiere el simulador.
+- **Qué desbloquea:** quitar la etiqueta «simulado» de la demo y cerrar CA-30 a
+  CA-33 como «Listo».
+
+Ver [`PRUEBA_SPRINT_2.md`](../PRUEBA_SPRINT_2.md) §2.3 y §9.9.
+
+---
+
+## 8. Aprobación de los ADR 0017 y 0018 — Sprint 2
+
+**Estado:** Sin resolver. Los dos registros están marcados **Propuesta — requiere
+aprobación del equipo**.
+
+- **ADR 0017** fija la lectura literal de CA-30 para cuentas nuevas: una identidad
+  social con correo verificado por el proveedor crea la cuenta ya verificada y no
+  dispara un correo de confirmación. La alternativa —exigir la verificación también
+  ahí— es más estricta y también defendible.
+- **ADR 0018** propone cuatro criterios adicionales solo para GitHub
+  (`CA-30-GH`…`CA-33-GH`). No están en la especificación oficial; si el equipo los
+  rechaza, se borran sin tocar el código.
+
+Mientras no se aprueben, el acta los cita como propuesta y no como criterio
+oficial. Ver [`PRUEBA_SPRINT_2.md`](../PRUEBA_SPRINT_2.md) §11.4.
+
+---
+
 ## Resueltas desde el inicio del proyecto
 
 Se conservan aquí para que el razonamiento no se pierda.

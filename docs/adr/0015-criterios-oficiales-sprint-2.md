@@ -65,3 +65,12 @@ Cuando una decisión del Sprint 2 no corresponde a ningún criterio literal de l
 especificación —por ejemplo, conservar los resultados parciales de un escaneo
 cancelado— se documenta en su propio ADR y las pruebas la citan por el número de
 ADR, nunca por un `CA-` inventado.
+
+## Estado de verificación
+
+El reparto de esta tabla se verificó el 2026-11-18 contra la aplicación en
+ejecución. El acta, con la evidencia por criterio, los veredictos y las brechas
+abiertas, está en [`PRUEBA_SPRINT_2.md`](../../PRUEBA_SPRINT_2.md). Los 21
+criterios se reportan con uno de los cinco veredictos del ADR 0026; ninguno se
+marca «Listo» sin una prueba con su identificador en el nombre que pasa **y**
+evidencia manual reproducida.

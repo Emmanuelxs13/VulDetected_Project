@@ -3,7 +3,8 @@
 El plan autoritativo de VulDetected. Si una afirmación sobre el alcance aparece
 en dos lugares, gana este archivo.
 
-Última actualización: Sprint 4, programación de escaneos y exportación ejecutiva.
+Última actualización: verificación del Sprint 2 oficial — operación continua,
+reportes y monetización.
 
 ## Leyenda de estados
 
@@ -24,6 +25,15 @@ en dos lugares, gana este archivo.
 | Sprint 3  | Clasificación de severidad, panel, remediación por vulnerabilidad                          | Completado  |
 | Sprint 4  | OAuth, exportación PDF ejecutiva y escaneos programados                                    | Completado  |
 | Sprint 5+ | Facturación, multitenancy y endurecimiento operativo                                       | Aplazado    |
+
+> **Dos numeraciones, una sola verdad.** Los sprints de esta tabla son la
+> planificación **interna** del repositorio. La especificación **oficial** del
+> curso numera de otra manera: su Sprint 2 —«Operación continua, reportes y
+> monetización»— cubre las siete historias que aquí aparecen repartidas entre los
+> sprints 2, 3 y 4 más la facturación. Cuando un acta, una prueba o un commit
+> citan `CA-XX` para el Sprint 2, se refieren a la numeración oficial, que manda
+> sobre la del repositorio (ADR 0015). La verificación completa de ese alcance
+> está en [`PRUEBA_SPRINT_2.md`](../PRUEBA_SPRINT_2.md).
 
 ---
 
