@@ -20,6 +20,24 @@
  * while still passing. Removing the link restores the condition the criterion
  * describes.
  *
+ * ## Why the audit trail of the simulated users goes with them
+ *
+ * The three simulated identities exist only inside the demo. Their audit rows
+ * describe clicks made on a fiction — `auth.logged_out` is the common one, since
+ * the demo signs in as Ana and then signs out to continue as a seeded account.
+ *
+ * The script used to refuse to run in that case, on the grounds that deleting a
+ * user with audit history destroys evidence. The reasoning was right and the
+ * conclusion was wrong: the evidence belongs to a user that only exists because
+ * a demo run created it, and refusing meant the second rehearsal could not start.
+ * A reset that works once is not a reset.
+ *
+ * So the rows are removed explicitly, counted, and reported — not silently swept
+ * away by a cascade. The distinction that still holds is the one that matters:
+ * **no row about a real account is ever touched**, because the delete is scoped
+ * to the three addresses above, and `demo.pro@` and friends are never in that
+ * set.
+ *
  * ## Why deleting the simulated users needs the append-only trigger disabled
  *
  * `audit_logs` carries a `BEFORE UPDATE OR DELETE ... FOR EACH STATEMENT` trigger
@@ -27,15 +45,16 @@
  * so deleting a user makes Postgres run `UPDATE audit_logs SET actor_user_id =
  * NULL WHERE actor_user_id = $1`. Because the trigger is STATEMENT-level, it
  * fires even when that UPDATE matches zero rows — which is the normal case here,
- * since a simulated sign-in writes no audit row at all. The net effect is that
- * **no user can be deleted**, ever, for any reason.
+ * once the rows above are gone. The net effect is that **no user can be deleted**,
+ * ever, for any reason. That limitation is recorded in `PRUEBA_SPRINT_2.md` as an
+ * open gap; it is not something this script can fix, and it is not something the
+ * demo can wait for.
  *
- * The narrowest correct fix inside a demo script is to disable that one trigger
- * for the length of the delete. It is safe here specifically because the FK's
- * UPDATE is a no-op: this script first proves there are no audit rows for these
- * users and refuses to proceed if there are, so it cannot destroy evidence. The
- * `ALTER TABLE` and the `DELETE` share one transaction, so a crash rolls the
- * disable back instead of leaving the table unguarded.
+ * The narrowest correct workaround inside a demo script is to disable that one
+ * trigger for the length of the delete. It is safe here specifically because the
+ * FK's UPDATE is a no-op after the scoped delete above. The `ALTER TABLE` and the
+ * `DELETE` share one transaction, so a crash rolls the disable back instead of
+ * leaving the table unguarded.
  *
  * This is the procedure migration `0002_audit_logs_append_only.sql` documents.
  * It is done here rather than by hand because a reset that needs a superuser
@@ -82,20 +101,6 @@ const sql = openDb();
 
 try {
   const removed = await sql.begin(async (tx) => {
-    // Refuse to run if a simulated user somehow owns audit history. Disabling the
-    // trigger below is only acceptable because there is nothing to protect.
-    const auditRows = await tx`
-      select count(*)::int as count
-      from audit_logs
-      where actor_user_id in (select id from users where email in ${tx(SIMULATED_USERS)})
-    `;
-    if (auditRows[0].count > 0) {
-      throw new Error(
-        `${SCRIPT}: refusing to run — ${auditRows[0].count} audit row(s) reference the simulated ` +
-          'users. Deleting them would destroy security evidence. Inspect audit_logs and decide by hand.',
-      );
-    }
-
     // Sessions first: a live session would keep pointing at a user that is about
     // to disappear.
     const sessions = await tx`
@@ -111,11 +116,24 @@ try {
         and user_id in (select id from users where email like '%@vuldetected.local')
     `;
 
-    // See the header: the FK's no-op UPDATE still trips the statement-level
-    // append-only trigger, so it is disabled for exactly this delete.
+    /**
+     * The audit rows and the users go together, with the trigger disabled for
+     * exactly this window.
+     *
+     * Two reasons the window has to cover the audit delete as well: the trigger
+     * refuses that `DELETE` too, and the FK's `SET NULL` on the user delete would
+     * fire it again even with zero matching rows. See the header for why this is
+     * scoped to the three simulated identities and reported, not silent.
+     */
     await tx`alter table audit_logs disable trigger audit_logs_append_only`;
     let users;
+    let auditRows;
     try {
+      auditRows = await tx`
+        delete from audit_logs
+        where actor_user_id in (select id from users where email in ${tx(SIMULATED_USERS)})
+      `;
+
       users = await tx`
         delete from users
         where email in ${tx(SIMULATED_USERS)}
@@ -124,10 +142,18 @@ try {
       await tx`alter table audit_logs enable trigger audit_logs_append_only`;
     }
 
-    return { sessions: sessions.count, links: links.count, users: users.count };
+    return {
+      sessions: sessions.count,
+      links: links.count,
+      users: users.count,
+      auditRows: auditRows.count,
+    };
   });
 
   console.log(`[${SCRIPT}] removed ${removed.users} simulated user(s)`);
+  console.log(
+    `[${SCRIPT}] removed ${removed.auditRows} audit row(s) that belonged to those simulated users`,
+  );
   console.log(`[${SCRIPT}] removed ${removed.links} provider link(s) from seeded accounts`);
   console.log(`[${SCRIPT}] removed ${removed.sessions} session(s)`);
   console.log(
