@@ -41,6 +41,12 @@ venv/
 packages/ui/dist/
 e2e/fixtures/vulnerable-site/token.txt
 
+# Browser verification output and local database backups are machine-local: the
+# Playwright report/videos can be regenerated, and a `pg_dump` holds real data.
+playwright-report/
+test-results/
+backups/
+
 # NOTE: packages/db/drizzle/meta/_journal.json IS tracked on purpose.
 # Drizzle Kit's migration journal is required to replay migrations; losing it
 # desynchronizes the migration history from the actual schema.
