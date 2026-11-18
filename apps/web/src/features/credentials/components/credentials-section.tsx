@@ -12,6 +12,7 @@ import {
   Input,
 } from '@vuldetected/ui';
 import { useFormatter, useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import type { CredentialListRow } from '@/lib/credentials/types';
@@ -19,7 +20,7 @@ import type { CredentialListRow } from '@/lib/credentials/types';
 import { revokeCredentialAction, saveCredentialAction } from '../actions';
 import { CREDENTIAL_ERROR_KEYS, isCredentialErrorCode } from '../error-codes';
 
-type Kind = 'basic' | 'bearer' | 'header';
+type Kind = 'basic' | 'bearer' | 'header' | 'form';
 
 interface VerifiedDomain {
   id: string;
@@ -60,10 +61,15 @@ export function CredentialsSection({
   const [token, setToken] = useState('');
   const [headerName, setHeaderName] = useState('');
   const [headerValue, setHeaderValue] = useState('');
+  const [loginPath, setLoginPath] = useState('/login');
+  const [usernameField, setUsernameField] = useState('email');
+  const [passwordField, setPasswordField] = useState('password');
+  const [successMarker, setSuccessMarker] = useState('');
 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<string | null>(null);
+  const router = useRouter();
 
   function secretFor(kindValue: Kind) {
     if (kindValue === 'basic') {
@@ -71,6 +77,17 @@ export function CredentialsSection({
     }
     if (kindValue === 'bearer') {
       return { kind: 'bearer' as const, token };
+    }
+    if (kindValue === 'form') {
+      return {
+        kind: 'form' as const,
+        loginPath,
+        usernameField,
+        passwordField,
+        username,
+        password,
+        successMarker,
+      };
     }
     return { kind: 'header' as const, headerName, headerValue };
   }
@@ -100,8 +117,12 @@ export function CredentialsSection({
     setToken('');
     setHeaderName('');
     setHeaderValue('');
+    setSuccessMarker('');
     setMessage({ type: 'success', text: t('saved') });
-    window.location.reload();
+    // `router.refresh()` re-renders the server component so the new row appears,
+    // while keeping this component's state. A full reload would wipe the
+    // confirmation the user just earned, which made the save look like a no-op.
+    router.refresh();
   }
 
   async function revoke(id: string) {
@@ -121,7 +142,7 @@ export function CredentialsSection({
     }
 
     setMessage({ type: 'success', text: t('revoked') });
-    window.location.reload();
+    router.refresh();
   }
 
   return (
@@ -217,11 +238,12 @@ export function CredentialsSection({
                   <option value="basic">{t('kinds.basic')}</option>
                   <option value="bearer">{t('kinds.bearer')}</option>
                   <option value="header">{t('kinds.header')}</option>
+                  <option value="form">{t('kinds.form')}</option>
                 </select>
               )}
             </Field>
 
-            {kind === 'basic' ? (
+            {kind === 'basic' || kind === 'form' ? (
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label={t('username')} required>
                   {(control) => (
@@ -287,6 +309,61 @@ export function CredentialsSection({
                       autoComplete="off"
                       maxLength={4096}
                       onChange={(event) => setHeaderValue(event.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+            ) : null}
+
+            {kind === 'form' ? (
+              <div className="flex flex-col gap-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Field label={t('loginPath')} required>
+                    {(control) => (
+                      <Input
+                        {...control}
+                        value={loginPath}
+                        autoComplete="off"
+                        maxLength={2048}
+                        placeholder={t('loginPathPlaceholder')}
+                        onChange={(event) => setLoginPath(event.target.value)}
+                      />
+                    )}
+                  </Field>
+                  <Field label={t('usernameField')} required>
+                    {(control) => (
+                      <Input
+                        {...control}
+                        value={usernameField}
+                        autoComplete="off"
+                        maxLength={128}
+                        placeholder={t('usernameFieldPlaceholder')}
+                        onChange={(event) => setUsernameField(event.target.value)}
+                      />
+                    )}
+                  </Field>
+                  <Field label={t('passwordField')} required>
+                    {(control) => (
+                      <Input
+                        {...control}
+                        value={passwordField}
+                        autoComplete="off"
+                        maxLength={128}
+                        placeholder={t('passwordFieldPlaceholder')}
+                        onChange={(event) => setPasswordField(event.target.value)}
+                      />
+                    )}
+                  </Field>
+                </div>
+                <Field label={t('successMarker')} description={t('successMarkerHint')} required>
+                  {(control) => (
+                    <Input
+                      {...control}
+                      value={successMarker}
+                      autoComplete="off"
+                      maxLength={200}
+                      placeholder={t('successMarkerPlaceholder')}
+                      onChange={(event) => setSuccessMarker(event.target.value)}
                     />
                   )}
                 </Field>

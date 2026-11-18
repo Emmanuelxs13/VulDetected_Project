@@ -313,6 +313,21 @@
       "verifiedDomainLabel": "Dominio verificado:",
       "checksLabel": "Comprobaciones:",
       "errorLabel": "Error:",
+    "authenticated": {
+      "title": "Escaneo autenticado",
+      "description": "El escáner inició sesión con la credencial guardada y también revisó las páginas que están detrás del login."
+    },
+    "loginFailed": {
+      "title": "No se pudo iniciar sesión",
+      "description": "El escaneo se detuvo para no presentar un resultado anónimo como si hubiera cubierto las páginas privadas.",
+      "reasons": {
+        "invalid_credentials": "El sitio rechazó el usuario o la contraseña guardados.",
+        "marker_missing": "La respuesta no contenía el texto que confirma la sesión. Revisa la credencial.",
+        "cross_origin_login": "La ruta del formulario de acceso apunta fuera del dominio escaneado.",
+        "cross_origin_redirect": "El formulario de acceso redirigió fuera del dominio escaneado.",
+        "transport_error": "No se pudo completar el envío del formulario de acceso."
+      }
+    },
       "partial": {
         "title": "Resultados parciales",
         "description": "Este escaneo no completó todas sus comprobaciones, así que sus hallazgos se conservan pero no cuentan para el historial comparativo ni para el semáforo."
@@ -539,6 +554,15 @@
     "token": "Token",
     "headerName": "Nombre de la cabecera",
     "headerValue": "Valor de la cabecera",
+    "loginPath": "Ruta del formulario de acceso",
+    "loginPathPlaceholder": "/login",
+    "usernameField": "Campo del usuario",
+    "usernameFieldPlaceholder": "email",
+    "passwordField": "Campo de la contraseña",
+    "passwordFieldPlaceholder": "password",
+    "successMarker": "Texto que confirma la sesión",
+    "successMarkerPlaceholder": "Cerrar sesión",
+    "successMarkerHint": "Una cadena que solo aparece con la sesión iniciada. Sin ella el escaneo no da la autenticación por buena.",
     "save": "Guardar credencial",
     "saving": "Guardando…",
     "saved": "Credencial guardada. Se usará en el próximo escaneo.",
@@ -551,7 +575,8 @@
     "kinds": {
       "basic": "Usuario y contraseña",
       "bearer": "Token Bearer",
-      "header": "Cabecera personalizada"
+      "header": "Cabecera personalizada",
+      "form": "Formulario de acceso"
     },
     "errors": {
       "codes": {

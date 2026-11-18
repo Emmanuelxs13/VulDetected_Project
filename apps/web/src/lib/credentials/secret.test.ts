@@ -17,8 +17,18 @@ import {
 
 const DOMAIN_ID = '11111111-1111-4111-8111-111111111111';
 
+const FORM_SECRET = {
+  kind: 'form',
+  loginPath: '/login',
+  usernameField: 'email',
+  passwordField: 'password',
+  username: 'demo@example.com',
+  password: 'Fixture-Pass-2026!',
+  successMarker: 'Invoice 2026-001',
+} as const;
+
 describe('credentialSecretSchema', () => {
-  it('accepts the three supported kinds', () => {
+  it('accepts the four supported kinds', () => {
     expect(
       credentialSecretSchema.safeParse({ kind: 'basic', username: 'u', password: 'p' }).success,
     ).toBe(true);
@@ -30,6 +40,29 @@ describe('credentialSecretSchema', () => {
         headerValue: 'secret',
       }).success,
     ).toBe(true);
+    expect(credentialSecretSchema.safeParse(FORM_SECRET).success).toBe(true);
+  });
+
+  it('accepts form field names that a browser would submit', () => {
+    // `user[name]` and `login[email]` are ordinary HTML field names; a rule
+    // written for header tokens would reject a working login.
+    for (const usernameField of ['email', 'login[email]', 'user[name]', 'password-confirm']) {
+      expect(
+        credentialSecretSchema.safeParse({ ...FORM_SECRET, usernameField }).success,
+      ).toBe(true);
+    }
+  });
+
+  it('requires the form login path to be root-relative', () => {
+    for (const loginPath of ['login', '//evil.example.net/login', 'https://evil.example.net/login', '']) {
+      expect(credentialSecretSchema.safeParse({ ...FORM_SECRET, loginPath }).success).toBe(false);
+    }
+  });
+
+  it('requires a success marker, because a 200 is not a session', () => {
+    expect(credentialSecretSchema.safeParse({ ...FORM_SECRET, successMarker: '   ' }).success).toBe(
+      false,
+    );
   });
 
   it('rejects an unknown kind and unknown fields', () => {
@@ -120,7 +153,9 @@ describe('serializeCredentialSecret / parseCredentialSecret', () => {
           ? ({ kind, username: 'u', password: 'p' } as const)
           : kind === 'bearer'
             ? ({ kind, token: 't' } as const)
-            : ({ kind, headerName: 'X-Api-Key', headerValue: 'v' } as const);
+            : kind === 'form'
+              ? FORM_SECRET
+              : ({ kind, headerName: 'X-Api-Key', headerValue: 'v' } as const);
 
       expect(parseCredentialSecret(serializeCredentialSecret(secret), kind)).toEqual(secret);
     }

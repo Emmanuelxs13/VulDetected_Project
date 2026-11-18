@@ -313,6 +313,21 @@
       "verifiedDomainLabel": "Verified domain:",
       "checksLabel": "Checks:",
       "errorLabel": "Error:",
+    "authenticated": {
+      "title": "Authenticated scan",
+      "description": "The scanner signed in with the stored credential and also checked the pages behind the login."
+    },
+    "loginFailed": {
+      "title": "Sign-in failed",
+      "description": "The scan stopped so an anonymous result is never presented as if it had covered the private pages.",
+      "reasons": {
+        "invalid_credentials": "The site rejected the stored username or password.",
+        "marker_missing": "The response did not contain the text that confirms the session. Check the credential.",
+        "cross_origin_login": "The login form path points outside the scanned domain.",
+        "cross_origin_redirect": "The login form redirected outside the scanned domain.",
+        "transport_error": "The login form could not be submitted."
+      }
+    },
       "partial": {
         "title": "Partial results",
         "description": "This scan did not finish every check, so its findings are kept but do not count toward the comparative history or the traffic light."
@@ -539,6 +554,15 @@
     "token": "Token",
     "headerName": "Header name",
     "headerValue": "Header value",
+    "loginPath": "Login form path",
+    "loginPathPlaceholder": "/login",
+    "usernameField": "Username field",
+    "usernameFieldPlaceholder": "email",
+    "passwordField": "Password field",
+    "passwordFieldPlaceholder": "password",
+    "successMarker": "Text that confirms the session",
+    "successMarkerPlaceholder": "Sign out",
+    "successMarkerHint": "A string that only appears once the session is signed in. Without it the scan does not accept the login as successful.",
     "save": "Save credential",
     "saving": "Saving…",
     "saved": "Credential saved. It will be used on the next scan.",
@@ -551,7 +575,8 @@
     "kinds": {
       "basic": "Username and password",
       "bearer": "Bearer token",
-      "header": "Custom header"
+      "header": "Custom header",
+      "form": "Login form"
     },
     "errors": {
       "codes": {
