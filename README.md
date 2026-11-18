@@ -12,10 +12,14 @@ Este README tiene dos objetivos:
 2. explicar, con evidencia concreta, de qué manera se cumple el Sprint 1 y cómo
    se valida el flujo completo de escaneo usado en la demo local.
 
-> **Estado actual:** Sprint 1 está completado para demo local y el flujo
+> **Estado actual:** el Sprint 1 está completado para demo local y el flujo
 > ampliado de autenticación, verificación de propiedad, escaneo, progreso,
-> hallazgos y exportación fue validado de extremo a extremo. La evidencia
-> detallada está en [PRUEBA_SPRINT_1.md](PRUEBA_SPRINT_1.md) y
+> hallazgos y exportación fue validado de extremo a extremo. El Sprint 2
+> —operación continua, reportes y monetización— está implementado y verificado;
+> dos de sus siete historias se demuestran contra un proveedor simulado y se
+> reportan como «Cumple en modo simulado». La evidencia detallada está en
+> [PRUEBA_SPRINT_1.md](PRUEBA_SPRINT_1.md),
+> [PRUEBA_SPRINT_2.md](PRUEBA_SPRINT_2.md) y
 > [runtime-validation-report.md](runtime-validation-report.md).
 
 ## 1. Qué incluye el Sprint 1
@@ -371,10 +375,13 @@ No uses secretos de desarrollo como valores de producción.
 
 ## 10. Evidencia y límites
 
-La evidencia oficial está separada en dos documentos:
+La evidencia oficial está separada en tres documentos:
 
 - [PRUEBA_SPRINT_1.md](PRUEBA_SPRINT_1.md): matriz descriptiva de historias,
-  criterios, pasos de demo, riesgos y límites.
+  criterios, pasos de demo, riesgos y límites del Sprint 1.
+- [PRUEBA_SPRINT_2.md](PRUEBA_SPRINT_2.md): verificación de las siete historias
+  del Sprint 2 (operación continua, reportes y monetización), el recorrido de
+  demo de ocho pasos, las mediciones reales y las brechas abiertas con su plan.
 - [runtime-validation-report.md](runtime-validation-report.md): comandos,
   códigos de salida, conteos y veredicto `overall: PASS`.
 
