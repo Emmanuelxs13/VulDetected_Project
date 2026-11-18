@@ -24,7 +24,8 @@
     "demo:reset-social": "node apps/web/scripts/demo/reset-social.mjs",
     "demo:seed-history": "node apps/web/scripts/demo/seed-history.mjs",
     "demo:run-schedule-now": "node apps/web/scripts/demo/run-schedule-now.mjs",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "demo:reset-billing": "node apps/web/scripts/demo/reset-billing.mjs"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
