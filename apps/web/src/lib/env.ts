@@ -168,6 +168,24 @@ const envSchema = z.object({
   SCAN_REQUIRE_VERIFIED_DOMAIN: z.enum(['true', 'false']).optional(),
 
   /**
+   * DEMO ONLY. The single switch that arms every demo accelerator:
+   * `pnpm demo:reset`, `pnpm demo:seed-history`, `pnpm demo:run-schedule-now`,
+   * the fixture site and the simulated payment provider.
+   *
+   * ## Why one switch instead of one per accelerator
+   *
+   * Four independent flags can be half-set, and the failure mode of a
+   * half-armed demo is the worst one available: a seeded history with no badge,
+   * or a simulated payment presented as a real charge. One flag means the
+   * accelerators are either all on and all labelled, or all off.
+   *
+   * Production refuses to boot with it enabled, exactly like
+   * `DEMO_ALLOW_PRIVATE_TARGETS`: an accelerator that can run in production is
+   * not an accelerator, it is a backdoor.
+   */
+  DEMO_MODE: z.enum(['true', 'false']).optional(),
+
+  /**
    * DEMO ONLY. Lets the egress guard reach loopback/RFC1918 addresses and
    * non-standard ports so the demo can scan a local fixture site.
    *
@@ -224,6 +242,15 @@ const productionRefinement = (value: z.infer<typeof envSchema>, ctx: z.Refinemen
       message:
         'CREDENTIALS_ENCRYPTION_KEY is required in production: it seals the scan credentials ' +
         'the settings page offers. Generate one with: openssl rand -base64 32',
+    });
+  }
+  if (value.DEMO_MODE === 'true') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DEMO_MODE'],
+      message:
+        'DEMO_MODE must not be enabled in production: it arms the demo accelerators ' +
+        '(reset, seeded history, simulated payments, schedule fast-forward).',
     });
   }
   if (value.DEMO_ALLOW_PRIVATE_TARGETS === 'true') {

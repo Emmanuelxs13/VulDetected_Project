@@ -22,11 +22,20 @@
  * validation still cannot silently disable the SSRF guard in production.
  */
 
+/**
+ * True only outside production, and only when the demo profile is armed.
+ *
+ * This is the master switch for every accelerator. `lib/env.ts` refuses to boot
+ * in production with `DEMO_MODE=true`, and the check is repeated here for the
+ * same defence-in-depth reason as `demoAllowsPrivateTargets`.
+ */
+export function demoModeEnabled(): boolean {
+  return process.env.NODE_ENV !== 'production' && process.env.DEMO_MODE === 'true';
+}
+
 /** True only outside production, and only when explicitly enabled. */
 export function demoAllowsPrivateTargets(): boolean {
-  return (
-    process.env.NODE_ENV !== 'production' && process.env.DEMO_ALLOW_PRIVATE_TARGETS === 'true'
-  );
+  return process.env.NODE_ENV !== 'production' && process.env.DEMO_ALLOW_PRIVATE_TARGETS === 'true';
 }
 
 /**
