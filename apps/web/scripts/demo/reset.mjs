@@ -18,6 +18,12 @@
  * worker and will post a callback for a scan that is gone. That produces error
  * noise in the middle of the demo for no reason. The broker list and the
  * cancellation flags are demo state, so they are cleared with the rest.
+ *
+ * The rate-limit windows go too. A rehearsal that signs in and out a few times,
+ * or a handful of scans within the hour, leaves `rl:*` counters armed; the next
+ * "clean" run then starts against a 429 or an exhausted scan budget that has
+ * nothing to do with the feature being demonstrated. Clearing a counter does not
+ * weaken the limit: the next request recreates the window.
  */
 import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -87,7 +93,14 @@ if (seed.status !== 0) {
   process.exit(seed.status ?? 1);
 }
 
-// Redis: the Celery broker list and every cancellation flag.
+// Redis: the Celery broker list, every cancellation flag and the rate-limit
+// windows.
+//
+// The rate-limit counters belong here for the same reason `demo:reset-social`
+// clears them: a leftover window makes a "clean" run start against a 429 or an
+// exhausted per-hour scan budget, which looks like a broken feature in front of
+// the audience. Clearing a counter does not weaken the limit — the very next
+// request recreates the window.
 if (process.env.REDIS_URL) {
   const client = createClient({ url: process.env.REDIS_URL });
   client.on('error', (error) => console.error(`[${SCRIPT}] redis: ${error.message}`));
@@ -96,6 +109,7 @@ if (process.env.REDIS_URL) {
     const removed = await client.del('celery');
     let cursor = '0';
     let flags = 0;
+    let limits = 0;
     do {
       const page = await client.scan(cursor, { MATCH: 'vuldetected:scan:cancel:*', COUNT: 500 });
       cursor = page.cursor;
@@ -104,8 +118,20 @@ if (process.env.REDIS_URL) {
         flags += page.keys.length;
       }
     } while (cursor !== '0');
+
+    cursor = '0';
+    do {
+      const page = await client.scan(cursor, { MATCH: 'rl:*', COUNT: 500 });
+      cursor = page.cursor;
+      if (page.keys.length > 0) {
+        await client.del(page.keys);
+        limits += page.keys.length;
+      }
+    } while (cursor !== '0');
+
     console.log(
-      `  redis               broker list cleared (${removed}), ${flags} cancel flags removed`,
+      `  redis               broker list cleared (${removed}), ${flags} cancel flags removed, ` +
+        `${limits} rate-limit counter(s) cleared`,
     );
   } catch (error) {
     // A reset without Redis still leaves the database clean, which is the part

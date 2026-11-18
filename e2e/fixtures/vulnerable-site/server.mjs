@@ -186,7 +186,7 @@ function loginPage(error = '') {
 </html>`;
 }
 
-function privatePage(email) {
+function privatePage(email, reflected = '') {
   return `<!doctype html>
 <html lang="en">
   <head><meta charset="utf-8"><title>MiApp — private</title></head>
@@ -194,6 +194,8 @@ function privatePage(email) {
     <h1>Private area</h1>
     <p>Signed in as ${email}.</p>
     <p>Invoice 2026-001 — internal only.</p>
+    <form action="/private" method="get"><input name="q" placeholder="Search invoices"> <button>Go</button></form>
+    ${reflected ? `<p>Results: ${reflected}</p>` : ''}
   </body>
 </html>`;
 }
@@ -263,7 +265,11 @@ const server = createServer(async (req, res) => {
     if (cookies.get(SESSION_COOKIE) !== SESSION_VALUE) {
       return send(res, 401, 'text/plain; charset=utf-8', 'authentication required');
     }
-    return send(res, 200, 'text/html; charset=utf-8', privatePage(LOGIN_EMAIL));
+    // Reflected on purpose, and only for a signed-in visitor: this is the
+    // finding that an anonymous scan cannot see (HU-04, CA-26). The `q` value
+    // is echoed unencoded, exactly like the public page does.
+    const reflected = url.searchParams.get('q') ?? '';
+    return send(res, 200, 'text/html; charset=utf-8', privatePage(LOGIN_EMAIL, reflected));
   }
 
   const sensitive = SENSITIVE_FILES.get(path);
