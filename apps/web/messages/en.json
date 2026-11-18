@@ -617,6 +617,8 @@
       "findingsHint": "Ordered from highest to lowest severity. Every finding recorded by the scan is included.",
       "noFindings": "This scan recorded no findings. A completed scan with no findings is a valid result, not an error.",
       "remediation": "How to fix it",
+      "partialNotice": "Partial results: this scan did not complete every check. The numbers describe only what was reached, so they are not comparable with the history or with the traffic light.",
+      "demoNotice": "Demo data: this report was generated from sample findings. It does not describe a real scan of a production domain.",
       "page": "Page {current} of {total}",
       "severityCount": "{severity}: {count}",
       "fields": {

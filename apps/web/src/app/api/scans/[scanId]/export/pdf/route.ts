@@ -50,6 +50,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
       id: scans.id,
       targetUrl: scans.targetUrl,
       status: scans.status,
+      partial: scans.partial,
+      isDemo: scans.isDemo,
       createdAt: scans.createdAt,
       hostname: domains.normalizedHostname,
     })
@@ -132,6 +134,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
     createdAt: scan.createdAt,
     generatedAt: new Date(),
     findings: reportFindings,
+    partial: scan.partial,
+    isDemo: scan.isDemo,
     copy: {
       title: tPdf('title'),
       subtitle: tPdf('subtitle'),
@@ -141,6 +145,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ scanId:
       findingsHint: tPdf('findingsHint'),
       noFindings: tPdf('noFindings'),
       remediation: tPdf('remediation'),
+      partialNotice: tPdf('partialNotice'),
+      demoNotice: tPdf('demoNotice'),
       page: tPdf('page'),
       severityCount: tPdf('severityCount'),
       fields: {

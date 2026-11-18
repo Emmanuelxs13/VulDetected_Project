@@ -617,6 +617,8 @@
       "findingsHint": "Ordenados de mayor a menor severidad. Se incluyen todos los hallazgos registrados por el escaneo.",
       "noFindings": "Este escaneo no registró hallazgos. Un escaneo completado sin hallazgos es un resultado válido, no un error.",
       "remediation": "Cómo corregirlo",
+      "partialNotice": "Resultados parciales: este escaneo no completó todas sus comprobaciones. Las cifras describen solo lo que se alcanzó a revisar, así que no son comparables con el historial ni con el semáforo.",
+      "demoNotice": "Datos de demostración: este informe se generó con hallazgos de ejemplo. No corresponde a un escaneo real de un dominio en producción.",
       "page": "Página {current} de {total}",
       "severityCount": "{severity}: {count}",
       "fields": {

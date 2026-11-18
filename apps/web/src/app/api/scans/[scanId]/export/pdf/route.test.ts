@@ -50,6 +50,8 @@ const SCAN_ROW = {
   id: SCAN_ID,
   targetUrl: 'https://example.test/',
   status: 'completed',
+  partial: false,
+  isDemo: false,
   createdAt: new Date('2026-10-01T10:00:00.000Z'),
   hostname: 'example.test',
 };

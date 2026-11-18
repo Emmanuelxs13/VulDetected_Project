@@ -34,6 +34,8 @@ function copyFrom(locale: 'es' | 'en'): ReportCopy {
     findingsHint: pdf.findingsHint,
     noFindings: pdf.noFindings,
     remediation: pdf.remediation,
+    partialNotice: pdf.partialNotice,
+    demoNotice: pdf.demoNotice,
     page: pdf.page,
     severityCount: pdf.severityCount,
     fields: pdf.fields,
@@ -90,6 +92,8 @@ function reportInput(overrides: Partial<ReportInput> = {}): ReportInput {
     createdAt: new Date('2026-10-01T10:00:00Z'),
     generatedAt: new Date('2026-10-02T12:30:00Z'),
     findings: [],
+    partial: false,
+    isDemo: false,
     copy: copyFrom('es'),
     ...overrides,
   };
@@ -102,6 +106,7 @@ function allText(pages: readonly ReportPage[]): string {
     .map((block) => {
       if (block.kind === 'text') return block.text;
       if (block.kind === 'risk') return [block.label, ...block.hintLines].join(' ');
+      if (block.kind === 'notice') return block.lines.join(' ');
       return '';
     })
     .join('\n');
