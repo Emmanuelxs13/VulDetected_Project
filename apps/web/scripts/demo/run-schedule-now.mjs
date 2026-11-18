@@ -54,6 +54,17 @@ let scheduleId;
 let domainId;
 let previousNextRunAt;
 
+/**
+ * Captured BEFORE the row becomes due, not before our own HTTP call.
+ *
+ * The dev scheduler ticks on its own every 15 s. If a tick lands in the window
+ * between "we made it due" and "our call arrives", the tick wins the claim and
+ * creates the scan — which is the correct outcome and must not be reported as
+ * a failure. Starting the window here means the confirmation below recognises a
+ * scan created by either path.
+ */
+let runStartedAt = new Date();
+
 try {
   const rows = await sql`
     select s.id, s.domain_id, s.next_run_at, s.enabled, d.verified, d.normalized_hostname
@@ -98,6 +109,8 @@ try {
   // the database, and a value that is exactly "now" from the client can land a
   // few milliseconds in the future once the clock skew of two processes is
   // involved. A due row must be unambiguously due.
+  runStartedAt = new Date();
+
   await sql`
     update scan_schedules
     set next_run_at = now() - interval '1 second'
@@ -141,7 +154,10 @@ try {
   const scans = await verifySql`
     select id, status, source, created_at
     from scans
-    where domain_id = ${domainId} and source = 'schedule'
+    where domain_id = ${domainId}
+      and source = 'schedule'
+      and is_demo = false
+      and created_at >= ${runStartedAt.toISOString()}::timestamptz
     order by created_at desc
     limit 1
   `;
