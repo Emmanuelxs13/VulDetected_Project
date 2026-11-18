@@ -1,6 +1,6 @@
 import { and, asc, domains, eq, isNull, lte, or, scanSchedules } from '@vuldetected/db';
 
-import { enqueueScanForDomain, scheduleTarget } from '@/features/scans/enqueue';
+import { enqueueScanForDomain, scheduleTargetFor } from '@/features/scans/enqueue';
 import { computeNextRunAt, isDue } from '@/features/scans/schedule-schema';
 import { db } from '@/lib/db';
 
@@ -62,6 +62,7 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedu
       interval: scanSchedules.interval,
       enabled: scanSchedules.enabled,
       nextRunAt: scanSchedules.nextRunAt,
+      targetUrl: scanSchedules.targetUrl,
       hostname: domains.normalizedHostname,
       verified: domains.verified,
     })
@@ -111,7 +112,7 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSchedu
 
     const outcome = await enqueueScanForDomain({
       domainId: row.domainId,
-      target: scheduleTarget(row.hostname),
+      target: scheduleTargetFor(row.hostname, row.targetUrl),
       actorUserId: row.userId,
       source: 'schedule',
     });

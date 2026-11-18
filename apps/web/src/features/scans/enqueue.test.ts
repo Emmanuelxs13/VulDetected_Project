@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { dbCalls, dbQueue, resetDbMock } from '@test/db-mock';
 
-import { enqueueScanForDomain } from './enqueue';
+import { enqueueScanForDomain, scheduleTarget, scheduleTargetFor } from './enqueue';
 
 vi.mock('@/lib/db', async () => {
   const { createDbMock } = await import('@test/db-mock');
@@ -181,5 +181,30 @@ describe('enqueueScanForDomain', () => {
     const set = dbCalls.find((call) => call.method === 'set')?.args[0] as
       Record<string, unknown> | undefined;
     expect(set).toEqual({ status: 'failed', error: 'enqueue_failed' });
+  });
+});
+describe('scheduleTargetFor', () => {
+  it('uses the HTTPS default when the schedule recorded no target', () => {
+    expect(scheduleTargetFor('example.com', null)).toEqual(scheduleTarget('example.com'));
+  });
+
+  it('scans the recorded target when one exists', () => {
+    const target = scheduleTargetFor('example.com', 'http://example.com:8099');
+
+    expect(target).toEqual({
+      url: 'http://example.com:8099',
+      scheme: 'http',
+      host: 'example.com',
+      port: 8099,
+      baseUrl: 'http://example.com:8099',
+    });
+  });
+
+  it('falls back to the default when the recorded value is not a valid http(s) URL', () => {
+    // The stored value reaches the worker, so a malformed one must degrade to a
+    // safe default instead of being forwarded.
+    expect(scheduleTargetFor('example.com', 'ftp://example.com')).toEqual(
+      scheduleTarget('example.com'),
+    );
   });
 });

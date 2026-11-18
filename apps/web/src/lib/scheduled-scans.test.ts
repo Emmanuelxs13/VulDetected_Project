@@ -20,6 +20,28 @@ vi.mock('@/features/scans/enqueue', () => ({
     port: 443,
     baseUrl: `https://${hostname}`,
   })),
+  /**
+   * Faithful stand-in for the real helper. The real implementation is tested in
+   * `enqueue.test.ts`; here it only has to behave like it, because this suite is
+   * about the runner's claim/enqueue ordering.
+   */
+  scheduleTargetFor: vi.fn((hostname: string, storedTargetUrl: string | null) =>
+    storedTargetUrl === null
+      ? {
+          url: `https://${hostname}`,
+          scheme: 'https',
+          host: hostname,
+          port: 443,
+          baseUrl: `https://${hostname}`,
+        }
+      : {
+          url: storedTargetUrl,
+          scheme: 'http',
+          host: hostname,
+          port: 8099,
+          baseUrl: storedTargetUrl,
+        },
+  ),
 }));
 
 const NOW = new Date('2026-01-02T00:00:00.000Z');
@@ -33,6 +55,7 @@ const ROW = {
   nextRunAt: new Date('2026-01-01T00:00:00.000Z'),
   hostname: 'example.com',
   verified: true,
+  targetUrl: null,
 };
 
 beforeEach(() => {
@@ -120,5 +143,19 @@ describe('runDueSchedules', () => {
     expect(result).toEqual({ due: 1, enqueued: 0, failed: 1, skipped: 0 });
     // The claim stands: one missed run is visible, a burst on recovery is not.
     expect(dbCalls.filter((call) => call.method === 'set')).toHaveLength(1);
+  });
+
+  it('scans the target the schedule recorded instead of assuming HTTPS 443', async () => {
+    dbQueue.push([{ ...ROW, targetUrl: 'http://example.com:8099' }]);
+    dbQueue.push([{ id: ROW.id }]);
+
+    await runDueSchedules(NOW);
+
+    expect(vi.mocked(enqueueScanForDomain)).toHaveBeenCalledWith({
+      domainId: ROW.domainId,
+      target: expect.objectContaining({ baseUrl: 'http://example.com:8099', port: 8099 }),
+      actorUserId: ROW.userId,
+      source: 'schedule',
+    });
   });
 });

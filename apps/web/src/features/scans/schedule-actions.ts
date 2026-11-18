@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, domains, eq, scanSchedules } from '@vuldetected/db';
+import { and, desc, domains, eq, scanSchedules, scans } from '@vuldetected/db';
 
 import type { ActionResult } from '@/features/auth/actions';
 import { requireUser } from '@/features/auth/session';
@@ -112,6 +112,20 @@ export async function createScheduleAction(input: {
   const now = new Date();
   const nextRunAt = computeNextRunAt(now, parsed.data.interval);
 
+  /**
+   * The schedule inherits the target of the domain's most recent scan, so it
+   * keeps scanning the URL the user actually verified and reported on instead of
+   * assuming `https://<hostname>`. When no scan exists yet the value is NULL and
+   * the scheduler uses that HTTPS default.
+   */
+  const lastScan = await db()
+    .select({ targetUrl: scans.targetUrl })
+    .from(scans)
+    .where(eq(scans.domainId, parsed.data.domainId))
+    .orderBy(desc(scans.createdAt))
+    .limit(1);
+  const targetUrl = lastScan[0]?.targetUrl ?? null;
+
   const existing = await db()
     .select({ id: scanSchedules.id })
     .from(scanSchedules)
@@ -121,7 +135,7 @@ export async function createScheduleAction(input: {
   if (existing[0] !== undefined) {
     const updated = await db()
       .update(scanSchedules)
-      .set({ interval: parsed.data.interval, enabled: true, nextRunAt, userId })
+      .set({ interval: parsed.data.interval, enabled: true, nextRunAt, userId, targetUrl })
       .where(eq(scanSchedules.id, existing[0].id))
       .returning({ id: scanSchedules.id });
 
@@ -159,6 +173,7 @@ export async function createScheduleAction(input: {
       interval: parsed.data.interval,
       enabled: true,
       nextRunAt,
+      targetUrl,
     })
     .returning({ id: scanSchedules.id });
 

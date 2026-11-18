@@ -1,0 +1,1 @@
+ALTER TABLE "scan_schedules" ADD COLUMN "target_url" text;
