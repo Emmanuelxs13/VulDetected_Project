@@ -25,12 +25,15 @@ import { sessions } from './sessions';
 import { users } from './users';
 import { verificationTokens } from './verification-tokens';
 import { notifications } from './notifications';
+import { checkoutSessions, paymentEvents } from './payments';
 
 export {
   accountStatusEnum,
+  checkoutStatusEnum,
   citext,
   findingStatusEnum,
   mailStatusEnum,
+  paymentEventOutcomeEnum,
   scanSourceValues,
   scanStatusEnum,
   severityEnum,
@@ -40,8 +43,10 @@ export {
 } from './enums';
 export type {
   AccountStatus,
+  CheckoutStatus,
   FindingStatus,
   MailStatus,
+  PaymentEventOutcome,
   ScanSource,
   ScanStatus,
   Severity,
@@ -88,6 +93,14 @@ export type { MailOutboxRow, NewMailOutboxRow } from './mail-outbox';
 export { scanCredentials } from './scan-credentials';
 export type { NewScanCredential, ScanCredential } from './scan-credentials';
 
+export { checkoutSessions, paymentEvents } from './payments';
+export type {
+  CheckoutSession,
+  NewCheckoutSession,
+  NewPaymentEventRow,
+  PaymentEventRow,
+} from './payments';
+
 export {
   accountsRelations,
   auditLogsRelations,
@@ -124,4 +137,6 @@ export const schema = {
   notifications,
   mailOutbox,
   scanCredentials,
+  checkoutSessions,
+  paymentEvents,
 };

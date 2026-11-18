@@ -76,6 +76,34 @@ describe('getEnv — production refusals', () => {
     expect(getEnv().DEMO_MODE).toBe('true');
   });
 
+  /**
+   * Sprint 2, HU-02b (ADR 0019).
+   *
+   * The simulated payment provider signs its webhooks with a secret that is
+   * published in this repository's demo documentation. A production deployment
+   * that kept accepting events signed with it would expose a free-upgrade
+   * endpoint, so the secret is refused on its own — not only when `DEMO_MODE` is
+   * also set, because a half-configured environment is exactly the case where
+   * one flag is missing.
+   */
+  it('refuses to boot production with the demo payment webhook secret set', () => {
+    stubBase({
+      NODE_ENV: 'production',
+      SMTP_HOST: 'smtp.example.com',
+      EMAIL_FROM: 'no-reply@example.com',
+      CREDENTIALS_ENCRYPTION_KEY: 'k'.repeat(44),
+      DEMO_PAYMENT_WEBHOOK_SECRET: 'demo-payment-secret-2026',
+    });
+
+    expect(() => getEnv()).toThrow(/DEMO_PAYMENT_WEBHOOK_SECRET/);
+  });
+
+  it('rejects a demo payment webhook secret shorter than 16 characters', () => {
+    stubBase({ DEMO_MODE: 'true', DEMO_PAYMENT_WEBHOOK_SECRET: 'short' });
+
+    expect(() => getEnv()).toThrow(/DEMO_PAYMENT_WEBHOOK_SECRET/);
+  });
+
   it('rejects a non-postgres DATABASE_URL', () => {
     stubBase({ DATABASE_URL: 'mysql://user:pass@127.0.0.1:3306/db' });
 

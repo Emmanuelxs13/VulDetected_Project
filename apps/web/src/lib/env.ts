@@ -228,6 +228,31 @@ const envSchema = z.object({
   OAUTH_DEMO_GITHUB_CLIENT_ID: z.string().min(1).optional(),
   OAUTH_DEMO_GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
 
+  /**
+   * DEMO ONLY. The shared secret the simulated payment provider uses to sign the
+   * webhook it delivers (HU-02b, ADR 0019).
+   *
+   * ## Why a secret at all, if nothing is charged
+   *
+   * The signature is the part of the design that has to survive contact with a
+   * real gateway, and it is the part that is easiest to get wrong: an endpoint
+   * that trusts an unauthenticated POST lets anyone set their own plan. Keeping
+   * the HMAC in the simulator means the webhook route is written, tested and
+   * exercised exactly as it will be in production; only the party holding the
+   * key changes.
+   *
+   * ## Why production rejects it
+   *
+   * A production deployment that accepts events signed with a demo secret has a
+   * free-upgrade endpoint. `DEMO_MODE` must also be true for the simulator to
+   * arm, but the secret is refused on its own so a half-configured environment
+   * cannot boot with a known key.
+   */
+  DEMO_PAYMENT_WEBHOOK_SECRET: z
+    .string()
+    .min(16, 'DEMO_PAYMENT_WEBHOOK_SECRET must be at least 16 characters')
+    .optional(),
+
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 });
 
@@ -322,6 +347,20 @@ const productionRefinement = (value: z.infer<typeof envSchema>, ctx: z.Refinemen
       message:
         'SCAN_REQUIRE_VERIFIED_DOMAIN must not be disabled in production: scanning a host ' +
         'without proving ownership is an abuse vector (HU-03, CA-03/CA-04).',
+    });
+  }
+  /**
+   * The simulated payment provider signs webhooks with a secret that lives in the
+   * repository's demo documentation. In production that secret is a free-upgrade
+   * endpoint, so it is refused on its own — not only when `DEMO_MODE` is set.
+   */
+  if (value.DEMO_PAYMENT_WEBHOOK_SECRET) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DEMO_PAYMENT_WEBHOOK_SECRET'],
+      message:
+        'DEMO_PAYMENT_WEBHOOK_SECRET must not be set in production: a webhook signed with a ' +
+        'demo secret lets anyone activate a paid plan.',
     });
   }
 };

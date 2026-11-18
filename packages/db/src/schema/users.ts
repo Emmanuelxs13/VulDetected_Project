@@ -90,6 +90,32 @@ export const users = pgTable(
     subscriptionStatus: subscriptionStatusEnum('subscription_status').notNull().default('active'),
 
     /**
+     * Billing state owned by the payment provider (Sprint 2, HU-02b).
+     *
+     * `subscriptionPlan` and `subscriptionStatus` above are the *effective*
+     * values the rest of the product reads; these four columns are the
+     * bookkeeping that makes them trustworthy:
+     *
+     *   - `subscription_provider` names the provider that wrote the current
+     *     state, so a second provider can never silently take over an account;
+     *   - `subscription_last_event_at` is the newest provider event already
+     *     applied. An event older than this is stale and must not roll the
+     *     subscription backwards;
+     *   - `subscription_period_end` is when the paid period ends;
+     *   - `subscription_cancel_at_period_end` records a cancellation that has
+     *     been requested but has not yet taken effect.
+     *
+     * All four are NULL/false for an account that never paid, which is the
+     * honest representation of "no billing relationship exists".
+     */
+    subscriptionProvider: text('subscription_provider'),
+    subscriptionLastEventAt: timestamp('subscription_last_event_at', { withTimezone: true }),
+    subscriptionPeriodEnd: timestamp('subscription_period_end', { withTimezone: true }),
+    subscriptionCancelAtPeriodEnd: boolean('subscription_cancel_at_period_end')
+      .notNull()
+      .default(false),
+
+    /**
      * UI language. Default `es` matches the owner's locale; the repository's
      * artifacts are English by contract, and the product copy language is still
      * an open decision. The column exists so that decision is a data change, not

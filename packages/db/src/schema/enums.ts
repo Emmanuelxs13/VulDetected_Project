@@ -45,6 +45,31 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', [
 ]);
 
 /**
+ * Checkout lifecycle (Sprint 2, HU-02b).
+ *
+ * A checkout is the user's *intent* to pay. It is deliberately separate from the
+ * subscription state on `users`: the subscription changes only when the provider
+ * confirms the payment, never when the form is submitted. `paid` and `declined`
+ * are terminal; `pending` is what the simulated hosted page shows while the user
+ * picks a test card.
+ */
+export const checkoutStatusEnum = pgEnum('checkout_status', ['pending', 'paid', 'declined']);
+
+/**
+ * What happened to a provider event.
+ *
+ * `duplicate` and `stale` are outcomes, not errors: a provider retries, and an
+ * out-of-order delivery is normal. Recording them is what makes "the webhook is
+ * idempotent" a fact someone can inspect instead of a claim in a comment.
+ */
+export const paymentEventOutcomeEnum = pgEnum('payment_event_outcome', [
+  'applied',
+  'duplicate',
+  'stale',
+  'ignored',
+]);
+
+/**
  * What a verification token authorizes.
  *
  * This vocabulary is what keeps token types from being interchangeable. Without
@@ -134,6 +159,8 @@ export const inet = customType<{ data: string }>({
 export type AccountStatus = (typeof accountStatusEnum.enumValues)[number];
 export type SubscriptionPlan = (typeof subscriptionPlanEnum.enumValues)[number];
 export type SubscriptionStatus = (typeof subscriptionStatusEnum.enumValues)[number];
+export type CheckoutStatus = (typeof checkoutStatusEnum.enumValues)[number];
+export type PaymentEventOutcome = (typeof paymentEventOutcomeEnum.enumValues)[number];
 export type TokenPurpose = (typeof tokenPurposeEnum.enumValues)[number];
 export type ScanStatus = (typeof scanStatusEnum.enumValues)[number];
 export type Severity = (typeof severityEnum.enumValues)[number];
