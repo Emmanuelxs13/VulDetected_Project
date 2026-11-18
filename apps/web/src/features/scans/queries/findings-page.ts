@@ -175,6 +175,7 @@ export async function getSeverityCounts(
 }
 
 export interface PostureTrend {
+  domainId: string;
   hostname: string;
   latestScanId: string;
   latestAt: Date;
@@ -253,6 +254,7 @@ export async function getDomainPostureTrends(ownerUserId: string): Promise<Postu
     const previousRisky = previous ? (riskyByScan.get(previous.id) ?? 0) : null;
 
     trends.push({
+      domainId: latest.domainId,
       hostname: latest.hostname,
       latestScanId: latest.id,
       latestAt: latest.createdAt,

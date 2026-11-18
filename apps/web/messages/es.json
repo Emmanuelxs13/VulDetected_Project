@@ -608,6 +608,55 @@
         "exports": "Exportar"
       }
     },
+    "history": {
+      "title": "Historial comparativo",
+      "subtitle": "Instantáneas de {host}, de la más reciente a la más antigua.",
+      "back": "Volver a informes",
+      "sessionRequired": {
+        "title": "Sesión no activa",
+        "description": "Inicia sesión para ver el historial de tus dominios."
+      },
+      "howToRead": {
+        "title": "Cómo leer este historial",
+        "description": "Cada fila es una foto de un escaneo, no una nota única.",
+        "snapshots": "Las columnas muestran cuántos hallazgos abiertos había por severidad en ese momento. No hay una nota compuesta porque escondería qué severidad cambió.",
+        "comparability": "Un escaneo se compara solo con el anterior completo y comparable. Si el modo de escaneo o el catálogo de severidad cambió, el cambio no se muestra: la diferencia sería nuestra, no del sitio."
+      },
+      "noComparablePair": "Todavía no hay dos escaneos comparables en este dominio, así que no hay un cambio que mostrar.",
+      "empty": {
+        "title": "Todavía no hay escaneos de este dominio",
+        "description": "Cuando termine el primer escaneo, aparecerá aquí con sus cifras."
+      },
+      "table": {
+        "title": "Escaneos",
+        "description": "Del más reciente al más antiguo. Cada fila enlaza al detalle y a su reporte ejecutivo.",
+        "date": "Fecha",
+        "status": "Estado",
+        "mode": "Modo",
+        "total": "Total",
+        "risky": "Críticos/altos",
+        "delta": "Cambio de riesgo",
+        "report": "Reporte"
+      },
+      "mode": {
+        "passive": "Pasivo",
+        "active": "Activo"
+      },
+      "badge": {
+        "demo": "Datos demo",
+        "partial": "Parcial",
+        "notCompleted": "No terminó",
+        "partialNotComparable": "Parcial: no comparable",
+        "notComparable": "No comparable",
+        "first": "Primer escaneo comparable",
+        "modeChanged": "Cambió el modo",
+        "catalogChanged": "Cambió el catálogo",
+        "demoMixed": "Mezcla demo y real",
+        "improved": "Mejoró",
+        "worsened": "Empeoró",
+        "unchanged": "Sin cambios"
+      }
+    },
     "pdf": {
       "title": "Reporte ejecutivo de seguridad",
       "subtitle": "Resultado del escaneo de {host}",

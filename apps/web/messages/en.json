@@ -608,6 +608,55 @@
         "exports": "Export"
       }
     },
+    "history": {
+      "title": "Comparative history",
+      "subtitle": "Snapshots of {host}, newest first.",
+      "back": "Back to reports",
+      "sessionRequired": {
+        "title": "No active session",
+        "description": "Sign in to see the history of your domains."
+      },
+      "howToRead": {
+        "title": "How to read this history",
+        "description": "Each row is one scan's snapshot, not a single score.",
+        "snapshots": "The columns show how many open findings of each severity existed at that moment. There is no composite score because it would hide which severity moved.",
+        "comparability": "A scan is compared only with the previous complete, comparable one. When the scan mode or the severity catalogue changed, the change is not shown: the difference would be ours, not the site's."
+      },
+      "noComparablePair": "This domain does not have two comparable scans yet, so there is no change to show.",
+      "empty": {
+        "title": "No scans for this domain yet",
+        "description": "When the first scan finishes, it will appear here with its numbers."
+      },
+      "table": {
+        "title": "Scans",
+        "description": "Newest first. Each row links to the scan detail and its executive report.",
+        "date": "Date",
+        "status": "Status",
+        "mode": "Mode",
+        "total": "Total",
+        "risky": "Critical/high",
+        "delta": "Risk change",
+        "report": "Report"
+      },
+      "mode": {
+        "passive": "Passive",
+        "active": "Active"
+      },
+      "badge": {
+        "demo": "Demo data",
+        "partial": "Partial",
+        "notCompleted": "Did not finish",
+        "partialNotComparable": "Partial: not comparable",
+        "notComparable": "Not comparable",
+        "first": "First comparable scan",
+        "modeChanged": "Scan mode changed",
+        "catalogChanged": "Catalogue changed",
+        "demoMixed": "Demo and real mixed",
+        "improved": "Improved",
+        "worsened": "Worsened",
+        "unchanged": "Unchanged"
+      }
+    },
     "pdf": {
       "title": "Executive security report",
       "subtitle": "Scan result for {host}",

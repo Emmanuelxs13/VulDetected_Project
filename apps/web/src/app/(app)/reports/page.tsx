@@ -141,7 +141,12 @@ export default async function ReportsPage() {
                 {trends.map((trend) => (
                   <TableRow key={trend.latestScanId}>
                     <TableCell>
-                      <span className="font-mono text-xs">{trend.hostname}</span>
+                      <Link
+                        href={`/reports/domains/${trend.domainId}`}
+                        className="font-mono text-xs text-primary hover:underline"
+                      >
+                        {trend.hostname}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-2">
