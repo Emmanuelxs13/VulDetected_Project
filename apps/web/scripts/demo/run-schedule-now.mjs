@@ -1,0 +1,177 @@
+/**
+ * `pnpm demo:run-schedule-now` — make the REAL scheduler fire a scheduled scan.
+ *
+ * ## Why this does not enqueue a scan directly
+ *
+ * A script that inserts a `scans` row and publishes a Celery message would prove
+ * that the worker can scan. It would prove nothing about the scheduler, which is
+ * the feature being demonstrated (HU-07): the claim, the compare-and-set, the
+ * `next_run_at` arithmetic, the verified-domain re-check and the "new finding"
+ * detection all live on the scheduler's path.
+ *
+ * So this script does exactly one thing to the data — it moves `next_run_at`
+ * into the past — and then calls the same authenticated endpoint the cron
+ * script calls. What runs after that is production code with no demo branch.
+ *
+ * ## Why it calls the endpoint instead of waiting for the tick
+ *
+ * The dev scheduler ticks every 15 s. Waiting would work, but a demo that pauses
+ * for an unpredictable interval in front of an audience is a demo that looks
+ * broken. The endpoint is idempotent and compare-and-set safe, so calling it
+ * early costs nothing and makes the step deterministic.
+ *
+ * ## Why the scan is NOT created if no schedule exists
+ *
+ * Creating the schedule is part of what HU-07 asks the user to do in the UI. A
+ * script that silently invents one would let the presenter skip the screen that
+ * has to be shown. When none exists, the script says exactly where to create it.
+ */
+import { createClient } from 'redis';
+
+import { closeRedis, openDb, requireDemoMode } from './_shared.mjs';
+
+const SCRIPT = 'demo:run-schedule-now';
+
+requireDemoMode(SCRIPT);
+
+const DEFAULT_HOSTNAME = '127-0-0-1.nip.io';
+
+/** Reads `--domain <hostname>` (or `--domain=<hostname>`). */
+function parseDomainArg(argv) {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--domain') return argv[index + 1] ?? null;
+    if (arg.startsWith('--domain=')) return arg.slice('--domain='.length);
+  }
+  return null;
+}
+
+const hostname = parseDomainArg(process.argv.slice(2)) ?? DEFAULT_HOSTNAME;
+
+const sql = openDb();
+
+let scheduleId;
+let domainId;
+let previousNextRunAt;
+
+try {
+  const rows = await sql`
+    select s.id, s.domain_id, s.next_run_at, s.enabled, d.verified, d.normalized_hostname
+    from scan_schedules s
+    join domains d on d.id = s.domain_id
+    where d.normalized_hostname = ${hostname}
+    limit 1
+  `;
+
+  if (rows.length === 0) {
+    console.error(
+      `[${SCRIPT}] No schedule exists for ${hostname}.\n` +
+        `  Create it in the UI first: http://localhost:3000/schedules\n` +
+        `  (sign in as demo.pro@vuldetected.local). Then re-run this script.`,
+    );
+    process.exit(1);
+  }
+
+  const row = rows[0];
+
+  if (!row.enabled) {
+    console.error(
+      `[${SCRIPT}] The schedule for ${hostname} is disabled, so the scheduler would\n` +
+        `  correctly skip it. Enable it in http://localhost:3000/schedules first.`,
+    );
+    process.exit(1);
+  }
+
+  if (!row.verified) {
+    console.error(
+      `[${SCRIPT}] ${hostname} is not verified. The scheduler re-checks verification\n` +
+        `  at run time and would skip it. Verify the domain first.`,
+    );
+    process.exit(1);
+  }
+
+  scheduleId = row.id;
+  domainId = row.domain_id;
+  previousNextRunAt = row.next_run_at;
+
+  // One second in the past, not `now()`: `lte(next_run_at, now)` is evaluated in
+  // the database, and a value that is exactly "now" from the client can land a
+  // few milliseconds in the future once the clock skew of two processes is
+  // involved. A due row must be unambiguously due.
+  await sql`
+    update scan_schedules
+    set next_run_at = now() - interval '1 second'
+    where id = ${scheduleId}
+  `;
+
+  console.log(`  schedule            ${scheduleId}`);
+  console.log(`  domain              ${hostname} (${domainId})`);
+  console.log(`  next_run_at         ${previousNextRunAt?.toISOString() ?? 'null'} -> past`);
+} finally {
+  await sql.end();
+}
+
+// Same machine credential and same endpoint as `scripts/run-scheduler.mjs`.
+const baseUrl = process.env.SCHEDULER_BASE_URL ?? 'http://localhost:3000';
+const secret = process.env.SCANNER_CALLBACK_SECRET;
+
+if (!secret) {
+  console.error(`[${SCRIPT}] SCANNER_CALLBACK_SECRET is required to call the scheduler endpoint.`);
+  process.exit(1);
+}
+
+const response = await fetch(`${baseUrl}/api/internal/schedules/run`, {
+  method: 'POST',
+  headers: { authorization: `Bearer ${secret}` },
+  signal: AbortSignal.timeout(30_000),
+});
+
+const body = await response.text();
+
+if (!response.ok) {
+  console.error(`[${SCRIPT}] Scheduler endpoint returned ${response.status}: ${body}`);
+  process.exit(1);
+}
+
+console.log(`\n[${SCRIPT}] Scheduler ran (real code path): ${body}`);
+
+// Confirm the scan the scheduler created, so the presenter knows what to open.
+const verifySql = openDb();
+try {
+  const scans = await verifySql`
+    select id, status, source, created_at
+    from scans
+    where domain_id = ${domainId} and source = 'schedule'
+    order by created_at desc
+    limit 1
+  `;
+
+  if (scans.length === 0) {
+    console.log(
+      '  No scheduled scan was created. Read the counts above: the scheduler may have\n' +
+        '  skipped this row (disabled, unverified or already claimed by another runner).',
+    );
+  } else {
+    const scan = scans[0];
+    console.log(`  scheduled scan      ${scan.id} (${scan.status})`);
+    console.log(`  open it at          ${baseUrl}/scans/${scan.id}`);
+  }
+} finally {
+  await verifySql.end();
+}
+
+// The broker list is where the job waits for the worker. If Redis is down the
+// enqueue above would already have failed, so this is informational only.
+if (process.env.REDIS_URL) {
+  const client = createClient({ url: process.env.REDIS_URL });
+  client.on('error', () => {});
+  try {
+    await client.connect();
+    const queued = await client.lLen('celery');
+    console.log(`  broker              ${queued} job(s) waiting in the celery list`);
+  } catch {
+    // Informational; never fails the demo step.
+  } finally {
+    await closeRedis(client);
+  }
+}
