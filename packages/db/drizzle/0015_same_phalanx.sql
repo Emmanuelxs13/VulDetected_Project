@@ -1,0 +1,2 @@
+ALTER TABLE "scan_credentials" DROP CONSTRAINT "scan_credentials_kind_check";--> statement-breakpoint
+ALTER TABLE "scan_credentials" ADD CONSTRAINT "scan_credentials_kind_check" CHECK ("scan_credentials"."kind" IN ('basic', 'bearer', 'header', 'form'));
