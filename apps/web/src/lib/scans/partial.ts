@@ -1,5 +1,5 @@
 /**
- * Comparability decision for a finished scan (Sprint 2, CA-22 / CA-29).
+ * Comparability decision for a finished scan (Sprint 2, HU-06 partial / CA-10).
  *
  * ## Why this is its own module
  *

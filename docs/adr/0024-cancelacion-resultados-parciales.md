@@ -6,7 +6,7 @@ Decisores: Equipo VulDetected
 
 ## Contexto
 
-**HU-06** (CA-20, CA-21, CA-22, CA-12) pide poder cancelar un escaneo, que el
+**HU-06** (CA-20, CA-21 y CA-22) pide poder cancelar un escaneo, que el
 trabajador se detenga y que el usuario reciba un correo.
 
 La implementación previa tenía un defecto silencioso: al cancelar, la acción

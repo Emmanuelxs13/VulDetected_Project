@@ -3,7 +3,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 /**
  * Sprint 2 · HU-07 (SCRUM-25) — the "new vulnerability" alert, measured.
  *
- * ## What this proves (CA-25)
+ * ## What this proves (CA-12)
  *
  * Three claims the sprint criteria make, each checked against the running
  * product rather than a mock:
@@ -137,7 +137,7 @@ async function readBody(request: APIRequestContext, id: string): Promise<string>
 }
 
 test.describe('Sprint 2 — HU-07 alert', () => {
-  test('CA-25: only a NEW critical alerts, and it arrives in under 60 s', async ({
+  test('CA-12: only a NEW critical alerts, and it arrives in under 60 s', async ({
     page,
     request,
   }) => {
@@ -187,7 +187,7 @@ test.describe('Sprint 2 — HU-07 alert', () => {
 
     // Reported so the sprint manual can quote a real number instead of a guess.
     console.log(
-      `[CA-25] alert latency: ${latencyMs} ms from scan.completed to mailbox ` +
+      `[CA-12] alert latency: ${latencyMs} ms from scan.completed to mailbox ` +
         `(budget ${ALERT_BUDGET_MS} ms)`,
     );
     test.info().annotations.push({

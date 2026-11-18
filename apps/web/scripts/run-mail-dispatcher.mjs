@@ -9,7 +9,7 @@
  * ## Why five seconds
  *
  * Sprint 2 promises that an alert is queued when the scan closes and delivered in
- * under sixty seconds (CA-25). A five-second poll leaves plenty of room for the
+ * under sixty seconds (CA-12). A five-second poll leaves plenty of room for the
  * SMTP round trip and makes the measurement in `PRUEBA_SPRINT_2.md` honest — the
  * guarantee comes from the poll interval, not from a lucky run.
  *

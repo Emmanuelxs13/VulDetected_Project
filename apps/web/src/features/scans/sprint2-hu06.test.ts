@@ -103,8 +103,8 @@ describe('Sprint 2 · HU-06 · CA-21 — the worker is told to stop', () => {
   });
 });
 
-describe('Sprint 2 · HU-06 · CA-12 — cancellation mail', () => {
-  it('CA-12: queues the cancellation email once, for this scan', async () => {
+describe('Sprint 2 · HU-06 · CA-22 — cancellation mail', () => {
+  it('CA-22: queues the cancellation email once, for this scan', async () => {
     dbQueue.push([{ id: 'scan-1' }]);
     dbQueue.push([{ id: 'scan-1' }]);
 
@@ -114,7 +114,7 @@ describe('Sprint 2 · HU-06 · CA-12 — cancellation mail', () => {
     expect(vi.mocked(notifyScanCancelled)).toHaveBeenCalledWith('scan-1');
   });
 
-  it('CA-12: a mail failure does not undo the cancellation', async () => {
+  it('CA-22: a mail failure does not undo the cancellation', async () => {
     vi.mocked(notifyScanCancelled).mockRejectedValueOnce(new Error('smtp down'));
     dbQueue.push([{ id: 'scan-1' }]);
     dbQueue.push([{ id: 'scan-1' }]);
@@ -127,8 +127,8 @@ describe('Sprint 2 · HU-06 · CA-12 — cancellation mail', () => {
   });
 });
 
-describe('Sprint 2 · HU-06 · CA-12 — the cancellation template', () => {
-  it('CA-12: renders a message that says results are kept and marked partial', async () => {
+describe('Sprint 2 · HU-06 · CA-22 — the cancellation template', () => {
+  it('CA-22: renders a message that says results are kept and marked partial', async () => {
     const { renderMail } = await import('@/lib/mail/templates');
 
     const rendered = renderMail('scan_cancelled', 'es', {
@@ -142,8 +142,8 @@ describe('Sprint 2 · HU-06 · CA-12 — the cancellation template', () => {
   });
 });
 
-describe('Sprint 2 · HU-06 · CA-12 — session guard', () => {
-  it('CA-12: a request without a session is refused before any write', async () => {
+describe('Sprint 2 · HU-06 · CA-22 — session guard', () => {
+  it('CA-22: a request without a session is refused before any write', async () => {
     vi.mocked(requireUser).mockRejectedValueOnce(new Error('Unauthorized'));
 
     await expect(cancelScanAction('scan-1')).rejects.toThrow('Unauthorized');

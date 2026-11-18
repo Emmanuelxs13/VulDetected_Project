@@ -19,7 +19,7 @@ import {
  *
  * HU-09 asks for an executive PDF of a scan: one document a non-technical
  * reader can open, with the risk verdict first, the numbers next and the
- * findings after. CA-26 covers the document itself; CA-27 covers the honesty of
+ * findings after. CA-09 covers the document itself; CA-28 covers the honesty of
  * the document when the data behind it is not a clean, real, finished scan.
  *
  * ## Why the assertions read the rendered bytes
@@ -112,7 +112,7 @@ function reportInput(overrides: Partial<ReportInput> = {}): ReportInput {
 }
 
 describe('Sprint 2 · HU-09', () => {
-  it('CA-26: the executive PDF is a real document with the verdict, the numbers and the findings', async () => {
+  it('CA-09: the executive PDF is a real document with the verdict, the numbers and the findings', async () => {
     const input = reportInput({
       findings: [
         finding({ severity: 'critical', title: 'CRITICAL-MARKER' }),
@@ -169,7 +169,7 @@ describe('Sprint 2 · HU-09', () => {
     );
   });
 
-  it('CA-27: a partial scan gets no risk verdict and says why', async () => {
+  it('CA-28: a partial scan gets no risk verdict and says why', async () => {
     const input = reportInput({ partial: true });
 
     const plan = await buildReportLayout(input);
@@ -190,7 +190,7 @@ describe('Sprint 2 · HU-09', () => {
     expect(parsed.getPageCount()).toBe(plan.length);
   });
 
-  it('CA-27: demo data is labelled inside the document, not only in the app', async () => {
+  it('CA-28: demo data is labelled inside the document, not only in the app', async () => {
     const plan = await buildReportLayout(reportInput({ isDemo: true }));
 
     const notices = plan[0]!.blocks.filter((block) => block.kind === 'notice');
@@ -205,7 +205,7 @@ describe('Sprint 2 · HU-09', () => {
     expect(bothNotices).toHaveLength(2);
   });
 
-  it('CA-26: the English catalogue produces an English document', async () => {
+  it('CA-09: the English catalogue produces an English document', async () => {
     const plan = await buildReportLayout(reportInput({ copy: copyFrom('en') }));
 
     const text = plan

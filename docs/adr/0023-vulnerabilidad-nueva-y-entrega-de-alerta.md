@@ -6,7 +6,7 @@ Decisores: Equipo VulDetected
 
 ## Contexto
 
-**HU-07** (CA-23, CA-24, CA-25) pide escaneos programados y alertas cuando aparece
+**HU-07** (CA-12, CA-23 y CA-24) pide escaneos programados y alertas cuando aparece
 una vulnerabilidad nueva. La palabra "nueva" parece obvia y no lo es: si se define
 mal, la alerta se convierte en ruido y el usuario deja de leerla.
 

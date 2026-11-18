@@ -79,7 +79,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
      * writes `cancelled` first (the durable truth), and the worker's
      * confirmation arrives afterwards carrying the findings it had already
      * collected. Dropping that callback would throw away the partial results
-     * the spec requires us to keep (CA-22); the transaction below re-reads the
+     * the spec requires us to keep (ADR 0024); the transaction below re-reads the
      * status and refuses to move a cancelled row while still ingesting what the
      * worker sent.
      */
@@ -134,7 +134,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
         /**
          * Was this run incomplete?
          *
-         * Comparability is the whole point of the flag (CA-22, CA-29): a scan
+         * Comparability is the whole point of the flag (CA-10): a scan
          * that ran three of ten checks has a real but partial picture, and
          * charting it next to a complete scan would show a drop that never
          * happened. The worker reports which checks it actually finished, so the
@@ -185,7 +185,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ scanId:
               and(
                 eq(findings.scanId, previousScanRows[0].id),
                 /**
-                 * Active findings only (Sprint 2, CA-25).
+                 * Active findings only (Sprint 2, CA-12).
                  *
                  * "New" means "not present in the previous comparable scan's
                  * OPEN findings". A finding the user marked resolved in that

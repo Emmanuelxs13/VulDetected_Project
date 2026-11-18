@@ -85,7 +85,7 @@ export default async function ReportsPage() {
           eq(scans.status, 'completed'),
           // A completed-but-partial run has an incomplete picture; listing it
           // beside complete scans would imply comparability it does not have
-          // (CA-22 / CA-29).
+          // (CA-10).
           eq(scans.partial, false),
         ),
       )

@@ -8,11 +8,13 @@ Decisores: Equipo VulDetected
 
 El Sprint 2 pide dos cosas que se tocan:
 
-- **CA-31** (HU-02a): un usuario puede iniciar sesión con Google o GitHub.
-- **CA-33** (HU-02b): si el correo del proveedor coincide con una cuenta local ya
-  existente, el sistema no debe crear una cuenta duplicada.
+- **CA-31** (HU-02a): si ya existe una cuenta local con el mismo correo que la
+  identidad del proveedor, el sistema vincula la identidad a esa cuenta, no crea
+  un duplicado y registra el evento en auditoría.
+- **CA-33** (HU-02a): una cuenta que ya tiene contraseña y llega por primera vez
+  con un proveedor social debe verificar el correo antes de recibir acceso.
 
-La lectura ingenua de CA-33 es "si el correo coincide, vincula y entra". Esa
+La lectura ingenua de CA-31 es "si el correo coincide, vincula y entra". Esa
 lectura es una vulnerabilidad de toma de cuenta: un proveedor puede entregar un
 correo que el usuario no controla (correo no verificado, correo corporativo
 reasignado, proveedor mal configurado). Si el sistema vincula por coincidencia de
@@ -33,6 +35,11 @@ Si cualquiera de las dos falla, no se crea sesión y no se vincula nada. El usua
 recibe la instrucción de iniciar sesión con su contraseña y vincular desde dentro
 de la aplicación, o de verificar su correo primero.
 
+Esa segunda condición es, además, la forma en que se cumple **CA-33**: una cuenta
+con contraseña activa no recibe acceso por el proveedor social mientras su buzón
+no esté verificado en nuestro sistema. La sesión no se concede "a medias": no hay
+sesión hasta que la verificación ocurre.
+
 ## Consecuencias
 
 - Un atacante que controle un correo en un proveedor externo no puede entrar a una
@@ -47,5 +54,5 @@ de la aplicación, o de verificar su correo primero.
 ## Alternativas consideradas
 
 - **Vincular por coincidencia de correo**: cómodo y peligroso. Descartada.
-- **No vincular nunca y crear cuenta nueva**: genera duplicados y contradice CA-33.
+- **No vincular nunca y crear cuenta nueva**: genera duplicados y contradice CA-31.
   Descartada.

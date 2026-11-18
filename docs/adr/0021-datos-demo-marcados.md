@@ -6,7 +6,7 @@ Decisores: Equipo VulDetected
 
 ## Contexto
 
-**HU-10** (CA-09, CA-10, CA-28, CA-29) pide un tablero comparativo de historial.
+**HU-10** (CA-10 y CA-29) pide un tablero comparativo de historial.
 Un tablero con dos puntos no demuestra nada: hace falta una serie temporal.
 
 Generar seis meses de historial es trivial. El riesgo no es técnico, es de

@@ -39,7 +39,7 @@
  * SQL injection starts ENABLED so the Sprint 1 scan keeps finding it. The
  * Sprint 2 flow turns it off, scans a baseline, turns it on and scans again.
  *
- * ## Login-protected route (HU-04, CA-26/CA-27)
+ * ## Login-protected route (HU-04, CA-25 a CA-27)
  *
  * `/login` renders a real form; `POST /login` with the fixture credentials sets a
  * session cookie and redirects to `/private`. `/private` returns 401 without that

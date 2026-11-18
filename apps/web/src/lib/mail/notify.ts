@@ -249,7 +249,7 @@ export async function notifyScanCompleted(scanId: string): Promise<void> {
 
   /**
    * Only findings that are NEW in this scan and at or above the alert threshold
-   * (Sprint 2, CA-25).
+   * (Sprint 2, CA-12).
    *
    * Before this change the alert fired for any critical finding in the scan, so
    * a target with one unfixed critical sent the same email on every run and

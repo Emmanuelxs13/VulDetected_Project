@@ -43,7 +43,7 @@ export const DEFAULT_CHECKS = [
 /**
  * The subset of checks that send no crafted requests.
  *
- * Used to record the scan's mode on the row (CA-29). A scan whose check list is
+ * Used to record the scan's mode on the row (CA-10). A scan whose check list is
  * entirely passive is not comparable with one that fired SQLi and XSS payloads,
  * and the history has to be able to say so instead of charting the two together.
  */
@@ -172,7 +172,7 @@ export async function enqueueScanForDomain(input: {
       source: input.source,
       checks: [...DEFAULT_CHECKS],
       // Recorded on the row so the history can refuse to compare a passive run
-      // with an active one (CA-29).
+      // with an active one (CA-10).
       scanMode: scanModeForChecks(DEFAULT_CHECKS),
       severityCatalogVersion: SEVERITY_MAPPING_VERSION,
       // Answers "which secret produced this report" after a rotation, because the

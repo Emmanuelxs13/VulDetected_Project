@@ -31,7 +31,7 @@ async function signIn(page: Page): Promise<void> {
 }
 
 test.describe('Sprint 2 — HU-10', () => {
-  test('CA-09/CA-10/CA-28/CA-29: the domain history shows comparable snapshots', async ({
+  test('CA-10/CA-29: the domain history shows comparable snapshots', async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -54,7 +54,7 @@ test.describe('Sprint 2 — HU-10', () => {
     // ── The page is the comparative history, not another summary ────────────
     await expect(page.getByRole('heading', { name: 'Historial comparativo' })).toBeVisible();
 
-    // CA-09: no composite score anywhere. The sprint forbids inventing one.
+    // CA-10: no composite score anywhere. The sprint forbids inventing one.
     await expect(page.getByText(/No hay una nota compuesta/)).toBeVisible();
 
     // CA-29: the page states the comparison rule instead of implying it.
@@ -82,9 +82,9 @@ test.describe('Sprint 2 — HU-10', () => {
       `every row must say what its change means, got: ${deltaCells.join(' | ')}`,
     ).toBe(true);
 
-    // CA-28: demo rows are labelled in the page, not only in the seed script.
+    // ADR 0021: demo rows are labelled in the page, not only in the seed script.
     const demoBadges = await page.getByText('Datos demo').count();
-    console.log(`[CA-28] demo badges on the history page: ${demoBadges}`);
+    console.log(`[ADR 0021] demo badges on the history page: ${demoBadges}`);
     expect(demoBadges, 'seeded demo scans must be labelled as demo').toBeGreaterThan(0);
 
     // ── A domain that is not yours is not found ─────────────────────────────

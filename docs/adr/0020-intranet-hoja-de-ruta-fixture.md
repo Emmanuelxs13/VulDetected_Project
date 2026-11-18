@@ -6,7 +6,7 @@ Decisores: Equipo VulDetected
 
 ## Contexto
 
-**HU-04** (SCRUM-30, CA-35…CA-37) pide escanear páginas privadas que están detrás
+**HU-04** (SCRUM-30, CA-25, CA-26 y CA-27) pide escanear páginas privadas que están detrás
 de un inicio de sesión. En el contexto del cliente eso significa una intranet.
 
 Una intranet real es una red privada. Permitir que el escáner la alcance exige
@@ -26,7 +26,7 @@ producto por comodidad de la demo. No se hace.
    cualquier objetivo de demo permitido, con la misma validación.
 4. La pantalla y el manual indican explícitamente que el objetivo es un fixture y
    no una intranet real.
-5. Los criterios CA-35…CA-37 se verifican contra el fixture y se reportan como
+5. Los criterios CA-25, CA-26 y CA-27 se verifican contra el fixture y se reportan como
    cumplidos **en modo demostración**.
 
 ## Consecuencias

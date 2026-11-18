@@ -18,7 +18,7 @@
  * ## What this seeded history is NOT allowed to prove
  *
  * It is chart data. It is never the baseline for a "new vulnerability" claim
- * (CA-25) and never evidence that a scan found something. Those require two real
+ * (CA-12) and never evidence that a scan found something. Those require two real
  * scans of the real fixture, one before and one after a change. The finding keys
  * here follow the canonical rule in `lib/findings/newness.ts`, but a real scan's
  * keys depend on the URLs and parameters it actually visits, so the two sets are

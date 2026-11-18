@@ -19,9 +19,9 @@ Se documentan equivalentes explícitos de los criterios de Google para GitHub, c
 el sufijo `-GH`:
 
 - `CA-30-GH` — crear cuenta e iniciar sesión con GitHub.
-- `CA-31-GH` — iniciar sesión con GitHub en una cuenta existente.
-- `CA-32-GH` — cerrar sesión y volver a entrar con GitHub.
-- `CA-33-GH` — no duplicar cuenta cuando el correo coincide.
+- `CA-31-GH` — iniciar sesión con GitHub en una cuenta existente, sin duplicarla.
+- `CA-32-GH` — consentimiento rechazado en GitHub: error, sin alta y sin cambio de sesión.
+- `CA-33-GH` — cuenta con contraseña y primer acceso con GitHub: exige verificar el correo.
 
 Reglas adicionales:
 

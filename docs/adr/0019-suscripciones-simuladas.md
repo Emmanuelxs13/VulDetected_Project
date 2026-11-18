@@ -6,7 +6,7 @@ Decisores: Equipo VulDetected
 
 ## Contexto
 
-**CA-33/CA-34** (HU-02b) piden gestión de suscripción: planes, cambio de plan,
+**CA-34 a CA-37** (HU-02b) piden gestión de suscripción: planes, cambio de plan,
 estado de la suscripción y cobro. Integrar una pasarela real (Stripe, MercadoPago)
 en un sprint académico introduce tres problemas que no son del producto:
 credenciales que no se pueden publicar, cumplimiento PCI, y un flujo que no se

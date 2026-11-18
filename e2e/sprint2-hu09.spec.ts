@@ -33,7 +33,7 @@ async function signIn(page: Page): Promise<void> {
 }
 
 test.describe('Sprint 2 — HU-09', () => {
-  test('CA-26: a completed scan exports an executive PDF the owner can download', async ({
+  test('CA-09: a completed scan exports an executive PDF the owner can download', async ({
     page,
   }) => {
     test.setTimeout(300_000);
@@ -83,6 +83,6 @@ test.describe('Sprint 2 — HU-09', () => {
     expect(bytes.toString('latin1')).toContain('%%EOF');
     expect(bytes.length, 'a report with findings is not an empty file').toBeGreaterThan(2_000);
 
-    console.log(`[CA-26] executive PDF downloaded: ${bytes.length} bytes, ${download.suggestedFilename()}`);
+    console.log(`[CA-09] executive PDF downloaded: ${bytes.length} bytes, ${download.suggestedFilename()}`);
   });
 });

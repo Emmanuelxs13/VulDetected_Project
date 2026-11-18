@@ -1,5 +1,5 @@
 /**
- * Which findings are worth an alert (Sprint 2, CA-25).
+ * Which findings are worth an alert (Sprint 2, CA-12).
  *
  * ## Why a threshold and not "any critical"
  *

@@ -5,11 +5,11 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
  *
  * ## What this proves
  *
- *   - CA-21: the user can cancel a scan that is already running.
- *   - CA-22: the worker stops promptly (the criteria ask for ≤ 10 s), the
- *     findings collected so far are KEPT, and the run is marked partial so it
+ *   - CA-20: the user can cancel a scan that is already running.
+ *   - CA-21: the worker stops promptly (the criteria ask for ≤ 10 s), and the
+ *     findings collected so far are KEPT. ADR 0024 marks the run partial so it
  *     cannot be mistaken for a complete one.
- *   - CA-12: the cancellation is communicated by email.
+ *   - CA-22: the cancellation is communicated by email.
  *
  * ## Why the fixture is slowed down
  *
@@ -103,7 +103,7 @@ test.describe('Sprint 2 — HU-06', () => {
     await setSlow(request, 0);
   });
 
-  test('CA-12/21/22: cancelling a running scan stops the worker and keeps partial results', async ({
+  test('CA-20/21/22: cancelling a running scan stops the worker and keeps partial results', async ({
     page,
     request,
   }) => {
@@ -117,7 +117,7 @@ test.describe('Sprint 2 — HU-06', () => {
 
     const scanId = await submitScan(page);
 
-    // CA-21: the cancel control only exists while the scan is active.
+    // CA-20: the cancel control only exists while the scan is active.
     await page.goto(`/scans/${scanId}`);
     const cancelButton = page.getByRole('button', { name: 'Cancelar escaneo' });
     await expect(cancelButton).toBeVisible({ timeout: 60_000 });
@@ -139,7 +139,7 @@ test.describe('Sprint 2 — HU-06', () => {
 
     const stopLatencyMs = new Date(stopped!.createdAt).getTime() - cancelledAtMs;
     console.log(
-      `[CA-22] worker stop latency: ${stopLatencyMs} ms from the click to scan.cancelled ` +
+      `[CA-21] worker stop latency: ${stopLatencyMs} ms from the click to scan.cancelled ` +
         `(budget ${STOP_BUDGET_MS} ms)`,
     );
     expect(
@@ -147,7 +147,7 @@ test.describe('Sprint 2 — HU-06', () => {
       `the worker must stop within ${STOP_BUDGET_MS} ms, took ${stopLatencyMs} ms`,
     ).toBeLessThan(STOP_BUDGET_MS);
 
-    // CA-22: the partial results are kept and the run says so.
+    // ADR 0024: the partial results are kept and the run says so.
     //
     // The worker publishes `scan.cancelled` and THEN posts the terminal
     // callback that sets `partial` and stores the findings, so the first reload
@@ -165,10 +165,10 @@ test.describe('Sprint 2 — HU-06', () => {
     await expect(allFindings).toBeVisible({ timeout: 20_000 });
 
     const total = Number((await allFindings.innerText()).match(/\((\d+)\)/)?.[1] ?? '0');
-    console.log(`[CA-22] findings preserved by the cancelled scan: ${total}`);
+    console.log(`[ADR 0024] findings preserved by the cancelled scan: ${total}`);
     expect(total, 'findings collected before the stop must be preserved').toBeGreaterThan(0);
 
-    // CA-12: the cancellation is communicated by email.
+    // CA-22: the cancellation is communicated by email.
     const deadline = Date.now() + 60_000;
     let cancelledMail = false;
     while (Date.now() < deadline && !cancelledMail) {

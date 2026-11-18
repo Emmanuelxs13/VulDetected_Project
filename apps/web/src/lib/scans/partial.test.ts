@@ -4,8 +4,8 @@ import { isPartialScan } from './partial';
 
 const CHECKS = ['security_headers', 'tls', 'cookies', 'xss', 'sqli'] as const;
 
-describe('Sprint 2 · HU-06 · CA-22 — partial results are kept but marked partial', () => {
-  it('CA-22: a cancelled run is partial even if every check happened to finish', () => {
+describe('Sprint 2 · HU-06 · ADR 0024 — partial results are kept but marked partial', () => {
+  it('ADR 0024: a cancelled run is partial even if every check happened to finish', () => {
     expect(
       isPartialScan({
         status: 'cancelled',
@@ -15,7 +15,7 @@ describe('Sprint 2 · HU-06 · CA-22 — partial results are kept but marked par
     ).toBe(true);
   });
 
-  it('CA-22: a run the row already marked cancelled is partial when the callback arrives', () => {
+  it('ADR 0024: a run the row already marked cancelled is partial when the callback arrives', () => {
     expect(
       isPartialScan({
         status: 'completed',
@@ -26,7 +26,7 @@ describe('Sprint 2 · HU-06 · CA-22 — partial results are kept but marked par
     ).toBe(true);
   });
 
-  it('CA-22: a completed run that skipped checks is partial', () => {
+  it('ADR 0024: a completed run that skipped checks is partial', () => {
     expect(
       isPartialScan({
         status: 'completed',
@@ -36,7 +36,7 @@ describe('Sprint 2 · HU-06 · CA-22 — partial results are kept but marked par
     ).toBe(true);
   });
 
-  it('CA-22: a completed run that covered every check is comparable', () => {
+  it('ADR 0024: a completed run that covered every check is comparable', () => {
     expect(
       isPartialScan({
         status: 'completed',
@@ -46,7 +46,7 @@ describe('Sprint 2 · HU-06 · CA-22 — partial results are kept but marked par
     ).toBe(false);
   });
 
-  it('CA-22: a failed run is not partial, because it never yields a comparable result set', () => {
+  it('ADR 0024: a failed run is not partial, because it never yields a comparable result set', () => {
     expect(
       isPartialScan({
         status: 'failed',
@@ -56,7 +56,7 @@ describe('Sprint 2 · HU-06 · CA-22 — partial results are kept but marked par
     ).toBe(false);
   });
 
-  it('CA-22: a row with no recorded check list cannot claim incompleteness', () => {
+  it('ADR 0024: a row with no recorded check list cannot claim incompleteness', () => {
     expect(
       isPartialScan({
         status: 'completed',

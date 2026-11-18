@@ -205,7 +205,7 @@ export async function getDomainPostureTrends(ownerUserId: string): Promise<Postu
       and(
         eq(domains.userId, ownerUserId),
         eq(scans.status, 'completed'),
-        // Comparability (CA-22/CA-29): a partial run is not a data point.
+        // Comparability (CA-10): a partial run is not a data point.
         eq(scans.partial, false),
       ),
     )

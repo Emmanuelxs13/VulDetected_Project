@@ -41,3 +41,27 @@ oficiales.
   hacer la traducción mental en cada tabla. Descartada.
 - **Reiniciar la numeración desde CA-01**: destruye la trazabilidad con el Sprint
   1 y con las actas ya entregadas. Descartada.
+
+## Reparto oficial por historia
+
+La especificación del Sprint 2 asigna 21 criterios a siete historias. Este es el
+reparto que usan el código, las pruebas y el manual de verificación:
+
+| Historia | Jira | Criterios |
+| --- | --- | --- |
+| HU-02a · Inicio de sesión social | SCRUM-28 | `CA-30`, `CA-31`, `CA-32`, `CA-33` |
+| HU-02b · Gestión de suscripción | SCRUM-29 | `CA-34`, `CA-35`, `CA-36`, `CA-37` |
+| HU-04 · Escaneo autenticado | SCRUM-30 | `CA-25`, `CA-26`, `CA-27` |
+| HU-06 · Cancelación de escaneo | SCRUM-19 | `CA-20`, `CA-21`, `CA-22` |
+| HU-07 · Escaneos programados y alertas | SCRUM-25 | `CA-12`, `CA-23`, `CA-24` |
+| HU-09 · Reporte ejecutivo en PDF | SCRUM-26 | `CA-09`, `CA-28` |
+| HU-10 · Historial comparativo | SCRUM-27 | `CA-10`, `CA-29` |
+
+Los identificadores que no aparecen en esta tabla y que el repositorio ya usaba
+(`CA-01`…`CA-19` del Sprint 1) conservan su significado del Sprint 1 y no se
+reutilizan para el Sprint 2.
+
+Cuando una decisión del Sprint 2 no corresponde a ningún criterio literal de la
+especificación —por ejemplo, conservar los resultados parciales de un escaneo
+cancelado— se documenta en su propio ADR y las pruebas la citan por el número de
+ADR, nunca por un `CA-` inventado.

@@ -15,10 +15,10 @@ import {
  *
  * ## What the criteria demand
  *
- * CA-09 and CA-10 describe the dashboard: the history of a domain, comparing
- * one scan with the previous one. CA-28 requires demo data to be visible as
- * demo. CA-29 requires that a comparison only happens between runs that can
- * actually be compared.
+ * CA-10 and CA-29 describe the dashboard: the history of a domain, comparing
+ * one scan with the previous one. ADR 0021 requires demo data to be visible as
+ * demo. The comparability rules require that a comparison only happens between
+ * runs that can actually be compared.
  *
  * ## Why the tests feed the pure function
  *
@@ -46,7 +46,7 @@ function snapshot(overrides: Partial<ScanSnapshotInput> = {}): ScanSnapshotInput
 }
 
 describe('Sprint 2 · HU-10', () => {
-  it('CA-09: each scan is a snapshot with per-severity counts and no composite score', () => {
+  it('CA-10: each scan is a snapshot with per-severity counts and no composite score', () => {
     const rows = buildHistoryRows([
       snapshot({ counts: counts({ critical: 1, high: 2, medium: 3, low: 4, info: 5 }) }),
     ]);
@@ -86,7 +86,7 @@ describe('Sprint 2 · HU-10', () => {
     expect(rows[0]!.delta).toBe(-4);
   });
 
-  it('CA-29: a partial run is kept but cannot be compared', () => {
+  it('CA-10: a partial run is kept but cannot be compared', () => {
     const rows = buildHistoryRows([
       snapshot({ scanId: 'partial', partial: true, counts: counts({ critical: 2 }) }),
       snapshot({ scanId: 'complete', counts: counts({ critical: 2 }) }),
@@ -98,7 +98,7 @@ describe('Sprint 2 · HU-10', () => {
     expect(rows[0]!.total).toBe(2);
   });
 
-  it('CA-29: a different scan mode withholds the delta and says why', () => {
+  it('CA-10: a different scan mode withholds the delta and says why', () => {
     const rows = buildHistoryRows([
       snapshot({ scanId: 'active', scanMode: 'active', counts: counts({ high: 1 }) }),
       snapshot({ scanId: 'passive', scanMode: 'passive', counts: counts({ high: 9 }) }),
@@ -108,7 +108,7 @@ describe('Sprint 2 · HU-10', () => {
     expect(rows[0]!.reason).toBe('mode_changed');
   });
 
-  it('CA-29: a different severity catalogue withholds the delta and says why', () => {
+  it('CA-10: a different severity catalogue withholds the delta and says why', () => {
     const rows = buildHistoryRows([
       snapshot({ scanId: 'v2', severityCatalogVersion: '2.0', counts: counts({ high: 1 }) }),
       snapshot({ scanId: 'v1', severityCatalogVersion: '1.0', counts: counts({ high: 9 }) }),
@@ -118,7 +118,7 @@ describe('Sprint 2 · HU-10', () => {
     expect(rows[0]!.reason).toBe('catalog_changed');
   });
 
-  it('CA-28: demo rows are labelled and never compared against real rows', () => {
+  it('ADR 0021: demo rows are labelled and never compared against real rows', () => {
     const rows = buildHistoryRows([
       snapshot({ scanId: 'real', isDemo: false, counts: counts({ high: 1 }) }),
       snapshot({ scanId: 'demo', isDemo: true, counts: counts({ high: 9 }) }),
@@ -134,14 +134,14 @@ describe('Sprint 2 · HU-10', () => {
     expect(demoOnly[0]!.delta).toBe(-3);
   });
 
-  it('CA-29: every non-completed status is excluded, not silently dropped', () => {
+  it('CA-10: every non-completed status is excluded, not silently dropped', () => {
     for (const status of ['queued', 'running', 'failed', 'cancelled'] as const) {
       expect(exclusionFor(snapshot({ status }))).toBe('not_completed');
     }
     expect(exclusionFor(snapshot())).toBeNull();
   });
 
-  it('CA-09: the totals count every severity and the risky figure only critical and high', () => {
+  it('CA-10: the totals count every severity and the risky figure only critical and high', () => {
     expect(countFindings(counts({ critical: 2, high: 3, medium: 1, low: 4, info: 5 }))).toEqual({
       total: 15,
       risky: 5,
