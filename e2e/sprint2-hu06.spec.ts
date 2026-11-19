@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
@@ -98,6 +100,11 @@ async function waitForEvent(
 }
 
 test.describe('Sprint 2 — HU-06', () => {
+  test.beforeAll(() => {
+    // One scan here, but the suite shares one account and one hourly budget.
+    execFileSync('node', ['apps/web/scripts/demo/clear-scan-limit.mjs'], { stdio: 'pipe' });
+  });
+
   test.afterAll(async ({ request }) => {
     // Leave the fixture as the other specs expect it.
     await setSlow(request, 0);

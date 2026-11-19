@@ -1,5 +1,6 @@
+import { execFileSync } from 'node:child_process';
+
 import { expect, test, type Page } from '@playwright/test';
-import { createClient } from 'redis';
 
 /**
  * Sprint 2 · HU-04 (SCRUM-23) — scanning the pages behind a login.
@@ -37,40 +38,6 @@ const FIXTURE_PASSWORD = 'Fixture-Pass-2026!';
 const SUCCESS_MARKER = 'Invoice 2026-001';
 
 const PRIVATE_PATH = '/private';
-
-/**
- * Clears the rate-limit windows before the suite runs.
- *
- * The product allows five scans per user per hour (`user:<id>:scan`), and this
- * file needs three. A second run inside the same hour would be refused by a
- * limit that has nothing to do with what is being tested, so the suite starts
- * from a clean window — exactly what `pnpm demo:reset` does. Deleting a counter
- * does not weaken the limit: the next request recreates it.
- */
-async function clearRateLimits(): Promise<void> {
-  const client = createClient({
-    url: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
-  });
-  client.on('error', () => undefined);
-
-  try {
-    await client.connect();
-    let cursor = '0';
-    do {
-      const page = await client.scan(cursor, { MATCH: 'rl:*', COUNT: 200 });
-      cursor = page.cursor;
-      if (page.keys.length > 0) await client.del(page.keys);
-    } while (cursor !== '0');
-  } finally {
-    // node-redis 6 `destroy()` is synchronous; awaiting it is harmless but the
-    // guard keeps a half-open client from throwing on teardown.
-    try {
-      if (client.isOpen) client.destroy();
-    } catch {
-      // Nothing to clean up.
-    }
-  }
-}
 
 async function signIn(page: Page): Promise<void> {
   await page.goto('/login');
@@ -194,7 +161,8 @@ async function scanFindings(
 
 test.describe('Sprint 2 — HU-04', () => {
   test.beforeAll(async () => {
-    await clearRateLimits();
+    // Three scans in one file against a five-per-hour budget. See the script.
+    execFileSync('node', ['apps/web/scripts/demo/clear-scan-limit.mjs'], { stdio: 'pipe' });
   });
 
   test('CA-25/26: an authenticated scan finds the private page an anonymous scan cannot see', async ({

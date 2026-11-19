@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
@@ -137,6 +139,11 @@ async function readBody(request: APIRequestContext, id: string): Promise<string>
 }
 
 test.describe('Sprint 2 — HU-07 alert', () => {
+  test.beforeAll(() => {
+    // Two scans here: the quiet baseline and the loud one that must alert.
+    execFileSync('node', ['apps/web/scripts/demo/clear-scan-limit.mjs'], { stdio: 'pipe' });
+  });
+
   test('CA-12: only a NEW critical alerts, and it arrives in under 60 s', async ({
     page,
     request,

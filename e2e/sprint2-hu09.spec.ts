@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -33,6 +35,11 @@ async function signIn(page: Page): Promise<void> {
 }
 
 test.describe('Sprint 2 — HU-09', () => {
+  test.beforeAll(() => {
+    // One scan here, but the budget is shared with every other Sprint 2 file.
+    execFileSync('node', ['apps/web/scripts/demo/clear-scan-limit.mjs'], { stdio: 'pipe' });
+  });
+
   test('CA-09: a completed scan exports an executive PDF the owner can download', async ({
     page,
   }) => {
