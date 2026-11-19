@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { createClient } from 'redis';
 
 /**
  * Sprint 2 · HU-07 (SCRUM-25) — the "new vulnerability" alert, measured.
@@ -55,6 +56,25 @@ async function signIn(page: Page): Promise<void> {
   await page.locator('input[name="password"]').fill(DEMO_PASSWORD);
   await page.locator('form button[type="submit"]').click();
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
+}
+
+async function clearRateLimits(): Promise<void> {
+  const client = createClient({
+    url: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
+  });
+  client.on('error', () => undefined);
+
+  try {
+    await client.connect();
+    let cursor = '0';
+    do {
+      const page = await client.scan(cursor, { MATCH: 'rl:*', COUNT: 200 });
+      cursor = page.cursor;
+      if (page.keys.length > 0) await client.del(page.keys);
+    } while (cursor !== '0');
+  } finally {
+    if (client.isOpen) client.destroy();
+  }
 }
 
 /** Switches the fixture's SQL injection endpoint on or off. */
@@ -137,6 +157,10 @@ async function readBody(request: APIRequestContext, id: string): Promise<string>
 }
 
 test.describe('Sprint 2 — HU-07 alert', () => {
+  test.beforeAll(async () => {
+    await clearRateLimits();
+  });
+
   test('CA-12: only a NEW critical alerts, and it arrives in under 60 s', async ({
     page,
     request,

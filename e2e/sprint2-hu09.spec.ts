@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createClient } from 'redis';
 
 /**
  * Sprint 2 · HU-09 (SCRUM-26) — the executive PDF, downloaded from the product.
@@ -32,7 +33,30 @@ async function signIn(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
 }
 
+async function clearRateLimits(): Promise<void> {
+  const client = createClient({
+    url: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
+  });
+  client.on('error', () => undefined);
+
+  try {
+    await client.connect();
+    let cursor = '0';
+    do {
+      const page = await client.scan(cursor, { MATCH: 'rl:*', COUNT: 200 });
+      cursor = page.cursor;
+      if (page.keys.length > 0) await client.del(page.keys);
+    } while (cursor !== '0');
+  } finally {
+    if (client.isOpen) client.destroy();
+  }
+}
+
 test.describe('Sprint 2 — HU-09', () => {
+  test.beforeAll(async () => {
+    await clearRateLimits();
+  });
+
   test('CA-09: a completed scan exports an executive PDF the owner can download', async ({
     page,
   }) => {

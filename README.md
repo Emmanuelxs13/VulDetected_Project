@@ -6,11 +6,12 @@ acciones de remediación. El repositorio contiene la aplicación Next.js, el
 modelo Drizzle/PostgreSQL, los componentes de interfaz y el worker Python que
 ejecuta los análisis.
 
-Este README tiene dos objetivos:
+Este README tiene tres objetivos:
 
 1. explicar cómo levantar el proyecto desde una instalación limpia;
-2. explicar, con evidencia concreta, de qué manera se cumple el Sprint 1 y cómo
-   se valida el flujo completo de escaneo usado en la demo local.
+2. explicar, con evidencia concreta, de qué manera se cumplen los Sprints 1 y 2;
+3. proporcionar un recorrido reproducible para demostrar autenticación social,
+   suscripciones simuladas, cancelación, programación, alertas, PDF e historial.
 
 > **Estado actual:** el Sprint 1 está completado para demo local y el flujo
 > ampliado de autenticación, verificación de propiedad, escaneo, progreso,
@@ -21,6 +22,53 @@ Este README tiene dos objetivos:
 > [PRUEBA_SPRINT_1.md](PRUEBA_SPRINT_1.md),
 > [PRUEBA_SPRINT_2.md](PRUEBA_SPRINT_2.md) y
 > [runtime-validation-report.md](runtime-validation-report.md).
+
+## Demo rápida del Sprint 2
+
+Ejecuta estos pasos desde una raíz limpia y con `DEMO_MODE=true`:
+
+```powershell
+pnpm install
+Copy-Item .env.example apps/web/.env.local
+pnpm dev:all
+pnpm demo:reset
+pnpm demo:seed-history
+pnpm demo:reset-billing
+pnpm demo:reset-social
+```
+
+1. Abre <http://localhost:3000/login>.
+2. Inicia sesión con `demo.pro@vuldetected.local` y
+   `VulDetected-Demo-2026!`.
+3. Desde el panel confirma el estado de riesgo del dominio.
+4. Abre `/scanner`, inicia un escaneo lento y pulsa **Cancelar escaneo**.
+   Comprueba que conserva hallazgos parciales y que aparece el correo en
+   <http://localhost:8025>.
+5. Abre `/schedules`, crea una programación semanal y ejecuta
+   `pnpm demo:run-schedule-now` para no esperar a la ventana natural.
+6. Activa SQL injection en el fixture, ejecuta el escaneo programado y confirma
+   que llega una alerta solo si aparece un hallazgo crítico nuevo.
+7. Abre `/reports`, descarga el PDF ejecutivo y abre `/reports/domains/[domainId]`
+   para revisar las instantáneas marcadas como demo de los últimos seis meses.
+8. Abre `/login`, pulsa **Continuar con Google** y usa el proveedor simulado.
+9. Abre `/settings/billing`, cambia a Pro y completa el checkout simulado.
+10. Configura el login del fixture con `demo@miapp.local` /
+    `Fixture-Pass-2026!` y lanza un escaneo autenticado de
+    `http://127-0-0-1.nip.io:8099/private`.
+
+Las piezas que usan proveedores simulados deben presentarse como tales:
+OAuth local, pagos simulados y datos históricos `is_demo`. Google, GitHub y
+Stripe reales no tienen credenciales ni integración de producción en esta demo.
+
+| Área del Sprint 2 | Evidencia reproducible |
+| --- | --- |
+| Cancelación y correo | Playwright HU-06 conserva hallazgos parciales y verifica el correo. |
+| Programación y alertas | Playwright HU-07 ejecuta una programación y mide la alerta crítica nueva. |
+| PDF ejecutivo | Playwright HU-09 descarga un PDF válido y sus pruebas unitarias validan el contenido. |
+| Historial comparativo | Instantáneas demo, delta por severidad y ninguna nota compuesta inventada. |
+| Login social | OAuth local con Google/GitHub simulado, PKCE, callbacks y vínculo transaccional. |
+| Suscripciones | Checkout, webhook firmado, deduplicación y cancelación al final del período en modo simulado. |
+| Escaneo autenticado | Credenciales cifradas y fixture `/private`; la intranet real queda fuera del alcance. |
 
 ## 1. Qué incluye el Sprint 1
 
@@ -209,6 +257,7 @@ pnpm typecheck
 pnpm test
 pnpm test:e2e
 pytest -q services/scanner/tests
+pnpm test:browser
 node scripts/check-sprints.js
 ```
 
@@ -220,8 +269,9 @@ Resultados esperados de la validación registrada:
 | Typecheck | PASS en los paquetes del workspace. |
 | Unit tests | PASS en la suite Vitest. |
 | E2E | 12/12 pruebas; usa PGlite para no depender de servicios externos. |
-| Scanner | 85 pruebas Python aprobadas. |
+| Scanner | 95 pruebas Python aprobadas. |
 | Sprint checker | Sprint 1, 2, 3 y 4 aparecen como `Completado`. |
+| Navegador Sprint 2 | 24 pruebas Playwright; deben pasar el recorrido de ocho pasos y las historias específicas. |
 
 También puedes ejecutar las comprobaciones de construcción:
 
