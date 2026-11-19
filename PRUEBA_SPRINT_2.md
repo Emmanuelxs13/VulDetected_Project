@@ -832,6 +832,19 @@ Sprint 1 que se conserva como regresión. El reparto por historia:
 | `e2e/sprint2-hu10.spec.ts` | 1 | Historial comparativo |
 | `e2e/sprint2-demo.spec.ts` | 1 | Los ocho pasos del recorrido completo |
 
+**Un detalle que cuesta dos pruebas rojas si se ignora:** la suite entera entra
+con la misma cuenta de demostración, y el producto limita a **cinco escaneos por
+usuario por hora** (`user:<id>:scan`). Los archivos del Sprint 2 envían siete
+escaneos entre todos: cinco caben y el sexto recibe un 429 con el mensaje
+«Alcanzaste el límite de escaneos por hora». El producto tiene razón; el que
+estaba mal era el conjunto de pruebas, que asumía un presupuesto infinito.
+
+Cada archivo que escanea llama a `apps/web/scripts/demo/clear-scan-limit.mjs`
+antes de empezar, que borra **solo** `rl:user:*:scan:*`. No toca el limitador de
+autenticación, porque HU-02a necesita verlo funcionar, y no cambia el límite: el
+siguiente escaneo recrea la ventana. Es la misma distinción que ya hace
+`pnpm demo:reset`, con un alcance más pequeño.
+
 **Qué significa:** cada criterio tiene al menos una prueba que lo nombra por su
 identificador en el nombre del test, de modo que `npx playwright test -g CA-26`
 selecciona la prueba de ese criterio y no otra.
