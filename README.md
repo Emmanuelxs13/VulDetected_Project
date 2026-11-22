@@ -444,6 +444,8 @@ archivar capturas o video— están descritas en
 
 ## 11. Preparación para Vercel
 
+El runbook principal para publicación en Vercel y migración desde PostgreSQL/pgAdmin 4 hacia Supabase está en [DESPLIEGUE.md](DESPLIEGUE.md). Incluye creación de base remota, migraciones Drizzle, respaldo local, restauración, variables secretas, worker externo y comprobaciones post-despliegue.
+
 El proyecto incluye `vercel.json` y el runbook
 [docs/vercel-deployment.md](docs/vercel-deployment.md). Vercel puede alojar la
 capa web y sus API, pero el worker Celery y el scheduler deben desplegarse en
