@@ -442,7 +442,42 @@ registro desde estado limpio varias veces, probar IDOR con dos cuentas y
 archivar capturas o video— están descritas en
 [PRUEBA_SPRINT_1.md](PRUEBA_SPRINT_1.md).
 
-## 11. Referencias
+## 11. Preparación para Vercel
+
+El proyecto incluye `vercel.json` y el runbook
+[docs/vercel-deployment.md](docs/vercel-deployment.md). Vercel puede alojar la
+capa web y sus API, pero el worker Celery y el scheduler deben desplegarse en
+otro servicio persistente. Redis también debe ser externo para que la cola,
+los límites y las cancelaciones sobrevivan a réplicas y reinicios.
+
+Antes de desplegar:
+
+```powershell
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pytest -q services/scanner/tests
+pnpm build
+```
+
+Después de configurar PostgreSQL y las variables de Vercel:
+
+```powershell
+pnpm deploy:preview
+```
+
+Para producción, después de validar la Preview:
+
+```powershell
+pnpm deploy:prod
+```
+
+No actives `DEMO_MODE`, objetivos privados, proveedor OAuth simulado ni el
+webhook de pagos simulado en producción. Sin worker externo y Redis externo,
+el despliegue Vercel demuestra la capa web, pero no el escaneo real completo.
+
+## 12. Referencias
 
 | Documento | Propósito |
 | --- | --- |

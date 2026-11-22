@@ -1,0 +1,11 @@
+test-results/
+playwright-report/
+docs/capturas/
+docs/demo/
+backups/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+infra/
+services/scanner/
