@@ -92,18 +92,78 @@ export const landingContent = {
     ],
   },
   features: {
-    title: 'Todo lo que necesitas para asegurar tu sitio.',
+    title: 'Seguridad web, sin puntos ciegos.',
+    intro:
+      'Pasa de una URL a una visión clara de tus riesgos. Analiza, prioriza y sigue cada hallazgo desde un solo lugar.',
     items: [
-      { title: 'Escáner de URL bajo demanda', description: 'Analiza tu sitio web al instante', flag: null },
-      { title: 'Validación de propiedad del dominio', description: 'Verificación segura por DNS o archivo', flag: null },
-      { title: 'Progreso en tiempo real', description: 'Monitorea el escaneo paso a paso', flag: null },
-      { title: 'Semáforo de riesgo y desglose por criticidad', description: 'Visualización clara por severidad', flag: null },
-      { title: 'Reporte ejecutivo en PDF', description: 'Listo para compartir con dirección', flag: 'technicalPdf' },
-      { title: 'Historial comparativo', description: 'Compara escaneos anteriores', flag: null },
-      { title: 'Guías de remediación con código', description: 'Soluciones listas para implementar', flag: null },
-      { title: 'Exportación a JSON y CSV', description: 'Integra con tus herramientas', flag: null },
-      { title: 'Escaneos programados y alertas por correo', description: 'Monitoreo continuo', flag: null },
-      { title: 'Gestión de estados: Falso positivo / Resuelto', description: 'Seguimiento de hallazgos', flag: null },
+      {
+        title: 'Escaneo web bajo demanda',
+        description:
+          'Inicia una revisión desde la URL de tu sitio y consulta los resultados en un mismo panel.',
+        icon: 'scan',
+        flag: null,
+      },
+      {
+        title: 'Verificación de dominio',
+        description:
+          'Confirma que tienes autorización para analizar el sitio mediante una prueba de propiedad.',
+        icon: 'domain',
+        flag: null,
+      },
+      {
+        title: 'Progreso en tiempo real',
+        description: 'Sigue el avance del análisis y conoce qué etapa se está ejecutando.',
+        icon: 'progress',
+        flag: null,
+      },
+      {
+        title: 'Riesgos priorizados',
+        description:
+          'Entiende la severidad de cada hallazgo con un resumen visual y fácil de interpretar.',
+        icon: 'findings',
+        flag: null,
+      },
+      {
+        title: 'Reportes listos para compartir',
+        description: 'Consulta y comparte un resumen ejecutivo de los resultados en PDF.',
+        icon: 'report',
+        flag: 'technicalPdf',
+      },
+      {
+        title: 'Historial de escaneos',
+        description:
+          'Vuelve a tus análisis anteriores y compara cómo evoluciona la seguridad de tus sitios.',
+        icon: 'history',
+        flag: null,
+      },
+      {
+        title: 'Guías para corregir hallazgos',
+        description:
+          'Revisa explicaciones claras y recomendaciones prácticas para abordar cada riesgo.',
+        icon: 'guides',
+        flag: null,
+      },
+      {
+        title: 'Exportación de resultados',
+        description:
+          'Descarga los hallazgos en formatos JSON o CSV para compartirlos con tu equipo.',
+        icon: 'export',
+        flag: null,
+      },
+      {
+        title: 'Escaneos programados y alertas',
+        description:
+          'Organiza revisiones recurrentes y recibe avisos por correo sobre hallazgos críticos.',
+        icon: 'schedule',
+        flag: null,
+      },
+      {
+        title: 'Seguimiento de hallazgos',
+        description:
+          'Marca los resultados como resueltos o falsos positivos para dar seguimiento al trabajo.',
+        icon: 'status',
+        flag: null,
+      },
     ],
   },
   owasp: {
@@ -119,11 +179,49 @@ export const landingContent = {
     ],
   },
   pricing: {
-    title: 'Empieza gratis. Crece cuando lo necesites.',
+    title: 'Empieza gratis. Amplía tu capacidad cuando lo necesites.',
+    intro:
+      'Todos los planes incluyen las mismas comprobaciones, reportes y guías de remediación. Elige el nivel de uso que se ajuste a tus sitios.',
     plans: [
-      { name: 'Gratis', price: '[PLACEHOLDER]', features: ['[PLACEHOLDER]', '[PLACEHOLDER]'], cta: 'Empezar gratis' },
-      { name: 'Pro', price: '[PLACEHOLDER]', features: ['[PLACEHOLDER]', '[PLACEHOLDER]'], cta: 'Próximamente' },
-      { name: 'Equipo', price: '[PLACEHOLDER]', features: ['[PLACEHOLDER]', '[PLACEHOLDER]'], cta: 'Próximamente' },
+      {
+        name: 'Gratis',
+        price: 'Sin costo',
+        description: 'Para empezar a conocer la seguridad de tus sitios.',
+        features: [
+          'Hasta 3 dominios verificados',
+          '60 escaneos al mes',
+          'Hasta 2 escaneos simultáneos',
+          '1 escaneo programado',
+          'Reportes, alertas y guías de remediación',
+        ],
+        cta: 'Empezar gratis',
+      },
+      {
+        name: 'Pro',
+        price: 'Próximamente',
+        description: 'Más capacidad para desarrolladores y proyectos en crecimiento.',
+        features: [
+          'Hasta 20 dominios verificados',
+          '400 escaneos al mes',
+          'Hasta 5 escaneos simultáneos',
+          'Hasta 10 escaneos programados',
+          'Reportes, alertas y guías de remediación',
+        ],
+        cta: 'Próximamente',
+      },
+      {
+        name: 'Equipo',
+        price: 'Próximamente',
+        description: 'Para equipos que protegen varias aplicaciones.',
+        features: [
+          'Hasta 100 dominios verificados',
+          'Escaneos mensuales sin límite',
+          'Hasta 15 escaneos simultáneos',
+          'Hasta 50 escaneos programados',
+          'Reportes, alertas y guías de remediación',
+        ],
+        cta: 'Próximamente',
+      },
     ],
   },
   faq: {
