@@ -5,8 +5,8 @@
   "type": "module",
   "description": "VulDetected web application — the entire product backend (Next.js App Router).",
   "scripts": {
-    "dev": "next dev",
-    "dev:turbo": "next dev --turbopack",
+    "dev": "next dev --port 3000",
+    "dev:turbo": "next dev --turbopack --port 3000",
     "build": "next build",
     "build:analyze": "cross-env ANALYZE=true next build --config next.config.analyze.ts",
     "start": "next start",

@@ -37,6 +37,13 @@ pnpm demo:reset-billing
 pnpm demo:reset-social
 ```
 
+The development server is pinned to port `3000`: Next.js otherwise silently
+chooses the next free port, while multiple instances of this app share
+`apps/web/.next` and can overwrite one another's route manifests and compiled
+pages. Run only one development server at a time. If startup reports that port
+`3000` is occupied, stop the existing server before starting `pnpm dev` or
+`pnpm dev:all` again.
+
 1. Abre <http://localhost:3000/login>.
 2. Inicia sesión con `demo.pro@vuldetected.local` y
    `VulDetected-Demo-2026!`.
